@@ -1,0 +1,14 @@
+"use client";
+
+import { Sidebar } from "@/components/layout/Sidebar";
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex h-screen overflow-hidden bg-white">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
+        {children}
+      </div>
+    </div>
+  );
+}
