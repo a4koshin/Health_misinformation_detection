@@ -1,9 +1,17 @@
+"use client";
+
+import { ChevronDown } from "lucide-react";
+
 export function ChatHeader() {
   return (
-    <header className="flex h-14 shrink-0 items-center justify-center border-b border-[#e5e5e5] bg-white px-4">
-      <h2 className="text-sm font-medium text-[#0d0d0d]">
-        Health Misinformation Detection
-      </h2>
+    <header className="flex h-[52px] shrink-0 items-center border-b border-gray-100 px-4">
+      <button
+        type="button"
+        className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-base font-medium text-gray-800 transition-colors hover:bg-gray-100"
+      >
+        Health AI
+        <ChevronDown className="size-4 text-gray-500" />
+      </button>
     </header>
   );
 }
