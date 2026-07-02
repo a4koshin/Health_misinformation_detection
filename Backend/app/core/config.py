@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     frontend_origin: str = "http://localhost:3000"
+    email_user: str | None = None
+    email_pass: str | None = None
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
 
 
 settings = Settings()
