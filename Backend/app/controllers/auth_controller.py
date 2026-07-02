@@ -6,7 +6,14 @@ from app.controllers.deps import get_current_user
 from app.core.database import get_db
 from app.core.security import create_access_token
 from app.models.user import User
-from app.schemas.auth import Token, UserRegister, UserResponse
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    MessageResponse,
+    ResetPasswordRequest,
+    Token,
+    UserRegister,
+    UserResponse,
+)
 from app.services import auth_service
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -46,3 +53,28 @@ def login(
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+def forgot_password(
+    data: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    auth_service.request_password_reset(db, data.email)
+    return MessageResponse(message=auth_service.FORGOT_PASSWORD_MESSAGE)
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(
+    data: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    try:
+        auth_service.reset_password(db, data.token, data.password)
+    except auth_service.InvalidResetTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset link.",
+        )
+
+    return MessageResponse(message="Your password has been reset. You can sign in now.")
