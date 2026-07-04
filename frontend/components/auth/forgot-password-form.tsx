@@ -56,6 +56,7 @@ export function ForgotPasswordForm() {
       <AuthLayout
         title="Check your email"
         description="If an account exists for that address, we sent password reset instructions to your inbox."
+        backHref="/login"
         footer={
           <AuthFooterLink text="Remember your password?" linkText="Sign in" href="/login" />
         }
@@ -77,6 +78,7 @@ export function ForgotPasswordForm() {
     <AuthLayout
       title="Forgot your password?"
       description="Enter your email and we will send you instructions to reset your password."
+      backHref="/login"
       footer={
         <AuthFooterLink text="Remember your password?" linkText="Sign in" href="/login" />
       }
