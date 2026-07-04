@@ -7,7 +7,7 @@ from app.controllers.auth_controller import router as auth_router
 from app.controllers.history_controller import router as history_router
 from app.core.config import settings
 from app.core.database import Base, engine
-from app.models import Detection, User  # noqa: F401
+from app.models import ChatMessage, Detection, User  # noqa: F401
 
 
 @asynccontextmanager
