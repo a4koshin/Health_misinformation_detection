@@ -33,7 +33,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <AuthInitializer>{children}</AuthInitializer>
-      <Toaster richColors closeButton position="top-center" />
+      <Toaster position="top-center" />
     </ThemeProvider>
   );
 }
