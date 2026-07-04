@@ -53,7 +53,7 @@ export function LoginForm() {
   return (
     <AuthLayout
       title="Sign in to your account"
-      description="Enter your credentials below to access your dashboard."
+      description="Enter your credentials below to start checking health claims."
       footer={
         <AuthFooterLink
           text="Don't have an account?"
