@@ -1,6 +1,6 @@
 import type { RegisterPayload, TokenResponse, User } from "@/types/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
 
 export class ApiError extends Error {
   status: number;
@@ -46,7 +46,7 @@ async function request<T>(
     if (isNetworkError(error)) {
       throw new ApiError(
         0,
-        "Cannot reach the server. Start the backend with: uvicorn app.main:app --port 4000",
+        `Cannot reach the server. Start the backend on ${API_BASE}.`,
       );
     }
     throw error;
@@ -104,7 +104,7 @@ export async function loginRequest(
     if (isNetworkError(error)) {
       throw new ApiError(
         0,
-        "Cannot reach the server. Start the backend with: uvicorn app.main:app --port 4000",
+        `Cannot reach the server. Start the backend on ${API_BASE}.`,
       );
     }
     throw error;
