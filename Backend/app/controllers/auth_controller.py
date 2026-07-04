@@ -60,7 +60,14 @@ def forgot_password(
     data: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ) -> MessageResponse:
-    auth_service.request_password_reset(db, data.email)
+    try:
+        auth_service.request_password_reset(db, data.email)
+    except auth_service.PasswordResetEmailError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=exc.message,
+        ) from exc
+
     return MessageResponse(message=auth_service.FORGOT_PASSWORD_MESSAGE)
 
 
