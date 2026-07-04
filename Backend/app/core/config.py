@@ -1,9 +1,16 @@
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
+
+def _clean_env_string(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return value.strip().strip('"').strip("'")
 
 
 class Settings(BaseSettings):
@@ -24,6 +31,19 @@ class Settings(BaseSettings):
     email_pass: str | None = None
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
+
+    @field_validator("email_user", mode="before")
+    @classmethod
+    def normalize_email_user(cls, value: str | None) -> str | None:
+        return _clean_env_string(value)
+
+    @field_validator("email_pass", mode="before")
+    @classmethod
+    def normalize_email_pass(cls, value: str | None) -> str | None:
+        cleaned = _clean_env_string(value)
+        if cleaned is None:
+            return None
+        return cleaned.replace(" ", "")
 
 
 settings = Settings()
