@@ -16,6 +16,13 @@ export type RegisterPayload = {
   full_name?: string;
 };
 
+export type StoredChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+};
+
 export type Detection = {
   id: string;
   user_id: string;
@@ -24,4 +31,9 @@ export type Detection = {
   confidence: number | null;
   somali_status: string;
   created_at: string;
+  message_count?: number;
+};
+
+export type Conversation = Detection & {
+  messages: StoredChatMessage[];
 };
