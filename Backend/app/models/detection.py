@@ -28,3 +28,9 @@ class Detection(Base):
     )
 
     user = relationship("User", back_populates="detections")
+    messages = relationship(
+        "ChatMessage",
+        back_populates="detection",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.created_at",
+    )
