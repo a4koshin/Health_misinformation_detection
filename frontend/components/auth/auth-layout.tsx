@@ -1,19 +1,32 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 export function AuthLayout({
   title,
   description,
   children,
   footer,
+  backHref,
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  backHref?: string;
 }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#ffffff] px-4 py-12">
       <div className="w-full max-w-[420px]">
+        {backHref ? (
+          <Link
+            href={backHref}
+            className="mb-6 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            aria-label="Back to sign in"
+          >
+            <ArrowLeft className="size-5" />
+          </Link>
+        ) : null}
+
         <header className="mb-8 space-y-2">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
             {title}
