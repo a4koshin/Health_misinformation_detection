@@ -13,7 +13,12 @@ class EmailNotConfiguredError(Exception):
 
 
 class EmailDeliveryError(Exception):
-    pass
+    def __init__(
+        self,
+        message: str = "Unable to send reset email. Check SMTP settings in Backend/.env.",
+    ) -> None:
+        super().__init__(message)
+        self.message = message
 
 
 def _is_email_configured() -> bool:
@@ -46,9 +51,16 @@ def send_password_reset_email(to_email: str, reset_url: str) -> None:
 
     try:
         with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as server:
+            server.ehlo()
             server.starttls()
+            server.ehlo()
             server.login(settings.email_user, settings.email_pass)
             server.sendmail(settings.email_user, [to_email], message.as_string())
-    except smtplib.SMTPException as exc:
-        logger.exception("SMTP error while sending password reset email to %s", to_email)
-        raise EmailDeliveryError() from exc
+    except smtplib.SMTPAuthenticationError:
+        logger.exception("SMTP authentication failed for configured sender account")
+        raise EmailDeliveryError(
+            "Unable to send reset email. Use a Gmail app password in EMAIL_PASS, not your normal Gmail password."
+        ) from None
+    except smtplib.SMTPException:
+        logger.exception("SMTP error while sending password reset email")
+        raise EmailDeliveryError() from None
