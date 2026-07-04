@@ -28,6 +28,11 @@ class InvalidResetTokenError(Exception):
     pass
 
 
+class PasswordResetEmailError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
 FORGOT_PASSWORD_MESSAGE = (
     "If an account exists for that email, password reset instructions have been sent."
 )
@@ -79,8 +84,12 @@ def request_password_reset(db: Session, email: str) -> None:
             email,
             token,
         )
-    except email_service.EmailDeliveryError:
+        raise PasswordResetEmailError(
+            "Email is not configured on the server. Add EMAIL_USER and EMAIL_PASS to Backend/.env."
+        ) from None
+    except email_service.EmailDeliveryError as exc:
         logger.exception("Failed to send password reset email to %s", email)
+        raise PasswordResetEmailError(exc.message) from None
 
 
 def reset_password(db: Session, token: str, password: str) -> User:
