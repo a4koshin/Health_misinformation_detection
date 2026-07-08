@@ -166,6 +166,50 @@ def append_message(
     return get_conversation(db, user_id, detection.id)
 
 
+def edit_message(
+    db: Session,
+    user_id: uuid.UUID,
+    detection_id: uuid.UUID,
+    message_id: uuid.UUID,
+    content: str,
+) -> Detection | None:
+    detection = get_conversation(db, user_id, detection_id)
+    if detection is None:
+        return None
+
+    messages = sorted(detection.messages, key=lambda message: message.created_at)
+    target = next((message for message in messages if message.id == message_id), None)
+    if target is None or target.role != "user":
+        return None
+
+    trimmed = content.strip()
+    if not trimmed:
+        return None
+
+    target_index = messages.index(target)
+    for message in messages[target_index + 1 :]:
+        db.delete(message)
+
+    target.content = trimmed
+
+    first_user_message = next(
+        (message for message in messages if message.role == "user"),
+        None,
+    )
+    if first_user_message and first_user_message.id == target.id:
+        detection.input_text = trimmed
+
+    assistant_message = ChatMessage(
+        detection_id=detection.id,
+        role="assistant",
+        content=build_assistant_reply(trimmed),
+    )
+    db.add(assistant_message)
+    db.commit()
+
+    return get_conversation(db, user_id, detection.id)
+
+
 def delete_conversation(
     db: Session,
     user_id: uuid.UUID,
