@@ -6,6 +6,7 @@ import { mapStoredMessages, type ChatMessage } from "@/lib/chat";
 import {
   appendConversationMessage,
   createConversation,
+  editConversationMessage,
 } from "@/lib/history";
 import type { Conversation } from "@/types/api";
 
@@ -23,6 +24,11 @@ type ChatState = {
   setConversation: (conversation: Conversation | null) => void;
   removeChat: (id: string) => void;
   sendMessage: (content: string, token: string) => Promise<void>;
+  editMessage: (
+    messageId: string,
+    content: string,
+    token: string,
+  ) => Promise<void>;
 };
 
 function applyConversation(conversation: Conversation) {
@@ -101,6 +107,37 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch {
       set({ isSaving: false });
       throw new Error("Unable to save chat to history.");
+    }
+  },
+
+  editMessage: async (messageId, content, token) => {
+    const trimmed = content.trim();
+    const { activeChatId } = get();
+    if (!trimmed) {
+      throw new Error("Message cannot be empty.");
+    }
+    if (!activeChatId) {
+      throw new Error("No active chat to update.");
+    }
+
+    set({ isSaving: true });
+
+    try {
+      const conversation = await editConversationMessage(
+        token,
+        activeChatId,
+        messageId,
+        trimmed,
+      );
+
+      set({
+        ...applyConversation(conversation),
+        historyRevision: get().historyRevision + 1,
+        isSaving: false,
+      });
+    } catch (error) {
+      set({ isSaving: false });
+      throw error;
     }
   },
 }));
