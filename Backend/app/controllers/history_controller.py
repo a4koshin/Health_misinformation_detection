@@ -11,6 +11,7 @@ from app.schemas.detection import (
     DetectionCreate,
     DetectionSummary,
     MessageCreate,
+    MessageUpdate,
 )
 from app.services import history_service
 
@@ -61,6 +62,29 @@ def append_history_message(
     )
     if conversation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+    return conversation
+
+
+@router.patch("/{detection_id}/messages/{message_id}", response_model=ConversationResponse)
+def edit_history_message(
+    detection_id: uuid.UUID,
+    message_id: uuid.UUID,
+    data: MessageUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ConversationResponse:
+    conversation = history_service.edit_message(
+        db,
+        current_user.id,
+        detection_id,
+        message_id,
+        data.content,
+    )
+    if conversation is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chat or message not found",
+        )
     return conversation
 
 
