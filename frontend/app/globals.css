@@ -123,10 +123,10 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-[#ffffff] text-foreground;
+    @apply bg-[#FDFCFC] text-foreground;
   }
   html {
-    @apply bg-[#ffffff] font-sans;
+    @apply bg-[#FDFCFC] font-sans;
   }
 
   [data-sonner-toaster] {
@@ -136,5 +136,21 @@
   [data-sonner-toast] {
     background: #000000 !important;
     color: #ffffff !important;
+  }
+
+  .material-symbols-rounded {
+    font-family: "Material Symbols Rounded";
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    font-feature-settings: "liga";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
   }
 }
