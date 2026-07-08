@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
@@ -13,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError, forgotPasswordRequest } from "@/lib/api";
 
 const inputClassName =
@@ -105,7 +105,7 @@ export function ForgotPasswordForm() {
           className="h-11 w-full gap-2 bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
         >
           {isSubmitting ? "Sending..." : "Send reset link"}
-          {!isSubmitting ? <ArrowRight className="size-4" /> : null}
+          {!isSubmitting ? <MaterialIcon name="arrow_forward" size={20} /> : null}
         </Button>
       </form>
     </AuthLayout>
