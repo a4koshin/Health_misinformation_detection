@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
 
 import { ChatHistoryItem } from "@/components/chat/chat-history-item";
 import { Input } from "@/components/ui/input";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import type { Detection } from "@/types/api";
 
 type SearchChatsDialogProps = {
@@ -75,13 +75,17 @@ export function SearchChatsDialog({
 
       <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12)] ring-1 ring-[#e3e3e3]">
         <div className="relative border-b border-[#e3e3e3] px-4 py-3">
-          <Search className="pointer-events-none absolute top-1/2 left-7 size-4 -translate-y-1/2 text-[#444746]" />
+          <MaterialIcon
+            name="search"
+            size={22}
+            className="pointer-events-none absolute top-1/2 left-6 -translate-y-1/2 text-[#444746]"
+          />
           <Input
             autoFocus
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search chats..."
-            className="h-11 rounded-xl border-0 bg-[#f0f4f9] pl-10 pr-10 shadow-none focus-visible:ring-0"
+            className="h-11 rounded-xl border-0 bg-[#FFFFFF] pl-10 pr-10 shadow-none focus-visible:ring-0"
           />
           <button
             type="button"
@@ -89,7 +93,7 @@ export function SearchChatsDialog({
             className="absolute top-1/2 right-7 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-[#444746] transition-colors hover:bg-[#e9eef6]"
             aria-label="Close search"
           >
-            <X className="size-4" />
+            <MaterialIcon name="close" size={20} />
           </button>
         </div>
 
