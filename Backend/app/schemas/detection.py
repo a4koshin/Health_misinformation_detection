@@ -12,6 +12,10 @@ class MessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=10000)
 
 
+class MessageUpdate(BaseModel):
+    content: str = Field(min_length=1, max_length=10000)
+
+
 class DetectionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
