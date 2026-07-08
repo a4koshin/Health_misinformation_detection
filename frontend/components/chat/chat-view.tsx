@@ -1,20 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import {
-  ArrowUp,
-  Copy,
-  MoreHorizontal,
-  Share2,
-  ThumbsDown,
-  ThumbsUp,
-} from "lucide-react";
 import { toast } from "sonner";
 
-import {
-  formatMessageTime,
-  type ChatMessage,
-} from "@/lib/chat";
+import { MaterialIcon } from "@/components/ui/material-icon";
+import { type ChatMessage } from "@/lib/chat";
 import { getConversation } from "@/lib/history";
 import { ApiError } from "@/lib/api";
 import { getRandomGreeting } from "@/lib/greetings";
@@ -29,12 +19,23 @@ export function ChatView() {
   const messages = useChatStore((state) => state.messages);
   const isSaving = useChatStore((state) => state.isSaving);
   const sendMessage = useChatStore((state) => state.sendMessage);
+  const editMessage = useChatStore((state) => state.editMessage);
   const setConversation = useChatStore((state) => state.setConversation);
   const greetingNonce = useChatStore((state) => state.greetingNonce);
   const [draft, setDraft] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [greeting, setGreeting] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [draft]);
 
   useEffect(() => {
     let active = true;
@@ -83,6 +84,10 @@ export function ChatView() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    setEditingMessageId(null);
+  }, [activeChatId]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft.trim() || !token || isSaving) return;
@@ -112,7 +117,7 @@ export function ChatView() {
   }, [showWelcome, firstName, greetingNonce]);
 
   return (
-    <main className="relative flex flex-1 flex-col overflow-hidden bg-white">
+    <main className="relative flex flex-1 flex-col overflow-hidden bg-[#FDFCFC]">
       <div className="flex min-h-0 flex-1 flex-col">
         {showWelcome ? (
           <div className="flex flex-1 flex-col items-center justify-center px-6 pb-32">
@@ -124,12 +129,22 @@ export function ChatView() {
 
         {showConversation ? (
           <div className="flex-1 overflow-y-auto px-4 py-8 md:px-8">
-            <div className="mx-auto flex w-full max-w-[760px] flex-col gap-8">
+            <div className="mx-auto flex w-full max-w-[760px] flex-col gap-10">
               {isLoadingConversation && messages.length === 0 ? (
                 <p className="text-sm text-[#444746]">Loading chat...</p>
               ) : null}
               {messages.map((message) => (
-                <MessageBlock key={message.id} message={message} />
+                <MessageBlock
+                  key={message.id}
+                  message={message}
+                  isEditing={editingMessageId === message.id}
+                  isSaving={isSaving}
+                  token={token}
+                  onStartEdit={() => setEditingMessageId(message.id)}
+                  onCancelEdit={() => setEditingMessageId(null)}
+                  onEditComplete={() => setEditingMessageId(null)}
+                  onEditMessage={editMessage}
+                />
               ))}
               <div ref={bottomRef} />
             </div>
@@ -141,14 +156,15 @@ export function ChatView() {
             onSubmit={handleSubmit}
             className="mx-auto w-full max-w-[760px]"
           >
-            <div className="flex items-center gap-2 rounded-[28px] bg-[#f0f4f9] px-4 py-2 shadow-sm ring-1 ring-[#e3e3e3]/60">
+            <div className="flex items-end gap-2 rounded-[28px] bg-[#FFFFFF] px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.06)]">
               <textarea
+                ref={textareaRef}
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="Ask HealthAI"
                 rows={1}
                 disabled={isSaving}
-                className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent py-0.5 text-base leading-6 text-[#1f1f1f] outline-none placeholder:text-[#444746] disabled:opacity-60"
+                className="max-h-52 min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent py-1 text-base leading-6 text-[#1f1f1f] outline-none placeholder:text-[#444746] disabled:opacity-60"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -161,10 +177,10 @@ export function ChatView() {
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#1f1f1f] text-white transition-colors hover:bg-[#333] disabled:opacity-60"
+                  className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#1f1f1f] text-white transition-colors hover:bg-[#333] disabled:opacity-60"
                   aria-label="Send message"
                 >
-                  <ArrowUp className="size-4" strokeWidth={2} />
+                  <MaterialIcon name="arrow_upward" size={20} />
                 </button>
               ) : null}
             </div>
@@ -179,15 +195,51 @@ export function ChatView() {
   );
 }
 
-function MessageBlock({ message }: { message: ChatMessage }) {
+function MessageBlock({
+  message,
+  isEditing,
+  isSaving,
+  token,
+  onStartEdit,
+  onCancelEdit,
+  onEditComplete,
+  onEditMessage,
+}: {
+  message: ChatMessage;
+  isEditing: boolean;
+  isSaving: boolean;
+  token: string | null;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onEditComplete: () => void;
+  onEditMessage: (messageId: string, content: string, token: string) => Promise<void>;
+}) {
   const isUser = message.role === "user";
 
   if (isUser) {
+    if (isEditing) {
+      return (
+        <UserMessageEditor
+          message={message}
+          isSaving={isSaving}
+          token={token}
+          onCancel={onCancelEdit}
+          onComplete={onEditComplete}
+          onEditMessage={onEditMessage}
+        />
+      );
+    }
+
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-[24px] bg-[#f0f4f9] px-5 py-3 text-[15px] leading-relaxed text-[#1f1f1f]">
+      <div className="flex flex-col items-end gap-1">
+        <div className="max-w-[85%] rounded-[20px] bg-[#f0f4f9] px-4 py-3 text-[15px] leading-relaxed text-[#1f1f1f]">
           {message.content}
         </div>
+        <UserActions
+          content={message.content}
+          onEdit={onStartEdit}
+          disabled={isSaving}
+        />
       </div>
     );
   }
@@ -197,17 +249,122 @@ function MessageBlock({ message }: { message: ChatMessage }) {
       <div className="whitespace-pre-wrap text-[15px] leading-7 text-[#1f1f1f]">
         {message.content}
       </div>
-      <AssistantActions content={message.content} createdAt={message.createdAt} />
+      <AssistantActions content={message.content} />
     </div>
   );
 }
 
-function AssistantActions({
+function UserMessageEditor({
+  message,
+  isSaving,
+  token,
+  onCancel,
+  onComplete,
+  onEditMessage,
+}: {
+  message: ChatMessage;
+  isSaving: boolean;
+  token: string | null;
+  onCancel: () => void;
+  onComplete: () => void;
+  onEditMessage: (messageId: string, content: string, token: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState(message.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const trimmedDraft = draft.trim();
+  const canUpdate =
+    Boolean(token) &&
+    !isSaving &&
+    trimmedDraft.length > 0 &&
+    trimmedDraft !== message.content.trim();
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [draft]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    textarea.focus();
+    const end = textarea.value.length;
+    textarea.setSelectionRange(end, end);
+    textarea.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, []);
+
+  async function handleUpdate() {
+    if (!token || !canUpdate) return;
+
+    try {
+      await onEditMessage(message.id, trimmedDraft, token);
+      toast.success("Message updated.");
+      onComplete();
+    } catch (err) {
+      const messageText =
+        err instanceof ApiError ? err.message : "Unable to update message.";
+      toast.error(messageText);
+    }
+  }
+
+  return (
+    <div className="flex w-full max-w-[85%] flex-col items-end gap-3">
+      <div className="w-full rounded-[28px] border border-[#1a73e8] bg-[#FFFFFF] px-4 py-3">
+        <textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          rows={1}
+          disabled={isSaving}
+          className="max-h-52 min-h-[24px] w-full resize-none overflow-y-auto bg-transparent text-[15px] leading-relaxed text-[#1f1f1f] outline-none disabled:opacity-60"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              event.preventDefault();
+              onCancel();
+              return;
+            }
+
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              void handleUpdate();
+            }
+          }}
+        />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSaving}
+          className="cursor-pointer text-sm text-[#1f1f1f] transition-opacity hover:opacity-70 disabled:opacity-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleUpdate()}
+          disabled={!canUpdate}
+          className="cursor-pointer rounded-full bg-[#e9eef6] px-5 py-2 text-sm text-[#444746] transition-colors hover:bg-[#dfe4ea] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isSaving ? "Updating..." : "Update"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function UserActions({
   content,
-  createdAt,
+  onEdit,
+  disabled,
 }: {
   content: string;
-  createdAt?: string;
+  onEdit: () => void;
+  disabled?: boolean;
 }) {
   async function handleCopy() {
     try {
@@ -218,39 +375,61 @@ function AssistantActions({
     }
   }
 
+  function handleEdit() {
+    if (disabled) return;
+    onEdit();
+  }
+
   return (
-    <div className="mt-3 flex items-center gap-1">
-      <ActionIcon label="Good response" icon={ThumbsUp} />
-      <ActionIcon label="Bad response" icon={ThumbsDown} />
-      <ActionIcon label="Copy" icon={Copy} onClick={() => void handleCopy()} />
-      <ActionIcon label="Share" icon={Share2} />
-      <ActionIcon label="More" icon={MoreHorizontal} />
-      {createdAt ? (
-        <span className="ml-2 text-[11px] text-[#444746]">
-          {formatMessageTime(createdAt)}
-        </span>
-      ) : null}
+    <div className="flex items-center gap-0.5 pr-1">
+      <ActionIcon label="Copy" icon="content_copy" onClick={() => void handleCopy()} />
+      <ActionIcon
+        label="Edit"
+        icon="edit"
+        onClick={handleEdit}
+        disabled={disabled}
+      />
+    </div>
+  );
+}
+
+function AssistantActions({ content }: { content: string }) {
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success("Copied to clipboard.");
+    } catch {
+      toast.error("Unable to copy.");
+    }
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-0.5">
+      <ActionIcon label="Copy" icon="content_copy" onClick={() => void handleCopy()} />
     </div>
   );
 }
 
 function ActionIcon({
   label,
-  icon: Icon,
+  icon,
   onClick,
+  disabled,
 }: {
   label: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: string;
   onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
-      className="flex size-8 cursor-pointer items-center justify-center rounded-full text-[#444746] transition-colors hover:bg-[#f0f4f9]"
+      className="flex size-8 cursor-pointer items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] disabled:cursor-not-allowed disabled:opacity-40"
     >
-      <Icon className="size-4" strokeWidth={1.75} />
+      <MaterialIcon name={icon} size={18} />
     </button>
   );
 }
