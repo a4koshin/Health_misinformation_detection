@@ -2,18 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import {
-  LogOut,
-  PanelLeftClose,
-  Search,
-  Settings,
-  SquarePen,
-} from "lucide-react";
 import { toast } from "sonner";
 
 import { ChatHistoryItem } from "@/components/chat/chat-history-item";
 import { SearchChatsDialog } from "@/components/chat/search-chats-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,11 +27,11 @@ type SidebarProps = {
 };
 
 function NavItem({
-  icon: Icon,
+  icon,
   label,
   onClick,
 }: {
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: string;
   label: string;
   onClick?: () => void;
 }) {
@@ -47,7 +41,7 @@ function NavItem({
       onClick={onClick}
       className="flex h-10 w-full cursor-pointer items-center gap-3 rounded-full px-4 text-sm text-[#1f1f1f] transition-colors hover:bg-[#e9eef6]"
     >
-      <Icon className="size-[18px] shrink-0 text-[#444746]" strokeWidth={1.75} />
+      <MaterialIcon name={icon} size={20} className="text-[#444746]" />
       {label}
     </button>
   );
@@ -135,7 +129,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
   return (
     <>
-      <aside className="flex h-full w-[288px] shrink-0 flex-col bg-[#f8f9fa]">
+      <aside className="flex h-full w-[288px] shrink-0 flex-col bg-[#FFFFFF]">
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <button
             type="button"
@@ -150,14 +144,14 @@ export function Sidebar({ onClose }: SidebarProps) {
             className="flex size-9 cursor-pointer items-center justify-center rounded-full text-[#444746] transition-colors hover:bg-[#e9eef6]"
             aria-label="Close sidebar"
           >
-            <PanelLeftClose className="size-5" strokeWidth={1.75} />
+            <MaterialIcon name="left_panel_close" size={20} />
           </button>
         </div>
 
         <div className="space-y-0.5 px-3 py-2">
-          <NavItem icon={SquarePen} label="New chat" onClick={handleNewChat} />
+          <NavItem icon="edit_square" label="New chat" onClick={handleNewChat} />
           <NavItem
-            icon={Search}
+            icon="search"
             label="Search chats"
             onClick={() => setSearchOpen(true)}
           />
@@ -206,7 +200,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                   className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#444746] transition-colors hover:bg-[#e9eef6]"
                   aria-label="Settings"
                 >
-                  <Settings className="size-[18px]" strokeWidth={1.75} />
+                  <MaterialIcon name="settings" size={20} />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" side="top" className="w-52">
@@ -224,7 +218,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                   onClick={handleLogout}
                   className="cursor-pointer"
                 >
-                  <LogOut className="size-4" />
+                  <MaterialIcon name="logout" size={18} />
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>
