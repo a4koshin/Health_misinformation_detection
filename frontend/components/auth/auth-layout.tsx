@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 export function AuthLayout({
   title,
@@ -23,7 +24,7 @@ export function AuthLayout({
             className="mb-6 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
             aria-label="Back to sign in"
           >
-            <ArrowLeft className="size-5" />
+            <MaterialIcon name="arrow_back" size={20} />
           </Link>
         ) : null}
 
