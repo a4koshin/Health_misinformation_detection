@@ -1,13 +1,8 @@
 "use client";
 
 import { Toaster as Sonner, type ToasterProps } from "sonner";
-import {
-  CircleAlertIcon,
-  CircleCheckIcon,
-  InfoIcon,
-  Loader2Icon,
-  TriangleAlertIcon,
-} from "lucide-react";
+
+import { MaterialIcon } from "@/components/ui/material-icon";
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
@@ -15,11 +10,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme="dark"
       className="toaster group"
       icons={{
-        success: <CircleCheckIcon className="size-4 text-emerald-400" />,
-        info: <InfoIcon className="size-4 text-white" />,
-        warning: <TriangleAlertIcon className="size-4 text-amber-400" />,
-        error: <CircleAlertIcon className="size-4 fill-white text-black" />,
-        loading: <Loader2Icon className="size-4 animate-spin text-white" />,
+        success: (
+          <MaterialIcon name="check_circle" size={18} fill className="text-emerald-400" />
+        ),
+        info: <MaterialIcon name="info" size={18} fill className="text-white" />,
+        warning: (
+          <MaterialIcon name="warning" size={18} fill className="text-amber-400" />
+        ),
+        error: <MaterialIcon name="error" size={18} fill className="text-white" />,
+        loading: (
+          <MaterialIcon
+            name="progress_activity"
+            size={18}
+            className="animate-spin text-white"
+          />
+        ),
       }}
       style={
         {
