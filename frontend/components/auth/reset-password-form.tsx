@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +13,7 @@ import {
 import { PasswordInput } from "@/components/auth/password-input";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError, resetPasswordRequest } from "@/lib/api";
 
 const inputClassName =
@@ -135,7 +135,7 @@ export function ResetPasswordForm() {
           className="h-11 w-full gap-2 bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
         >
           {isSubmitting ? "Resetting..." : "Reset password"}
-          {!isSubmitting ? <ArrowRight className="size-4" /> : null}
+          {!isSubmitting ? <MaterialIcon name="arrow_forward" size={20} /> : null}
         </Button>
       </form>
     </AuthLayout>
