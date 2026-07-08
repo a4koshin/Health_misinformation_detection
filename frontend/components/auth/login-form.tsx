@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -15,6 +14,7 @@ import { PasswordInput } from "@/components/auth/password-input";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
 
@@ -109,7 +109,7 @@ export function LoginForm() {
           className="h-11 w-full gap-2 bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
         >
           {isLoading ? "Signing in..." : "Sign in"}
-          {!isLoading ? <ArrowRight className="size-4" /> : null}
+          {!isLoading ? <MaterialIcon name="arrow_forward" size={20} /> : null}
         </Button>
       </form>
     </AuthLayout>
