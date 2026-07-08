@@ -1,6 +1,5 @@
 "use client";
 
-import { MoreVertical, Share2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -9,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/chat";
 import { deleteConversation } from "@/lib/history";
@@ -150,7 +150,7 @@ function ChatActionsMenu({
           )}
           aria-label="Chat options"
         >
-          <MoreVertical className="size-4" strokeWidth={1.75} />
+          <MaterialIcon name="more_vert" size={20} />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-36">
@@ -158,7 +158,7 @@ function ChatActionsMenu({
           className="cursor-pointer"
           onSelect={onShare}
         >
-          <Share2 className="size-4" />
+          <MaterialIcon name="share" size={18} />
           Share
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -166,7 +166,7 @@ function ChatActionsMenu({
           className="cursor-pointer"
           onSelect={onDelete}
         >
-          <Trash2 className="size-4" />
+          <MaterialIcon name="delete" size={18} />
           Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
