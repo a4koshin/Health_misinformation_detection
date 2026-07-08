@@ -41,6 +41,22 @@ export async function appendConversationMessage(
   );
 }
 
+export async function editConversationMessage(
+  token: string,
+  conversationId: string,
+  messageId: string,
+  content: string,
+): Promise<Conversation> {
+  return apiFetch<Conversation>(
+    `/api/history/${conversationId}/messages/${messageId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ content }),
+    },
+    token,
+  );
+}
+
 export async function deleteConversation(
   token: string,
   conversationId: string,
