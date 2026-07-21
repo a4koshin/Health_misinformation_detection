@@ -88,25 +88,24 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   sendMessage: async (content, token) => {
-    const trimmed = content.trim();
-    if (!trimmed) return;
+    if (!content) return;
 
     const { activeChatId } = get();
     set({ isSaving: true });
 
     try {
       const conversation = activeChatId
-        ? await appendConversationMessage(token, activeChatId, trimmed)
-        : await createConversation(token, trimmed);
+        ? await appendConversationMessage(token, activeChatId, content)
+        : await createConversation(token, content);
 
       set({
         ...applyConversation(conversation),
         historyRevision: get().historyRevision + 1,
         isSaving: false,
       });
-    } catch {
+    } catch (error) {
       set({ isSaving: false });
-      throw new Error("Unable to save chat to history.");
+      throw error;
     }
   },
 
