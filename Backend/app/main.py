@@ -5,14 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.controllers.auth_controller import router as auth_router
 from app.controllers.history_controller import router as history_router
+from app.controllers.prediction_controller import router as prediction_router
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.models import ChatMessage, Detection, User  # noqa: F401
+from app.services import detection_service
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    detection_service.load_models()
     yield
 
 
@@ -28,3 +31,4 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(history_router)
+app.include_router(prediction_router)
