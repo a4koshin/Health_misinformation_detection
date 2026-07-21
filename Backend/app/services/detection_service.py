@@ -3,6 +3,7 @@ from pathlib import Path
 import joblib
 from fastapi import HTTPException, status
 
+from app.services.input_validation_service import validate_somali_text
 from app.services.preprocessing_service import clean_text
 
 MODEL_DIR = Path(__file__).resolve().parents[1] / "models"
@@ -49,6 +50,7 @@ def predict(text: str) -> str:
     Returns one of: "Reliable", "Misinformation"
     """
     _ensure_loaded()
+    validate_somali_text(text)
 
     cleaned = clean_text(text)
     if not cleaned:
