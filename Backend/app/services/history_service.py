@@ -102,8 +102,8 @@ def create_conversation(
     user_id: uuid.UUID,
     input_text: str,
 ) -> Detection:
+    label = detection_service.predict(input_text)
     content = input_text.strip()
-    label = detection_service.predict(content)
 
     detection = Detection(
         user_id=user_id,
@@ -141,8 +141,8 @@ def append_message(
     if detection is None:
         return None
 
+    label = detection_service.predict(content)
     trimmed = content.strip()
-    label = detection_service.predict(trimmed)
 
     detection.label = label
     detection.confidence = None
@@ -180,16 +180,14 @@ def edit_message(
     if target is None or target.role != "user":
         return None
 
+    label = detection_service.predict(content)
     trimmed = content.strip()
-    if not trimmed:
-        return None
 
     target_index = messages.index(target)
     for message in messages[target_index + 1 :]:
         db.delete(message)
 
     target.content = trimmed
-    label = detection_service.predict(trimmed)
 
     first_user_message = next(
         (message for message in messages if message.role == "user"),
