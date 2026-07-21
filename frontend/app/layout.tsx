@@ -4,7 +4,7 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 
 export const metadata: Metadata = {
-  title: "HealthAI — Sign in",
+  title: "HealthAI — Somali Health Misinformation Detection",
   description:
     "Detect and classify health-related misinformation in Somali text.",
 };
