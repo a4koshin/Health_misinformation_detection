@@ -5,25 +5,11 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.chat_message import ChatMessage
 from app.models.detection import Detection
 from app.schemas.detection import DetectionSummary
+from app.services import detection_service
 
 
-def build_assistant_reply(user_message: str) -> str:
-    preview = user_message.strip()
-    if len(preview) > 120:
-        preview = f"{preview[:120]}…"
-
-    return (
-        "Thanks for sharing that claim. I would review the wording, check trusted health sources, "
-        "and compare it with current medical guidance before treating it as reliable. "
-        f'For now this is a preview response for: "{preview}"'
-    )
-
-
-def build_label_reply(label: str, confidence: float | None) -> str:
-    readable_label = label.replace("_", " ")
-    if confidence is None:
-        return f"Result: {readable_label}."
-    return f"Result: {readable_label} ({round(confidence * 100)}% confidence)."
+def build_label_reply(label: str) -> str:
+    return f"Result: {label}."
 
 
 def get_user_detections(db: Session, user_id: uuid.UUID) -> list[DetectionSummary]:
@@ -66,11 +52,15 @@ def _ensure_legacy_messages(db: Session, detection: Detection) -> None:
         role="user",
         content=detection.input_text,
     )
-    assistant_content = (
-        build_label_reply(detection.label, detection.confidence)
-        if detection.label
-        else build_assistant_reply(detection.input_text)
-    )
+    if detection.label:
+        assistant_content = build_label_reply(detection.label)
+    else:
+        label = detection_service.predict(detection.input_text)
+        detection.label = label
+        detection.confidence = None
+        detection.somali_status = "classified"
+        assistant_content = build_label_reply(label)
+
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
@@ -113,12 +103,14 @@ def create_conversation(
     input_text: str,
 ) -> Detection:
     content = input_text.strip()
+    label = detection_service.predict(content)
+
     detection = Detection(
         user_id=user_id,
         input_text=content,
-        label=None,
+        label=label,
         confidence=None,
-        somali_status="pending",
+        somali_status="classified",
     )
     db.add(detection)
     db.flush()
@@ -131,7 +123,7 @@ def create_conversation(
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
-        content=build_assistant_reply(content),
+        content=build_label_reply(label),
     )
     db.add_all([user_message, assistant_message])
     db.commit()
@@ -150,6 +142,12 @@ def append_message(
         return None
 
     trimmed = content.strip()
+    label = detection_service.predict(trimmed)
+
+    detection.label = label
+    detection.confidence = None
+    detection.somali_status = "classified"
+
     user_message = ChatMessage(
         detection_id=detection.id,
         role="user",
@@ -158,7 +156,7 @@ def append_message(
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
-        content=build_assistant_reply(trimmed),
+        content=build_label_reply(label),
     )
     db.add_all([user_message, assistant_message])
     db.commit()
@@ -191,6 +189,7 @@ def edit_message(
         db.delete(message)
 
     target.content = trimmed
+    label = detection_service.predict(trimmed)
 
     first_user_message = next(
         (message for message in messages if message.role == "user"),
@@ -199,10 +198,14 @@ def edit_message(
     if first_user_message and first_user_message.id == target.id:
         detection.input_text = trimmed
 
+    detection.label = label
+    detection.confidence = None
+    detection.somali_status = "classified"
+
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
-        content=build_assistant_reply(trimmed),
+        content=build_label_reply(label),
     )
     db.add(assistant_message)
     db.commit()
