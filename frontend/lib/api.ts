@@ -32,7 +32,11 @@ async function request<T>(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  if (options.body && !headers.has("Content-Type")) {
+  if (
+    options.body &&
+    !(options.body instanceof FormData) &&
+    !headers.has("Content-Type")
+  ) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -128,6 +132,20 @@ export async function registerRequest(
 
 export async function getCurrentUser(token: string): Promise<User> {
   return apiFetch<User>("/api/auth/me", {}, token);
+}
+
+export async function updateCurrentUser(
+  token: string,
+  payload: { email?: string; full_name?: string | null },
+): Promise<User> {
+  return apiFetch<User>(
+    "/api/auth/me",
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
 }
 
 export async function forgotPasswordRequest(
