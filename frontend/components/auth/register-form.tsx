@@ -15,13 +15,13 @@ import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
-import { useAuth } from "@/store/auth-store";
+import { useAuth, useAuthStore } from "@/store/auth-store";
 
 
 
 
 const inputClassName =
-  "h-11 border-border bg-white text-foreground placeholder:text-muted-foreground";
+  "h-11 rounded-xl border-gray-200 bg-gray-50 text-[#0f172a] backdrop-blur-xl placeholder:text-[#64748b] hover:bg-gray-100 focus-visible:border-[#ff8a4d] focus-visible:ring-[#ff5c00]/20";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -54,7 +54,8 @@ export function RegisterForm() {
         full_name: fullName.trim(),
       });
       toast.success("Account created successfully!");
-      router.replace("/chat");
+      const role = useAuthStore.getState().user?.role;
+      router.replace(role === "admin" ? "/dashboard" : "/chat");
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : "Unable to create account.";
@@ -121,7 +122,7 @@ export function RegisterForm() {
         <Button
           type="submit"
           disabled={isLoading}
-          className="h-11 w-full gap-2 bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
+          className="h-11 w-full cursor-pointer gap-2 rounded-xl bg-[#ff5c00] text-base font-semibold text-white shadow-[0_12px_28px_-12px_rgba(255,92,0,0.65)] transition-all hover:bg-[#e65300]"
         >
           {isLoading ? "Creating account..." : "Create account"}
           {!isLoading ? <MaterialIcon name="arrow_forward" size={20} /> : null}
