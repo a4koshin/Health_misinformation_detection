@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Logo } from "@/components/marketing/logo";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 export function AuthLayout({
@@ -16,30 +17,42 @@ export function AuthLayout({
   backHref?: string;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#ffffff] px-4 py-12">
-      <div className="w-full max-w-[420px]">
-        {backHref ? (
-          <Link
-            href={backHref}
-            className="mb-6 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-            aria-label="Back to sign in"
-          >
-            <MaterialIcon name="arrow_back" size={20} />
-          </Link>
-        ) : null}
+    <div className="liquid-bg flex min-h-screen items-center justify-center px-4 py-12">
+      <div className="w-full max-w-[440px]">
+        <div className="mb-6 flex items-center justify-between">
+          <Logo />
+          {backHref ? (
+            <Link
+              href={backHref}
+              className="flex size-10 items-center justify-center rounded-xl text-[#475569] transition-colors hover:bg-gray-100 hover:text-[#0f172a]"
+              aria-label="Back to sign in"
+            >
+              <MaterialIcon name="arrow_back" size={20} />
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="text-sm font-medium text-[#475569] transition-colors hover:text-[#ff5c00]"
+            >
+              Back to home
+            </Link>
+          )}
+        </div>
 
-        <header className="mb-8 space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            {title}
-          </h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {description}
-          </p>
-        </header>
+        <div className="glass-strong rounded-3xl p-8 sm:p-9">
+          <header className="mb-8 space-y-2">
+            <h1 className="text-2xl font-normal tracking-tight text-[#0f172a]">
+              {title}
+            </h1>
+            <p className="text-sm leading-relaxed text-[#475569]">
+              {description}
+            </p>
+          </header>
 
-        {children}
+          {children}
 
-        {footer ? <footer className="mt-8">{footer}</footer> : null}
+          {footer ? <footer className="mt-8">{footer}</footer> : null}
+        </div>
       </div>
     </div>
   );
@@ -58,7 +71,7 @@ export function AuthFieldLabel({
     <div className="mb-2 flex items-center justify-between gap-3">
       <label
         htmlFor={htmlFor}
-        className="text-xs font-semibold tracking-widest text-foreground uppercase"
+        className="text-xs font-semibold tracking-widest text-[#0f172a] uppercase"
       >
         {children}
       </label>
@@ -77,11 +90,11 @@ export function AuthFooterLink({
   href: string;
 }) {
   return (
-    <p className="text-center text-sm text-muted-foreground">
+    <p className="text-center text-sm text-[#475569]">
       {text}{" "}
       <Link
         href={href}
-        className="font-medium text-primary transition-colors hover:text-primary/80"
+        className="font-medium text-[#ff5c00] transition-colors hover:text-[#cc4a00]"
       >
         {linkText}
       </Link>
