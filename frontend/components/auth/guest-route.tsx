@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { getPrivateHomePath } from "@/lib/auth-routing";
 import { useAuth } from "@/store/auth-store";
 
 export function GuestRoute({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,7 @@ export function GuestRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isInitialized && user) {
-      router.replace("/chat");
+      router.replace(getPrivateHomePath(user));
     }
   }, [isInitialized, user, router]);
 
