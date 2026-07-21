@@ -11,7 +11,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from app.schemas.auth import UserRegister
+from app.schemas.auth import UserProfileUpdate, UserRegister
 from app.services import email_service
 
 logger = logging.getLogger(__name__)
@@ -37,6 +37,34 @@ FORGOT_PASSWORD_MESSAGE = (
     "If an account exists for that email, password reset instructions have been sent."
 )
 
+
+def seed_admin_user(db: Session) -> User | None:
+    """Create or promote the administrator configured in Backend/.env."""
+    if not settings.admin_email or not settings.admin_password:
+        logger.warning(
+            "ADMIN_EMAIL/ADMIN_PASSWORD are not configured; admin seed skipped."
+        )
+        return None
+
+    user = get_user_by_email(db, settings.admin_email)
+    if user is None:
+        user = User(
+            email=settings.admin_email,
+            full_name=settings.admin_full_name,
+            hashed_password=hash_password(settings.admin_password),
+            role="admin",
+        )
+        db.add(user)
+    else:
+        user.role = "admin"
+        if not user.full_name:
+            user.full_name = settings.admin_full_name
+
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def get_user_by_id(db: Session, user_id: uuid.UUID) -> User | None:
     return db.query(User).filter(User.id == user_id).first()
 
@@ -53,6 +81,7 @@ def register_user(db: Session, data: UserRegister) -> User:
         email=data.email,
         full_name=data.full_name,
         hashed_password=hash_password(data.password),
+        role="user",
     )
     db.add(user)
     db.commit()
@@ -64,6 +93,21 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
     user = get_user_by_email(db, email)
     if user is None or not verify_password(password, user.hashed_password):
         raise InvalidCredentialsError()
+    return user
+
+
+def update_profile(db: Session, user: User, data: UserProfileUpdate) -> User:
+    if data.email is not None and data.email != user.email:
+        if get_user_by_email(db, data.email):
+            raise EmailAlreadyRegisteredError()
+        user.email = data.email
+
+    if "full_name" in data.model_fields_set:
+        user.full_name = data.full_name
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return user
 
 
