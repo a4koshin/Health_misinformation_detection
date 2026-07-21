@@ -16,7 +16,7 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError, forgotPasswordRequest } from "@/lib/api";
 
 const inputClassName =
-  "h-11 border-border bg-white text-foreground placeholder:text-muted-foreground";
+  "h-11 rounded-xl border-gray-200 bg-gray-50 text-[#0f172a] backdrop-blur-xl placeholder:text-[#64748b] hover:bg-gray-100 focus-visible:border-[#ff8a4d] focus-visible:ring-[#ff5c00]/20";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -102,7 +102,7 @@ export function ForgotPasswordForm() {
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="h-11 w-full gap-2 bg-primary text-base font-semibold text-primary-foreground hover:bg-primary/90"
+          className="h-11 w-full cursor-pointer gap-2 rounded-xl bg-[#ff5c00] text-base font-semibold text-white shadow-[0_12px_28px_-12px_rgba(255,92,0,0.65)] transition-all hover:bg-[#e65300]"
         >
           {isSubmitting ? "Sending..." : "Send reset link"}
           {!isSubmitting ? <MaterialIcon name="arrow_forward" size={20} /> : null}
