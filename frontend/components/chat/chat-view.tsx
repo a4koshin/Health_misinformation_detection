@@ -90,7 +90,11 @@ export function ChatView() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!draft.trim() || !token || isSaving) return;
+    if (!token || isSaving) return;
+    if (!draft) {
+      toast.error("Text cannot be empty.");
+      return;
+    }
 
     try {
       await sendMessage(draft, token);
@@ -173,7 +177,7 @@ export function ChatView() {
                 }}
               />
 
-              {draft.trim() ? (
+              {draft ? (
                 <button
                   type="submit"
                   disabled={isSaving}
