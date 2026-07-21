@@ -12,3 +12,4 @@ python-dotenv
 scikit-learn==1.7.2
 joblib
 numpy
+langdetect==1.0.9
