@@ -11,6 +11,7 @@ from app.schemas.auth import (
     MessageResponse,
     ResetPasswordRequest,
     Token,
+    UserProfileUpdate,
     UserRegister,
     UserResponse,
 )
@@ -53,6 +54,21 @@ def login(
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    try:
+        return auth_service.update_profile(db, current_user, data)
+    except auth_service.EmailAlreadyRegisteredError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        ) from None
 
 
 @router.post("/forgot-password", response_model=MessageResponse)
