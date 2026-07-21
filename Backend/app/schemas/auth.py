@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
@@ -16,7 +17,13 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str | None
+    role: Literal["user", "admin"]
     created_at: datetime
+
+
+class UserProfileUpdate(BaseModel):
+    email: EmailStr | None = None
+    full_name: str | None = None
 
 
 class Token(BaseModel):
