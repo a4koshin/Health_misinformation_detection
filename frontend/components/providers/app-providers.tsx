@@ -16,9 +16,9 @@ function AuthInitializer({ children }: { children: React.ReactNode }) {
 
   if (!isInitialized) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#ffffff]">
+      <div className="liquid-bg flex min-h-screen items-center justify-center">
         <div
-          className="size-5 animate-spin rounded-full border-2 border-muted border-t-foreground"
+          className="size-6 animate-spin rounded-full border-2 border-[#ff5c00]/20 border-t-[#ff5c00]"
           role="status"
           aria-label="Loading"
         />
