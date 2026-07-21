@@ -75,8 +75,8 @@ export function ChatHistoryItem({
     return (
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-xl transition-colors hover:bg-[#f0f4f9]",
-          isActive && "bg-[#e9eef6]",
+          "group flex items-center gap-1 rounded-xl transition-colors hover:bg-orange-50",
+          isActive && "bg-[#ffefe6]",
         )}
       >
         <button
@@ -106,19 +106,19 @@ export function ChatHistoryItem({
   return (
     <div
       className={cn(
-        "group flex items-center gap-0.5 rounded-full transition-colors hover:bg-[#e9eef6]",
-        isActive && "bg-[#e9eef6]",
+        "group flex items-center gap-0.5 rounded-full transition-colors hover:bg-orange-50",
+        isActive && "bg-[#ffefe6]",
       )}
     >
       <button
         type="button"
         onClick={() => onSelect(item.id)}
         className={cn(
-          "min-w-0 flex-1 cursor-pointer truncate py-2.5 pr-1 pl-4 text-left text-sm",
+          "min-w-0 flex-1 cursor-pointer truncate py-2 pr-1 pl-3.5 text-left text-[13px]",
           isActive ? "font-medium text-[#1f1f1f]" : "text-[#444746]",
         )}
       >
-        {truncateText(item.input_text, 28)}
+        {truncateText(item.input_text, 24)}
       </button>
       <ChatActionsMenu
         isActive={isActive}
@@ -145,7 +145,7 @@ function ChatActionsMenu({
           type="button"
           onClick={(event) => event.stopPropagation()}
           className={cn(
-            "mr-1 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#444746] opacity-0 transition-opacity hover:bg-[#dfe4ea] group-hover:opacity-100 data-[state=open]:opacity-100",
+            "mr-1 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-[#444746] opacity-0 transition-opacity hover:bg-orange-100 hover:text-brand group-hover:opacity-100 data-[state=open]:opacity-100",
             isActive && "opacity-100",
           )}
           aria-label="Chat options"
