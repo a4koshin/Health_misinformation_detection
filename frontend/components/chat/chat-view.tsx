@@ -121,46 +121,61 @@ export function ChatView() {
   }, [showWelcome, firstName, greetingNonce]);
 
   return (
-    <main className="relative flex flex-1 flex-col overflow-hidden bg-[#FDFCFC]">
+    <main className="relative flex flex-1 flex-col overflow-hidden bg-white">
       <div className="flex min-h-0 flex-1 flex-col">
         {showWelcome ? (
           <div className="flex flex-1 flex-col items-center justify-center px-6 pb-32">
-            <h1 className="text-center text-4xl font-normal tracking-tight text-[#1f1f1f] md:text-5xl">
-              {greeting}
+            <h1 className="max-w-xl text-center text-3xl font-normal tracking-tight text-ink md:text-4xl">
+              {renderGreeting(greeting, firstName)}
             </h1>
           </div>
         ) : null}
 
         {showConversation ? (
-          <div className="flex-1 overflow-y-auto px-4 py-8 md:px-8">
-            <div className="mx-auto flex w-full max-w-[760px] flex-col gap-10">
+          <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
+            <div className="mx-auto flex w-full max-w-[600px] flex-col gap-8">
               {isLoadingConversation && messages.length === 0 ? (
-                <p className="text-sm text-[#444746]">Loading chat...</p>
+                <p className="text-sm text-ink-muted">Loading chat...</p>
               ) : null}
-              {messages.map((message) => (
-                <MessageBlock
-                  key={message.id}
-                  message={message}
-                  isEditing={editingMessageId === message.id}
-                  isSaving={isSaving}
-                  token={token}
-                  onStartEdit={() => setEditingMessageId(message.id)}
-                  onCancelEdit={() => setEditingMessageId(null)}
-                  onEditComplete={() => setEditingMessageId(null)}
-                  onEditMessage={editMessage}
-                />
+              {groupMessages(messages).map((turn) => (
+                <div key={turn.id} className="flex flex-col gap-3">
+                  {turn.user ? (
+                    <MessageBlock
+                      message={turn.user}
+                      isEditing={editingMessageId === turn.user.id}
+                      isSaving={isSaving}
+                      token={token}
+                      onStartEdit={() => setEditingMessageId(turn.user!.id)}
+                      onCancelEdit={() => setEditingMessageId(null)}
+                      onEditComplete={() => setEditingMessageId(null)}
+                      onEditMessage={editMessage}
+                    />
+                  ) : null}
+                  {turn.assistant ? (
+                    <MessageBlock
+                      message={turn.assistant}
+                      isEditing={false}
+                      isSaving={isSaving}
+                      token={token}
+                      onStartEdit={() => undefined}
+                      onCancelEdit={() => undefined}
+                      onEditComplete={() => undefined}
+                      onEditMessage={editMessage}
+                    />
+                  ) : null}
+                </div>
               ))}
               <div ref={bottomRef} />
             </div>
           </div>
         ) : null}
 
-        <div className="shrink-0 px-4 pb-4 pt-2 md:px-8">
+        <div className="shrink-0 px-4 pt-2 pb-4 md:px-8">
           <form
             onSubmit={handleSubmit}
-            className="mx-auto w-full max-w-[760px]"
+            className="mx-auto w-full max-w-[600px]"
           >
-            <div className="flex items-end gap-2 rounded-[28px] bg-[#FFFFFF] px-4 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.06),0_4px_16px_rgba(0,0,0,0.06)]">
+            <div className="glass flex items-end gap-2 rounded-full px-3.5 py-1.5 transition-shadow focus-within:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_16px_40px_-16px_rgba(255,92,0,0.28)]">
               <textarea
                 ref={textareaRef}
                 value={draft}
@@ -168,7 +183,7 @@ export function ChatView() {
                 placeholder="Ask HealthAI"
                 rows={1}
                 disabled={isSaving}
-                className="max-h-52 min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent py-1 text-base leading-6 text-[#1f1f1f] outline-none placeholder:text-[#444746] disabled:opacity-60"
+                className="max-h-52 min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent py-1.5 text-sm leading-5 text-ink outline-none placeholder:text-ink-muted disabled:opacity-60"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -177,25 +192,63 @@ export function ChatView() {
                 }}
               />
 
-              {draft ? (
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-[#1f1f1f] text-white transition-colors hover:bg-[#333] disabled:opacity-60"
-                  aria-label="Send message"
-                >
-                  <MaterialIcon name="arrow_upward" size={20} />
-                </button>
-              ) : null}
+              <button
+                type="submit"
+                disabled={isSaving || !draft.trim()}
+                className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand text-white transition-colors hover:bg-[#e65300] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                aria-label="Send message"
+              >
+                <MaterialIcon name="arrow_upward" size={16} />
+              </button>
             </div>
 
-            <p className="mt-3 text-center text-xs text-[#444746]">
+            <p className="mt-2 text-center text-[11px] text-ink-muted">
               HealthAI is AI and can make mistakes.
             </p>
           </form>
         </div>
       </div>
     </main>
+  );
+}
+
+function groupMessages(messages: ChatMessage[]) {
+  const turns: {
+    id: string;
+    user: ChatMessage | null;
+    assistant: ChatMessage | null;
+  }[] = [];
+
+  for (const message of messages) {
+    if (message.role === "user") {
+      turns.push({ id: message.id, user: message, assistant: null });
+      continue;
+    }
+
+    const lastTurn = turns[turns.length - 1];
+    if (lastTurn && lastTurn.user && !lastTurn.assistant) {
+      lastTurn.assistant = message;
+      continue;
+    }
+
+    turns.push({ id: message.id, user: null, assistant: message });
+  }
+
+  return turns;
+}
+
+function renderGreeting(greeting: string, firstName: string) {
+  if (!firstName || !greeting.includes(firstName)) {
+    return greeting;
+  }
+
+  const parts = greeting.split(firstName);
+  return (
+    <>
+      {parts[0]}
+      <span className="text-brand">{firstName}</span>
+      {parts.slice(1).join(firstName)}
+    </>
   );
 }
 
@@ -216,7 +269,11 @@ function MessageBlock({
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onEditComplete: () => void;
-  onEditMessage: (messageId: string, content: string, token: string) => Promise<void>;
+  onEditMessage: (
+    messageId: string,
+    content: string,
+    token: string,
+  ) => Promise<void>;
 }) {
   const isUser = message.role === "user";
 
@@ -236,7 +293,7 @@ function MessageBlock({
 
     return (
       <div className="flex flex-col items-end gap-1">
-        <div className="max-w-[85%] rounded-[20px] bg-[#f0f4f9] px-4 py-3 text-[15px] leading-relaxed text-[#1f1f1f]">
+        <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-[#ffefe6] px-4 py-2.5 text-sm leading-relaxed text-ink">
           {message.content}
         </div>
         <UserActions
@@ -249,12 +306,46 @@ function MessageBlock({
   }
 
   return (
-    <div className="max-w-full">
-      <div className="whitespace-pre-wrap text-[15px] leading-7 text-[#1f1f1f]">
-        {message.content}
-      </div>
+    <div className="flex max-w-[80%] flex-col items-start gap-1">
+      <AssistantVerdict content={message.content} />
       <AssistantActions content={message.content} />
     </div>
+  );
+}
+
+function AssistantVerdict({ content }: { content: string }) {
+  const isMisinformation = /misinformation/i.test(content);
+  const isReliable = !isMisinformation && /reliable/i.test(content);
+
+  if (!isMisinformation && !isReliable) {
+    return (
+      <div className="rounded-3xl rounded-bl-lg border border-gray-200 bg-white px-4 py-3 text-sm leading-6 text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        {content}
+      </div>
+    );
+  }
+
+  const config = isReliable
+    ? {
+        icon: "verified",
+        label: "Reliable",
+        pillClass: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700",
+        cardClass: "border-emerald-100 bg-emerald-50/60",
+      }
+    : {
+        icon: "report",
+        label: "Misinformation",
+        pillClass: "border-red-500/25 bg-red-500/10 text-red-700",
+        cardClass: "border-red-100 bg-red-50/60",
+      };
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${config.pillClass}`}
+    >
+      <MaterialIcon name={config.icon} size={15} />
+      {config.label}
+    </span>
   );
 }
 
@@ -271,7 +362,11 @@ function UserMessageEditor({
   token: string | null;
   onCancel: () => void;
   onComplete: () => void;
-  onEditMessage: (messageId: string, content: string, token: string) => Promise<void>;
+  onEditMessage: (
+    messageId: string,
+    content: string,
+    token: string,
+  ) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(message.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -316,14 +411,14 @@ function UserMessageEditor({
 
   return (
     <div className="flex w-full max-w-[85%] flex-col items-end gap-3">
-      <div className="w-full rounded-[28px] border border-[#1a73e8] bg-[#FFFFFF] px-4 py-3">
+      <div className="w-full rounded-3xl border border-brand bg-white px-4 py-3">
         <textarea
           ref={textareaRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           rows={1}
           disabled={isSaving}
-          className="max-h-52 min-h-[24px] w-full resize-none overflow-y-auto bg-transparent text-[15px] leading-relaxed text-[#1f1f1f] outline-none disabled:opacity-60"
+          className="max-h-52 min-h-[24px] w-full resize-none overflow-y-auto bg-transparent text-[15px] leading-relaxed text-ink outline-none disabled:opacity-60"
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               event.preventDefault();
@@ -339,12 +434,12 @@ function UserMessageEditor({
         />
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onCancel}
           disabled={isSaving}
-          className="cursor-pointer text-sm text-[#1f1f1f] transition-opacity hover:opacity-70 disabled:opacity-50"
+          className="cursor-pointer text-sm text-ink-muted transition-colors hover:text-ink disabled:opacity-50"
         >
           Cancel
         </button>
@@ -352,7 +447,7 @@ function UserMessageEditor({
           type="button"
           onClick={() => void handleUpdate()}
           disabled={!canUpdate}
-          className="cursor-pointer rounded-full bg-[#e9eef6] px-5 py-2 text-sm text-[#444746] transition-colors hover:bg-[#dfe4ea] disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-full bg-brand px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-[#e65300] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
         >
           {isSaving ? "Updating..." : "Update"}
         </button>
@@ -386,7 +481,11 @@ function UserActions({
 
   return (
     <div className="flex items-center gap-0.5 pr-1">
-      <ActionIcon label="Copy" icon="content_copy" onClick={() => void handleCopy()} />
+      <ActionIcon
+        label="Copy"
+        icon="content_copy"
+        onClick={() => void handleCopy()}
+      />
       <ActionIcon
         label="Edit"
         icon="edit"
@@ -409,7 +508,11 @@ function AssistantActions({ content }: { content: string }) {
 
   return (
     <div className="mt-2 flex items-center gap-0.5">
-      <ActionIcon label="Copy" icon="content_copy" onClick={() => void handleCopy()} />
+      <ActionIcon
+        label="Copy"
+        icon="content_copy"
+        onClick={() => void handleCopy()}
+      />
     </div>
   );
 }
@@ -431,9 +534,9 @@ function ActionIcon({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="flex size-8 cursor-pointer items-center justify-center rounded-full text-[#5f6368] transition-colors hover:bg-[#f1f3f4] hover:text-[#202124] disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex size-7 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
     >
-      <MaterialIcon name={icon} size={18} />
+      <MaterialIcon name={icon} size={16} />
     </button>
   );
 }
