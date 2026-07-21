@@ -1,0 +1,82 @@
+import type { Metadata } from "next";
+
+import { LegalPage } from "@/components/marketing/legal-page";
+
+export const metadata: Metadata = {
+  title: "Terms & Conditions — HealthAI",
+  description: "The terms and conditions for using HealthAI.",
+};
+
+const sections = [
+  {
+    heading: "1. Acceptance of terms",
+    body: [
+      "By creating an account or using HealthAI you agree to these Terms & Conditions and our Privacy Policy. If you do not agree, please do not use the service.",
+    ],
+  },
+  {
+    heading: "2. Description of the service",
+    body: [
+      "HealthAI is an AI-assisted tool that classifies Somali-language health claims as Reliable or Misinformation using a machine learning model.",
+      "The service is provided for informational and educational purposes. It is a research project and is offered free of charge.",
+    ],
+  },
+  {
+    heading: "3. Not medical advice",
+    body: [
+      "HealthAI does not provide medical advice, diagnosis, or treatment. Predictions are automated classifications of text and can be wrong.",
+      "Always consult a qualified healthcare professional for medical decisions. Never disregard professional advice because of a HealthAI result.",
+    ],
+  },
+  {
+    heading: "4. Acceptable use",
+    body: [
+      "You agree not to misuse the service, including attempting to access other users' data, overloading the system with automated requests, or using the service to generate or spread misinformation.",
+      "Administrator features may only be used by authorized administrators for legitimate platform management.",
+    ],
+  },
+  {
+    heading: "5. Accounts",
+    body: [
+      "You are responsible for keeping your credentials confidential and for all activity under your account. Notify us immediately of any unauthorized use.",
+      "We may suspend accounts that violate these terms or threaten the integrity of the service.",
+    ],
+  },
+  {
+    heading: "6. Intellectual property",
+    body: [
+      "The HealthAI application, model, and branding are the intellectual property of the project team. You retain ownership of the text you submit.",
+    ],
+  },
+  {
+    heading: "7. Limitation of liability",
+    body: [
+      "The service is provided 'as is' without warranties of any kind. To the maximum extent permitted by law, we are not liable for any damages arising from use of, or reliance on, the service or its predictions.",
+    ],
+  },
+  {
+    heading: "8. Changes to these terms",
+    body: [
+      "We may revise these terms as the project evolves. Continued use of the service after changes take effect constitutes acceptance of the new terms.",
+    ],
+  },
+  {
+    heading: "9. Contact",
+    body: ["Questions about these terms? Contact legal@healthai.app."],
+  },
+];
+
+export default function TermsPage() {
+  return (
+    <LegalPage
+      badge="Legal"
+      title={
+        <>
+          Terms &amp; <span className="text-gradient-brand">Conditions</span>
+        </>
+      }
+      updated="July 21, 2026"
+      sections={sections}
+    />
+  );
+}
