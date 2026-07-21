@@ -31,10 +31,13 @@ class Settings(BaseSettings):
     email_pass: str | None = None
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
+    admin_email: str | None = None
+    admin_password: str | None = None
+    admin_full_name: str = "HealthAI Administrator"
 
-    @field_validator("email_user", mode="before")
+    @field_validator("email_user", "admin_email", "admin_full_name", mode="before")
     @classmethod
-    def normalize_email_user(cls, value: str | None) -> str | None:
+    def normalize_optional_string(cls, value: str | None) -> str | None:
         return _clean_env_string(value)
 
     @field_validator("email_pass", mode="before")
@@ -44,6 +47,11 @@ class Settings(BaseSettings):
         if cleaned is None:
             return None
         return cleaned.replace(" ", "")
+
+    @field_validator("admin_password", mode="before")
+    @classmethod
+    def normalize_admin_password(cls, value: str | None) -> str | None:
+        return _clean_env_string(value)
 
 
 settings = Settings()
