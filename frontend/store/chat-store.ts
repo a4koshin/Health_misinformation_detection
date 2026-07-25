@@ -90,13 +90,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sendMessage: async (content, token) => {
     if (!content) return;
 
-    const { activeChatId } = get();
-    set({ isSaving: true });
+    const { activeChatId, messages } = get();
+    const optimisticUser: ChatMessage = {
+      id: `temp-user-${Date.now()}`,
+      role: "user",
+      content,
+    };
+
+    set({
+      isSaving: true,
+      messages: [...messages, optimisticUser],
+    });
+
+    const startedAt = Date.now();
+    const minLoadingMs = 900;
 
     try {
       const conversation = activeChatId
         ? await appendConversationMessage(token, activeChatId, content)
         : await createConversation(token, content);
+
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < minLoadingMs) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, minLoadingMs - elapsed),
+        );
+      }
 
       set({
         ...applyConversation(conversation),
@@ -104,7 +123,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isSaving: false,
       });
     } catch (error) {
-      set({ isSaving: false });
+      set({
+        isSaving: false,
+        messages: get().messages.filter(
+          (message) => message.id !== optimisticUser.id,
+        ),
+      });
       throw error;
     }
   },
