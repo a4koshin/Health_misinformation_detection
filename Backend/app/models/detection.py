@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, String, Text, case, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.chat_message import ChatMessage
 
 
 class Detection(Base):
@@ -32,5 +33,10 @@ class Detection(Base):
         "ChatMessage",
         back_populates="detection",
         cascade="all, delete-orphan",
-        order_by="ChatMessage.created_at",
+        # Same-second pairs must keep user before assistant.
+        order_by=(
+            ChatMessage.created_at,
+            case((ChatMessage.role == "user", 0), else_=1),
+            ChatMessage.id,
+        ),
     )
