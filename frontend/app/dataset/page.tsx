@@ -24,11 +24,34 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
 import type { DatasetPredictionResponse } from "@/types/api";
 
+const ACCEPTED_EXTENSIONS =
+  ".csv,.xlsx,.xlsm,.xls,.xltx,.xltm,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
 const summaryCards = [
-  { key: "total_rows", label: "Total rows", icon: "table_rows" },
-  { key: "processed_rows", label: "Processed", icon: "task_alt" },
-  { key: "reliable_count", label: "Reliable", icon: "verified" },
-  { key: "misinformation_count", label: "Misinformation", icon: "report" },
+  {
+    key: "total_rows",
+    label: "Total rows",
+    icon: "table_rows",
+    tone: "neutral",
+  },
+  {
+    key: "processed_rows",
+    label: "Processed",
+    icon: "task_alt",
+    tone: "neutral",
+  },
+  {
+    key: "reliable_count",
+    label: "Reliable",
+    icon: "verified",
+    tone: "success",
+  },
+  {
+    key: "misinformation_count",
+    label: "Misinformation",
+    icon: "report",
+    tone: "danger",
+  },
 ] as const;
 
 function DatasetContent() {
@@ -40,7 +63,7 @@ function DatasetContent() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token || !file) {
-      toast.error("Choose a CSV file first.");
+      toast.error("Choose a CSV or Excel file first.");
       return;
     }
 
@@ -48,7 +71,9 @@ function DatasetContent() {
     try {
       const data = await predictDataset(token, file);
       setResult(data);
-      toast.success("Dataset processed.");
+      toast.success(
+        `Done — ${data.reliable_count} Reliable, ${data.misinformation_count} Misinformation.`,
+      );
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -63,29 +88,39 @@ function DatasetContent() {
   return (
     <PrivatePage
       title="Dataset"
-      description="Upload a CSV with a text column to run batch predictions."
+      description="Upload a CSV or Excel file with a text column to run batch predictions and see Reliable vs Misinformation counts."
     >
       <form onSubmit={handleSubmit}>
         <GlassCard strong className="mb-6 space-y-4 p-7">
           <div className="space-y-2">
-            <GlassLabel htmlFor="dataset">CSV file</GlassLabel>
+            <GlassLabel htmlFor="dataset">Dataset file</GlassLabel>
             <GlassInput
               id="dataset"
               type="file"
-              accept=".csv,text/csv"
+              accept={ACCEPTED_EXTENSIONS}
               className="cursor-pointer"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
-            <p className="text-xs text-[#475569]">
-              Required column: text, input_text, claim, or sentence.
+            <p className="text-xs text-ink-muted">
+              Accepted: .csv, .xlsx, .xlsm, .xls, .xltx, .xltm. Required column:
+              text, input_text, claim, sentence, or content.
             </p>
+            {file ? (
+              <p className="text-xs font-medium text-brand">
+                Selected: {file.name}
+              </p>
+            ) : null}
           </div>
 
-          <GlassButton type="submit" disabled={isLoading}>
+          <GlassButton
+            type="submit"
+            disabled={isLoading || !file}
+            className="bg-brand bg-none hover:bg-[#e65300]"
+          >
             {isLoading ? (
               <>
                 <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                Processing...
+                Predicting...
               </>
             ) : (
               <>
@@ -100,20 +135,58 @@ function DatasetContent() {
       {result ? (
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {summaryCards.map((card) => (
-              <GlassCard key={card.key} className="p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-[#475569]">{card.label}</p>
-                  <span className="flex size-9 items-center justify-center rounded-xl bg-[#ff5c00]/10 text-[#ff5c00]">
-                    <MaterialIcon name={card.icon} size={20} />
-                  </span>
-                </div>
-                <p className="mt-3 text-2xl font-normal tracking-tight text-[#0f172a]">
-                  {result[card.key]}
-                </p>
-              </GlassCard>
-            ))}
+            {summaryCards.map((card) => {
+              const value = result[card.key];
+              const isReliable = card.key === "reliable_count";
+              const isMisinfo = card.key === "misinformation_count";
+
+              return (
+                <GlassCard
+                  key={card.key}
+                  className={`p-5 ${
+                    isReliable
+                      ? "border-emerald-200 bg-emerald-50/50"
+                      : isMisinfo
+                        ? "border-red-200 bg-red-50/50"
+                        : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-ink-muted">{card.label}</p>
+                    <span
+                      className={`flex size-9 items-center justify-center rounded-xl ${
+                        isReliable
+                          ? "bg-emerald-500/10 text-emerald-700"
+                          : isMisinfo
+                            ? "bg-red-500/10 text-red-700"
+                            : "bg-brand/10 text-brand"
+                      }`}
+                    >
+                      <MaterialIcon name={card.icon} size={20} />
+                    </span>
+                  </div>
+                  <p
+                    className={`mt-3 text-3xl font-normal tracking-tight ${
+                      isReliable
+                        ? "text-emerald-700"
+                        : isMisinfo
+                          ? "text-red-700"
+                          : "text-ink"
+                    }`}
+                  >
+                    {value}
+                  </p>
+                </GlassCard>
+              );
+            })}
           </div>
+
+          {result.error_count > 0 ? (
+            <p className="text-sm text-ink-muted">
+              {result.error_count} row
+              {result.error_count === 1 ? "" : "s"} could not be classified.
+            </p>
+          ) : null}
 
           <GlassTable>
             <GlassTableHead>
@@ -127,7 +200,7 @@ function DatasetContent() {
             <GlassTableBody>
               {result.results.map((row) => (
                 <GlassTableRow key={`${row.row}-${row.text}`}>
-                  <GlassTableCell className="text-[#475569]">
+                  <GlassTableCell className="text-ink-muted">
                     {row.row}
                   </GlassTableCell>
                   <GlassTableCell className="max-w-md truncate">
@@ -156,12 +229,13 @@ function DatasetContent() {
         </div>
       ) : (
         <GlassCard className="flex flex-col items-center gap-2 p-12 text-center">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
+          <span className="flex size-12 items-center justify-center rounded-2xl bg-brand/10 text-brand">
             <MaterialIcon name="upload_file" size={24} />
           </span>
-          <p className="text-sm font-medium text-[#0f172a]">No results yet</p>
-          <p className="text-sm text-[#475569]">
-            Upload a CSV dataset above to see batch predictions here.
+          <p className="text-sm font-medium text-ink">No results yet</p>
+          <p className="text-sm text-ink-muted">
+            Upload a CSV or Excel dataset above to see Reliable and
+            Misinformation counts.
           </p>
         </GlassCard>
       )}
