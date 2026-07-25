@@ -6,10 +6,34 @@ from app.models.chat_message import ChatMessage
 from app.models.detection import Detection
 from app.schemas.detection import DetectionSummary
 from app.services import detection_service
+from app.services.chat_intent_service import (
+    maybe_conversational_reply,
+    validate_appropriate_input,
+    validate_basic_input,
+)
+from app.services.input_validation_service import validate_somali_text
 
 
 def build_label_reply(label: str) -> str:
     return f"Result: {label}."
+
+
+def resolve_user_message(text: str) -> tuple[str, str | None, str]:
+    """
+    Validate first, answer chat intents without the model, otherwise predict.
+
+    Returns (assistant_content, label|None, somali_status).
+    """
+    stripped = validate_basic_input(text)
+    validate_appropriate_input(stripped)
+
+    conversational = maybe_conversational_reply(stripped)
+    if conversational:
+        return conversational, None, "chat"
+
+    validate_somali_text(stripped)
+    label = detection_service.predict(stripped, skip_validation=True)
+    return build_label_reply(label), label, "classified"
 
 
 def get_user_detections(db: Session, user_id: uuid.UUID) -> list[DetectionSummary]:
@@ -52,21 +76,25 @@ def _ensure_legacy_messages(db: Session, detection: Detection) -> None:
         role="user",
         content=detection.input_text,
     )
+    db.add(user_message)
+    db.flush()
+
     if detection.label:
         assistant_content = build_label_reply(detection.label)
     else:
-        label = detection_service.predict(detection.input_text)
+        assistant_content, label, somali_status = resolve_user_message(
+            detection.input_text
+        )
         detection.label = label
         detection.confidence = None
-        detection.somali_status = "classified"
-        assistant_content = build_label_reply(label)
+        detection.somali_status = somali_status
 
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
         content=assistant_content,
     )
-    db.add_all([user_message, assistant_message])
+    db.add(assistant_message)
     db.commit()
     db.refresh(detection)
 
@@ -102,7 +130,7 @@ def create_conversation(
     user_id: uuid.UUID,
     input_text: str,
 ) -> Detection:
-    label = detection_service.predict(input_text)
+    assistant_content, label, somali_status = resolve_user_message(input_text)
     content = input_text.strip()
 
     detection = Detection(
@@ -110,7 +138,7 @@ def create_conversation(
         input_text=content,
         label=label,
         confidence=None,
-        somali_status="classified",
+        somali_status=somali_status,
     )
     db.add(detection)
     db.flush()
@@ -120,12 +148,15 @@ def create_conversation(
         role="user",
         content=content,
     )
+    db.add(user_message)
+    db.flush()
+
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
-        content=build_label_reply(label),
+        content=assistant_content,
     )
-    db.add_all([user_message, assistant_message])
+    db.add(assistant_message)
     db.commit()
 
     return get_conversation(db, user_id, detection.id)
@@ -141,24 +172,27 @@ def append_message(
     if detection is None:
         return None
 
-    label = detection_service.predict(content)
+    assistant_content, label, somali_status = resolve_user_message(content)
     trimmed = content.strip()
 
     detection.label = label
     detection.confidence = None
-    detection.somali_status = "classified"
+    detection.somali_status = somali_status
 
     user_message = ChatMessage(
         detection_id=detection.id,
         role="user",
         content=trimmed,
     )
+    db.add(user_message)
+    db.flush()
+
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
-        content=build_label_reply(label),
+        content=assistant_content,
     )
-    db.add_all([user_message, assistant_message])
+    db.add(assistant_message)
     db.commit()
 
     return get_conversation(db, user_id, detection.id)
@@ -175,12 +209,19 @@ def edit_message(
     if detection is None:
         return None
 
-    messages = sorted(detection.messages, key=lambda message: message.created_at)
+    messages = sorted(
+        detection.messages,
+        key=lambda message: (
+            message.created_at,
+            0 if message.role == "user" else 1,
+            str(message.id),
+        ),
+    )
     target = next((message for message in messages if message.id == message_id), None)
     if target is None or target.role != "user":
         return None
 
-    label = detection_service.predict(content)
+    assistant_content, label, somali_status = resolve_user_message(content)
     trimmed = content.strip()
 
     target_index = messages.index(target)
@@ -198,12 +239,12 @@ def edit_message(
 
     detection.label = label
     detection.confidence = None
-    detection.somali_status = "classified"
+    detection.somali_status = somali_status
 
     assistant_message = ChatMessage(
         detection_id=detection.id,
         role="assistant",
-        content=build_label_reply(label),
+        content=assistant_content,
     )
     db.add(assistant_message)
     db.commit()
