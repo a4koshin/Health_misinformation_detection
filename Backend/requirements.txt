@@ -13,3 +13,5 @@ scikit-learn==1.7.2
 joblib
 numpy
 langdetect==1.0.9
+openpyxl
+xlrd==1.2.0
