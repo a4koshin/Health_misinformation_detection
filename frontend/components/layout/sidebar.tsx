@@ -178,7 +178,7 @@ export function Sidebar({ onClose }: SidebarProps) {
         </div>
 
         <div className="px-3 pt-2">
-          <p className="px-2 pb-1 text-[10px] font-semibold tracking-wider text-ink-muted uppercase">
+          <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
             Menu
           </p>
           <div className="space-y-0.5">
@@ -198,7 +198,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
         {isAdmin ? (
           <div className="px-3 pt-3">
-            <p className="px-2 pb-1 text-[10px] font-semibold tracking-wider text-ink-muted uppercase">
+            <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
               Admin
             </p>
             <div className="space-y-0.5">
@@ -226,7 +226,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
         {showChatRecents ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pt-3">
-            <p className="px-2 pb-1 text-[10px] font-semibold tracking-wider text-ink-muted uppercase">
+            <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
               Recents
             </p>
 
