@@ -43,14 +43,15 @@ def _ensure_loaded() -> None:
         )
 
 
-def predict(text: str) -> str:
+def predict(text: str, *, skip_validation: bool = False) -> str:
     """
     Predict reliability label for Somali text.
 
     Returns one of: "Reliable", "Misinformation"
     """
     _ensure_loaded()
-    validate_somali_text(text)
+    if not skip_validation:
+        validate_somali_text(text)
 
     cleaned = clean_text(text)
     if not cleaned:
