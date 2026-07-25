@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { MaterialIcon } from "@/components/ui/material-icon";
-import { type ChatMessage } from "@/lib/chat";
+import { type ChatMessage, compareChatMessages } from "@/lib/chat";
 import { getConversation } from "@/lib/history";
 import { ApiError } from "@/lib/api";
 import { getRandomGreeting } from "@/lib/greetings";
@@ -28,13 +28,15 @@ export function ChatView() {
   const [greeting, setGreeting] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sortedMessages = [...messages].sort(compareChatMessages);
 
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
+    textarea.style.height = "0px";
+    const nextHeight = Math.min(Math.max(textarea.scrollHeight, 24), 160);
+    textarea.style.height = `${nextHeight}px`;
   }, [draft]);
 
   useEffect(() => {
@@ -82,7 +84,7 @@ export function ChatView() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isSaving]);
 
   useEffect(() => {
     setEditingMessageId(null);
@@ -96,10 +98,13 @@ export function ChatView() {
       return;
     }
 
+    const content = draft;
+    setDraft("");
+
     try {
-      await sendMessage(draft, token);
-      setDraft("");
+      await sendMessage(content, token);
     } catch (err) {
+      setDraft(content);
       const message =
         err instanceof ApiError
           ? err.message
@@ -109,8 +114,12 @@ export function ChatView() {
   }
 
   const showWelcome =
-    !activeChatId && messages.length === 0 && !isLoadingConversation;
-  const showConversation = messages.length > 0 || isLoadingConversation;
+    !activeChatId &&
+    messages.length === 0 &&
+    !isLoadingConversation &&
+    !isSaving;
+  const showConversation =
+    messages.length > 0 || isLoadingConversation || isSaving;
   const displayName = user ? getDisplayName(user) : "there";
   const firstName = displayName.split(/\s+/)[0];
 
@@ -124,7 +133,7 @@ export function ChatView() {
     <main className="relative flex flex-1 flex-col overflow-hidden bg-white">
       <div className="flex min-h-0 flex-1 flex-col">
         {showWelcome ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-6 pb-32">
+          <div className="flex flex-1 flex-col items-center justify-center px-6 pb-28">
             <h1 className="max-w-xl text-center text-3xl font-normal tracking-tight text-ink md:text-4xl">
               {renderGreeting(greeting, firstName)}
             </h1>
@@ -132,50 +141,36 @@ export function ChatView() {
         ) : null}
 
         {showConversation ? (
-          <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8">
-            <div className="mx-auto flex w-full max-w-[600px] flex-col gap-8">
-              {isLoadingConversation && messages.length === 0 ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8">
+            <div className="mx-auto flex w-full max-w-[600px] flex-col gap-5">
+              {isLoadingConversation && sortedMessages.length === 0 ? (
                 <p className="text-sm text-ink-muted">Loading chat...</p>
               ) : null}
-              {groupMessages(messages).map((turn) => (
-                <div key={turn.id} className="flex flex-col gap-3">
-                  {turn.user ? (
-                    <MessageBlock
-                      message={turn.user}
-                      isEditing={editingMessageId === turn.user.id}
-                      isSaving={isSaving}
-                      token={token}
-                      onStartEdit={() => setEditingMessageId(turn.user!.id)}
-                      onCancelEdit={() => setEditingMessageId(null)}
-                      onEditComplete={() => setEditingMessageId(null)}
-                      onEditMessage={editMessage}
-                    />
-                  ) : null}
-                  {turn.assistant ? (
-                    <MessageBlock
-                      message={turn.assistant}
-                      isEditing={false}
-                      isSaving={isSaving}
-                      token={token}
-                      onStartEdit={() => undefined}
-                      onCancelEdit={() => undefined}
-                      onEditComplete={() => undefined}
-                      onEditMessage={editMessage}
-                    />
-                  ) : null}
-                </div>
+              {sortedMessages.map((message) => (
+                <MessageBlock
+                  key={message.id}
+                  message={message}
+                  isEditing={editingMessageId === message.id}
+                  isSaving={isSaving}
+                  token={token}
+                  onStartEdit={() => setEditingMessageId(message.id)}
+                  onCancelEdit={() => setEditingMessageId(null)}
+                  onEditComplete={() => setEditingMessageId(null)}
+                  onEditMessage={editMessage}
+                />
               ))}
+              {isSaving ? <TypingIndicator /> : null}
               <div ref={bottomRef} />
             </div>
           </div>
         ) : null}
 
-        <div className="shrink-0 px-4 pt-2 pb-4 md:px-8">
+        <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-4 md:px-8">
           <form
             onSubmit={handleSubmit}
-            className="mx-auto w-full max-w-[600px]"
+            className="mx-auto flex w-full max-w-[600px] flex-col gap-2"
           >
-            <div className="glass flex items-end gap-2 rounded-full px-3.5 py-1.5 transition-shadow focus-within:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_16px_40px_-16px_rgba(255,92,0,0.28)]">
+            <div className="grid grid-cols-[1fr_auto] items-end gap-2 rounded-3xl border border-gray-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.08)] focus-within:border-brand/40 focus-within:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_16px_40px_-16px_rgba(255,92,0,0.22)]">
               <textarea
                 ref={textareaRef}
                 value={draft}
@@ -183,7 +178,7 @@ export function ChatView() {
                 placeholder="Ask HealthAI"
                 rows={1}
                 disabled={isSaving}
-                className="max-h-52 min-h-[24px] flex-1 resize-none overflow-y-auto bg-transparent py-1.5 text-sm leading-5 text-ink outline-none placeholder:text-ink-muted disabled:opacity-60"
+                className="max-h-40 min-h-6 w-full resize-none overflow-y-auto bg-transparent py-1.5 text-sm leading-6 text-ink outline-none placeholder:text-ink-muted disabled:opacity-60"
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
@@ -195,14 +190,22 @@ export function ChatView() {
               <button
                 type="submit"
                 disabled={isSaving || !draft.trim()}
-                className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-brand text-white transition-colors hover:bg-[#e65300] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-                aria-label="Send message"
+                className={`mb-0.5 flex size-8 shrink-0 items-center justify-center self-end rounded-full text-white transition-colors ${
+                  isSaving
+                    ? "cursor-wait bg-brand"
+                    : "cursor-pointer bg-brand hover:bg-[#e65300] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+                }`}
+                aria-label={isSaving ? "Sending message" : "Send message"}
               >
-                <MaterialIcon name="arrow_upward" size={16} />
+                {isSaving ? (
+                  <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                ) : (
+                  <MaterialIcon name="arrow_upward" size={16} />
+                )}
               </button>
             </div>
 
-            <p className="mt-2 text-center text-[11px] text-ink-muted">
+            <p className="text-center text-[11px] leading-4 text-ink-muted">
               HealthAI is AI and can make mistakes.
             </p>
           </form>
@@ -212,29 +215,21 @@ export function ChatView() {
   );
 }
 
-function groupMessages(messages: ChatMessage[]) {
-  const turns: {
-    id: string;
-    user: ChatMessage | null;
-    assistant: ChatMessage | null;
-  }[] = [];
-
-  for (const message of messages) {
-    if (message.role === "user") {
-      turns.push({ id: message.id, user: message, assistant: null });
-      continue;
-    }
-
-    const lastTurn = turns[turns.length - 1];
-    if (lastTurn && lastTurn.user && !lastTurn.assistant) {
-      lastTurn.assistant = message;
-      continue;
-    }
-
-    turns.push({ id: message.id, user: null, assistant: message });
-  }
-
-  return turns;
+function TypingIndicator() {
+  return (
+    <div
+      className="flex max-w-[80%] flex-col items-start gap-1.5"
+      aria-live="polite"
+      aria-label="HealthAI is analyzing your claim"
+    >
+      <div className="inline-flex items-center gap-2 rounded-3xl rounded-bl-lg border border-orange-100 bg-[#ffefe6] px-4 py-3">
+        <span className="size-1.5 animate-bounce rounded-full bg-brand [animation-delay:-0.2s]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-brand [animation-delay:-0.1s]" />
+        <span className="size-1.5 animate-bounce rounded-full bg-brand" />
+      </div>
+      <p className="pl-1 text-[11px] text-ink-muted">Analyzing claim...</p>
+    </div>
+  );
 }
 
 function renderGreeting(greeting: string, firstName: string) {
