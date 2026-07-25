@@ -8,12 +8,23 @@ export type ChatMessage = {
 };
 
 export function mapStoredMessages(messages: StoredChatMessage[]): ChatMessage[] {
-  return messages.map((message) => ({
-    id: message.id,
-    role: message.role,
-    content: message.content,
-    createdAt: message.created_at,
-  }));
+  return [...messages]
+    .map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      createdAt: message.created_at,
+    }))
+    .sort(compareChatMessages);
+}
+
+/** Keep user messages before assistant replies when timestamps match. */
+export function compareChatMessages(a: ChatMessage, b: ChatMessage): number {
+  const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  if (timeA !== timeB) return timeA - timeB;
+  if (a.role !== b.role) return a.role === "user" ? -1 : 1;
+  return a.id.localeCompare(b.id);
 }
 
 export function formatRelativeTime(value: string): string {
