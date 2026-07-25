@@ -1,8 +1,10 @@
 import csv
 import io
 import uuid
+from pathlib import Path
 
 from fastapi import HTTPException, status
+from openpyxl import load_workbook
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,11 @@ from app.schemas.admin import (
     DatasetPredictionRow,
 )
 from app.services import auth_service, detection_service
+
+TEXT_COLUMN_KEYS = ("text", "input_text", "claim", "sentence", "content")
+CSV_EXTENSIONS = {".csv"}
+EXCEL_EXTENSIONS = {".xlsx", ".xlsm", ".xltx", ".xltm", ".xls"}
+SUPPORTED_EXTENSIONS = CSV_EXTENSIONS | EXCEL_EXTENSIONS
 
 
 class UserNotFoundError(Exception):
@@ -140,13 +147,19 @@ def get_dashboard_stats(db: Session) -> DashboardStats:
     )
 
 
-def predict_dataset(file_bytes: bytes, filename: str) -> DatasetPredictionResponse:
-    if not filename.lower().endswith(".csv"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only CSV files are supported.",
-        )
+def _find_text_header(headers: list[str]) -> str | None:
+    normalized = {
+        header.strip().lower(): header
+        for header in headers
+        if header and str(header).strip()
+    }
+    for key in TEXT_COLUMN_KEYS:
+        if key in normalized:
+            return normalized[key]
+    return None
 
+
+def _rows_from_csv(file_bytes: bytes) -> list[dict[str, object]]:
     try:
         decoded = file_bytes.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
@@ -162,35 +175,135 @@ def predict_dataset(file_bytes: bytes, filename: str) -> DatasetPredictionRespon
             detail="CSV file is empty or missing a header row.",
         )
 
-    normalized_headers = {
-        header.strip().lower(): header for header in reader.fieldnames if header
-    }
-    text_header = next(
-        (
-            normalized_headers[key]
-            for key in ("text", "input_text", "claim", "sentence")
-            if key in normalized_headers
-        ),
-        None,
-    )
+    text_header = _find_text_header([str(header) for header in reader.fieldnames])
     if text_header is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CSV must include a text column named text, input_text, claim, or sentence.",
+            detail="File must include a text column named text, input_text, claim, sentence, or content.",
         )
+
+    return [
+        {
+            "row": index,
+            "text": (row.get(text_header) or "").strip(),
+        }
+        for index, row in enumerate(reader, start=2)
+    ]
+
+
+def _rows_from_excel(file_bytes: bytes, extension: str) -> list[dict[str, object]]:
+    if extension == ".xls":
+        try:
+            import xlrd
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Excel .xls support is unavailable. Save the file as .xlsx or CSV.",
+            ) from exc
+
+        try:
+            book = xlrd.open_workbook(file_contents=file_bytes)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to read the .xls file. Try saving it as .xlsx or CSV.",
+            ) from exc
+
+        sheet = book.sheet_by_index(0)
+        if sheet.nrows == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Excel file is empty.",
+            )
+
+        headers = [
+            str(cell.value).strip() if cell.value is not None else ""
+            for cell in sheet.row(0)
+        ]
+        text_header = _find_text_header(headers)
+        if text_header is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must include a text column named text, input_text, claim, sentence, or content.",
+            )
+        text_index = headers.index(text_header)
+
+        rows: list[dict[str, object]] = []
+        for index in range(1, sheet.nrows):
+            value = sheet.cell_value(index, text_index)
+            text = str(value).strip() if value is not None else ""
+            rows.append({"row": index + 1, "text": text})
+        return rows
+
+    try:
+        workbook = load_workbook(
+            io.BytesIO(file_bytes),
+            read_only=True,
+            data_only=True,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to read the Excel file. Use .xlsx, .xlsm, or CSV.",
+        ) from exc
+
+    sheet = workbook.active
+    rows_iter = sheet.iter_rows(values_only=True)
+    try:
+        header_row = next(rows_iter)
+    except StopIteration as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Excel file is empty.",
+        ) from exc
+
+    headers = [str(cell).strip() if cell is not None else "" for cell in header_row]
+    text_header = _find_text_header(headers)
+    if text_header is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must include a text column named text, input_text, claim, sentence, or content.",
+        )
+    text_index = headers.index(text_header)
+
+    rows = []
+    for index, row in enumerate(rows_iter, start=2):
+        value = row[text_index] if text_index < len(row) else None
+        text = str(value).strip() if value is not None else ""
+        rows.append({"row": index, "text": text})
+    return rows
+
+
+def _load_dataset_rows(file_bytes: bytes, filename: str) -> list[dict[str, object]]:
+    extension = Path(filename).suffix.lower()
+    if extension not in SUPPORTED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only CSV and Excel files are supported (.csv, .xlsx, .xlsm, .xls, .xltx, .xltm).",
+        )
+
+    if extension in CSV_EXTENSIONS:
+        return _rows_from_csv(file_bytes)
+    return _rows_from_excel(file_bytes, extension)
+
+
+def predict_dataset(file_bytes: bytes, filename: str) -> DatasetPredictionResponse:
+    rows = _load_dataset_rows(file_bytes, filename)
 
     results: list[DatasetPredictionRow] = []
     reliable_count = 0
     misinformation_count = 0
     error_count = 0
 
-    for index, row in enumerate(reader, start=2):
-        raw_text = (row.get(text_header) or "").strip()
+    for item in rows:
+        raw_text = str(item["text"])
+        row_number = int(item["row"])
+
         if not raw_text:
             error_count += 1
             results.append(
                 DatasetPredictionRow(
-                    row=index,
+                    row=row_number,
                     text="",
                     error="Empty text cell.",
                 )
@@ -205,7 +318,7 @@ def predict_dataset(file_bytes: bytes, filename: str) -> DatasetPredictionRespon
                 misinformation_count += 1
             results.append(
                 DatasetPredictionRow(
-                    row=index,
+                    row=row_number,
                     text=raw_text,
                     prediction=prediction,
                 )
@@ -214,7 +327,7 @@ def predict_dataset(file_bytes: bytes, filename: str) -> DatasetPredictionRespon
             error_count += 1
             results.append(
                 DatasetPredictionRow(
-                    row=index,
+                    row=row_number,
                     text=raw_text,
                     error=str(exc.detail),
                 )
