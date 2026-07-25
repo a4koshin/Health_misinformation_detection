@@ -14,7 +14,7 @@ const navLinks = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/features", label: "Features" },
-  { href: "/how-it-works", label: "How It Works" },
+  { href: "/how-it-works", label: "How it works" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -35,7 +35,7 @@ export function GlassNavbar() {
 
   const linkClassName = (active: boolean) =>
     cn(
-      "px-1 text-[13px] font-bold tracking-[0.14em] uppercase transition-colors duration-200",
+      "px-1 text-[13px] font-medium tracking-normal transition-colors duration-200",
       active ? "text-[#ff5c00]" : "text-[#0f172a]/80 hover:text-[#ff5c00]",
     );
 
@@ -78,7 +78,7 @@ export function GlassNavbar() {
                 <GlassButton
                   asChild
                   size="sm"
-                  className="bg-[#ff5c00] bg-none font-bold tracking-[0.08em] uppercase shadow-[0_10px_24px_-10px_rgba(255,92,0,0.7)] hover:bg-[#e65300]"
+                  className="bg-[#ff5c00] bg-none font-medium shadow-[0_10px_24px_-10px_rgba(255,92,0,0.7)] hover:bg-[#e65300]"
                 >
                   <Link href={getPrivateHomePath(user)}>
                     Open app
@@ -91,14 +91,14 @@ export function GlassNavbar() {
                     asChild
                     variant="outline"
                     size="sm"
-                    className="border-[#ff5c00] font-bold tracking-[0.08em] text-[#ff5c00] uppercase hover:border-[#e65300] hover:bg-[#ffefe6] hover:text-[#e65300]"
+                    className="border-[#ff5c00] font-medium text-[#ff5c00] hover:border-[#e65300] hover:bg-[#ffefe6] hover:text-[#e65300]"
                   >
                     <Link href="/login">Login</Link>
                   </GlassButton>
                   <GlassButton
                     asChild
                     size="sm"
-                    className="bg-[#ff5c00] bg-none font-bold tracking-[0.08em] uppercase shadow-[0_10px_24px_-10px_rgba(255,92,0,0.7)] hover:bg-[#e65300]"
+                    className="bg-[#ff5c00] bg-none font-medium shadow-[0_10px_24px_-10px_rgba(255,92,0,0.7)] hover:bg-[#e65300]"
                   >
                     <Link href="/register">Register</Link>
                   </GlassButton>
@@ -129,7 +129,7 @@ export function GlassNavbar() {
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "rounded-xl px-3.5 py-2.5 text-[13px] font-bold tracking-[0.14em] uppercase transition-colors",
+                  "rounded-xl px-3.5 py-2.5 text-[13px] font-medium tracking-normal transition-colors",
                   pathname === link.href
                     ? "bg-[#ff5c00]/10 text-[#ff5c00]"
                     : "text-[#0f172a]/80 hover:bg-gray-100 hover:text-[#ff5c00]",
@@ -143,7 +143,7 @@ export function GlassNavbar() {
                 <GlassButton
                   asChild
                   size="md"
-                  className="bg-[#ff5c00] bg-none font-bold tracking-[0.08em] uppercase hover:bg-[#e65300]"
+                  className="bg-[#ff5c00] bg-none font-medium hover:bg-[#e65300]"
                 >
                   <Link
                     href={getPrivateHomePath(user)}
@@ -158,7 +158,7 @@ export function GlassNavbar() {
                     asChild
                     variant="outline"
                     size="md"
-                    className="border-[#ff5c00] font-bold tracking-[0.08em] text-[#ff5c00] uppercase hover:border-[#e65300] hover:bg-[#ffefe6] hover:text-[#e65300]"
+                    className="border-[#ff5c00] font-medium text-[#ff5c00] hover:border-[#e65300] hover:bg-[#ffefe6] hover:text-[#e65300]"
                   >
                     <Link href="/login" onClick={() => setMobileOpen(false)}>
                       Login
@@ -167,7 +167,7 @@ export function GlassNavbar() {
                   <GlassButton
                     asChild
                     size="md"
-                    className="bg-[#ff5c00] bg-none font-bold tracking-[0.08em] uppercase hover:bg-[#e65300]"
+                    className="bg-[#ff5c00] bg-none font-medium hover:bg-[#e65300]"
                   >
                     <Link href="/register" onClick={() => setMobileOpen(false)}>
                       Register
