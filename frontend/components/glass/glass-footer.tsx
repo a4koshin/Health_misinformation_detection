@@ -2,11 +2,11 @@ import Link from "next/link";
 
 const footerLinks = [
   { href: "/", label: "Home" },
-  { href: "/about", label: "About Us" },
+  { href: "/about", label: "About us" },
   { href: "/features", label: "Features" },
-  { href: "/how-it-works", label: "How It Works" },
+  { href: "/how-it-works", label: "How it works" },
   { href: "/faq", label: "FAQ" },
-  { href: "/contact", label: "Contact Us" },
+  { href: "/contact", label: "Contact us" },
 ];
 
 function SocialButton({
@@ -59,7 +59,7 @@ export function GlassFooter() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-xs font-bold tracking-[0.12em] text-[#0f172a] uppercase shadow-sm transition-colors duration-200 hover:border-[#ff5c00] hover:text-[#ff5c00]"
+                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-xs font-medium tracking-normal text-[#0f172a] shadow-sm transition-colors duration-200 hover:border-[#ff5c00] hover:text-[#ff5c00]"
               >
                 {link.label}
               </Link>
