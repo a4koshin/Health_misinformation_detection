@@ -15,7 +15,7 @@ from app.services.input_validation_service import validate_somali_text
 
 
 def build_label_reply(label: str) -> str:
-    return f"Result: {label}."
+    return f"Natiijadu waa {label}."
 
 
 def resolve_user_message(text: str) -> tuple[str, str | None, str]:
