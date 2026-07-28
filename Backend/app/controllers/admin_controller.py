@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
-from app.controllers.deps import get_current_admin
+from app.controllers.deps import get_current_admin, get_current_user
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.admin import (
@@ -102,7 +102,7 @@ def delete_user(
 @router.post("/dataset/predict", response_model=DatasetPredictionResponse)
 async def predict_dataset(
     file: UploadFile = File(...),
-    _: User = Depends(get_current_admin),
+    _: User = Depends(get_current_user),
 ) -> DatasetPredictionResponse:
     content = await file.read()
     if not content:
