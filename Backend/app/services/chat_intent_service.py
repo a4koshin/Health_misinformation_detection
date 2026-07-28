@@ -7,41 +7,41 @@ import re
 
 from fastapi import HTTPException, status
 
-EMPTY_MESSAGE = "Text cannot be empty."
-WHITESPACE_ONLY_MESSAGE = "Text cannot contain only spaces."
-NUMERIC_ONLY_MESSAGE = "Numeric input is not allowed."
-SPECIAL_CHARACTERS_ONLY_MESSAGE = "Special characters only are not allowed."
-ARABIC_MESSAGE = "Arabic text is not allowed. Please enter Somali text."
+EMPTY_MESSAGE = "Qoraalka ma noqon karo mid madhan."
+WHITESPACE_ONLY_MESSAGE = "Qoraalka ma noqon karo mid bannaan oo keliya."
+NUMERIC_ONLY_MESSAGE = "Lambar keliya lama oggola."
+SPECIAL_CHARACTERS_ONLY_MESSAGE = "Calaamado keliya lama oggola."
+ARABIC_MESSAGE = "Qoraal Carabi ah lama oggola. Fadlan geli qoraal Soomaali ah."
 
 INAPPROPRIATE_MESSAGES = [
-    "Please keep this chat professional. Send a Somali health claim to check.",
-    "That message is not appropriate here. Paste a Somali health claim instead.",
-    "HealthAI only checks health claims. Please avoid flirtatious or casual slang.",
+    "Fadlan ha isticmaalin ereyo aan habboonayn. Geli sheegasho caafimaad oo Soomaali ah.",
+    "Fariintaan halkan kuma habboona. Fadlan geli sheegasho caafimaad oo Soomaali ah.",
+    "HealthAI waxay hubisaa sheegashooyinka caafimaadka oo keliya. Ka fogow ereyada jacaylka.",
     "Fadlan isticmaal ereyo habboon. Geli sheegasho caafimaad oo Soomaali ah.",
-    "This tool is for health information only. Try a Somali health claim.",
+    "Qalabkani wuxuu u gaar yahay macluumaadka caafimaadka. Isku day sheegasho Soomaali ah.",
 ]
 
 IDENTITY_REPLIES = [
-    "I'm HealthAI — an assistant that checks Somali health claims for misinformation.",
-    "Waxaan ahay HealthAI. Waxaan kaa caawinayaa inaad hubiso sheegashooyinka caafimaadka ee Soomaaliga.",
-    "I'm HealthAI. Send me a Somali health claim and I'll tell you if it looks Reliable or Misinformation.",
+    "Waxaan ahay HealthAI — caawiye hubiya sheegashooyinka caafimaad ee Soomaaliga.",
+    "Ani waa HealthAI. Waxaan kaa caawinayaa inaad hubiso sheegashooyinka caafimaadka.",
+    "Waxaan ahay HealthAI. Ii soo dir sheegasho caafimaad oo Soomaali ah, aan kuu sheego Reliable ama Misinformation.",
     "Ani waa HealthAI. Ujeedadaydu waa inaan baadho sheegashooyinka caafimaad ee af-Soomaali.",
-    "I'm HealthAI, built to help Somali speakers verify health information quickly and clearly.",
+    "Waxaan ahay HealthAI, waxaan u dhisnahay inaan ka caawiyo dadka Soomaalida ah hubinta macluumaadka caafimaadka.",
 ]
 
 GREETING_REPLIES = [
-    "Hello! Paste a Somali health claim and I'll check it for you.",
-    "Hi there — send any Somali health statement and I'll analyze it.",
+    "Salaan! Geli sheegasho caafimaad oo Soomaali ah, aan kuu baadho.",
+    "Waa ku salaamay — ii soo dir qoraal caafimaad oo Soomaali ah, aan falanqeeyo.",
     "Salaam! Geli sheegasho caafimaad oo Soomaali ah, aan kuu baadho.",
     "Iska warran! Maxaad rabtaa inaad hubiso maanta?",
-    "Welcome to HealthAI. Drop a Somali health claim whenever you're ready.",
+    "Ku soo dhowow HealthAI. Markaad diyaar tahay geli sheegasho caafimaad oo Soomaali ah.",
 ]
 
 HELP_REPLIES = [
-    "I classify Somali health claims as Reliable or Misinformation. Just paste the claim here.",
+    "Waxaan kala saaraa sheegashooyinka caafimaad ee Soomaaliga: Reliable ama Misinformation. Kaliya geli sheegashada halkan.",
     "Waxaan kala saaraa sheegashooyinka caafimaad ee Soomaaliga: Reliable ama Misinformation.",
-    "Send a Somali health claim — for example something you saw on WhatsApp — and I'll return a verdict.",
-    "Ask me to check a Somali health statement. I don't give medical treatment advice.",
+    "Ii soo dir sheegasho caafimaad oo Soomaali ah — tusaale waxaad ka aragtay WhatsApp — aan kuu soo celiyo natiijada.",
+    "I weydii inaad hubiso qoraal caafimaad oo Soomaali ah. Anigu ma bixiyo talo daweyn caafimaad.",
     "Geli qoraal caafimaad oo Soomaali ah. Aniga ayaa kuu sheegi doona Reliable ama Misinformation.",
 ]
 
@@ -122,7 +122,7 @@ HELP_PATTERNS = [
     r"\bmaxaad sameyn kartaa\b",
     r"\bmaxaad samayn kartaa\b",
     r"\bmaxaad ii sameyn kartaa\b",
-    r"\bsidee bay u shaqeysaa\b",
+    r"\bsidee baa u shaqeysaa\b",
     r"\bsidee buu u shaqeeyaa\b",
     r"\bicaawin\b",
 ]
