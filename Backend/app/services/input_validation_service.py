@@ -5,9 +5,9 @@ from app.services.chat_intent_service import validate_basic_input
 
 DetectorFactory.seed = 0
 
-ENGLISH_MESSAGE = "English text is not allowed. Please enter Somali text."
-UNSUPPORTED_LANGUAGE_MESSAGE = "Unsupported language. Please enter Somali text."
-UNIDENTIFIED_LANGUAGE_MESSAGE = "Only Somali text is supported."
+ENGLISH_MESSAGE = "Qoraal Ingiriis ah lama oggola. Fadlan geli qoraal Soomaali ah."
+UNSUPPORTED_LANGUAGE_MESSAGE = "Luqaddan lama taageero. Fadlan geli qoraal Soomaali ah."
+UNIDENTIFIED_LANGUAGE_MESSAGE = "Kaliya qoraal Soomaali ah ayaa la oggol yahay."
 
 
 def _bad_request(detail: str) -> HTTPException:
