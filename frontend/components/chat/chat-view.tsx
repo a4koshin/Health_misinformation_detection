@@ -462,8 +462,19 @@ function MessageBlock({
 }
 
 function AssistantVerdict({ content }: { content: string }) {
-  const isMisinformation = /misinformation/i.test(content);
-  const isReliable = !isMisinformation && /reliable/i.test(content);
+  const isNaturalReply = /Waad ku mahadsantahay/i.test(content);
+  if (isNaturalReply) {
+    return (
+      <div className="rounded-3xl rounded-bl-lg border border-gray-200 bg-white px-4 py-3 text-sm leading-6 whitespace-pre-line text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        {renderBoldPredictionTerms(content)}
+      </div>
+    );
+  }
+
+  const isMisinformation =
+    /misinformation|non[-\s]?reliable/i.test(content);
+  const isReliable =
+    !isMisinformation && /\breliable\b/i.test(content);
 
   if (!isMisinformation && !isReliable) {
     return (
@@ -478,22 +489,60 @@ function AssistantVerdict({ content }: { content: string }) {
         icon: "verified",
         label: "Reliable",
         pillClass: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700",
-        cardClass: "border-emerald-100 bg-emerald-50/60",
       }
     : {
         icon: "report",
-        label: "Misinformation",
+        label: "Non-Reliable",
         pillClass: "border-red-500/25 bg-red-500/10 text-red-700",
-        cardClass: "border-red-100 bg-red-50/60",
       };
 
+  const topicMatch = content.match(
+    /(?:Mowduuca:|mowduuca)\s*(.+?)\.?$/i,
+  );
+  const topic = topicMatch?.[1]?.trim();
+
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${config.pillClass}`}
-    >
-      <MaterialIcon name={config.icon} size={15} />
-      {config.label}
-    </span>
+    <div className="flex flex-col items-start gap-2">
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${config.pillClass}`}
+      >
+        <MaterialIcon name={config.icon} size={15} />
+        {config.label}
+      </span>
+      {isReliable && topic ? (
+        <span className="inline-flex items-center rounded-full border border-orange-200 bg-[#ffefe6] px-2.5 py-1 text-xs font-medium text-[#cc4a00]">
+          {topic}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+const BOLD_PREDICTION_TERMS = [
+  "Non-Reliable",
+  "Reliable",
+  "Mental Health Advice",
+  "Prevention Advice",
+  "Medication Advice",
+  "Lifestyle Advice",
+];
+
+function renderBoldPredictionTerms(content: string) {
+  const pattern = new RegExp(
+    `(${BOLD_PREDICTION_TERMS.map((term) =>
+      term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    ).join("|")})`,
+    "g",
+  );
+
+  return content.split(pattern).map((part, index) =>
+    BOLD_PREDICTION_TERMS.includes(part) ? (
+      <strong key={`${part}-${index}`} className="font-semibold text-ink">
+        {part}
+      </strong>
+    ) : (
+      <span key={`text-${index}`}>{part}</span>
+    ),
   );
 }
 
