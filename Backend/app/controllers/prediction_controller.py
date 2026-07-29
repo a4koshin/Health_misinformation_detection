@@ -13,5 +13,11 @@ def predict_text(
     data: PredictRequest,
     current_user: User = Depends(get_current_user),
 ) -> PredictResponse:
-    prediction = detection_service.predict(data.text)
-    return PredictResponse(prediction=prediction)
+    result = detection_service.predict_detailed(data.text)
+    return PredictResponse(
+        prediction=result["label"],
+        confidence=result["confidence"],
+        topic=result["topic"],
+        topic_confidence=result["topic_confidence"],
+        message=result["message"],
+    )
