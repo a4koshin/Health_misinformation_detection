@@ -314,7 +314,7 @@ def predict_dataset(file_bytes: bytes, filename: str) -> DatasetPredictionRespon
             prediction = detection_service.predict(raw_text)
             if prediction == "Reliable":
                 reliable_count += 1
-            elif prediction == "Misinformation":
+            elif prediction in {"Misinformation", "Non-Reliable"}:
                 misinformation_count += 1
             results.append(
                 DatasetPredictionRow(
