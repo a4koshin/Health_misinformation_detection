@@ -7,3 +7,7 @@ class PredictRequest(BaseModel):
 
 class PredictResponse(BaseModel):
     prediction: str
+    confidence: float
+    topic: str | None = None
+    topic_confidence: float | None = None
+    message: str
