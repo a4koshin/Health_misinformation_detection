@@ -14,8 +14,9 @@ from app.services.chat_intent_service import (
 from app.services.input_validation_service import validate_somali_text
 
 
-def build_label_reply(label: str) -> str:
-    return f"Natiijadu waa {label}."
+def build_label_reply(label: str, topic: str | None = None) -> str:
+    """Prefer the shared Somali wrapper from detection_service."""
+    return detection_service.build_response_message(label, topic)
 
 
 def resolve_user_message(text: str) -> tuple[str, str | None, str]:
@@ -32,8 +33,9 @@ def resolve_user_message(text: str) -> tuple[str, str | None, str]:
         return conversational, None, "chat"
 
     validate_somali_text(stripped)
-    label = detection_service.predict(stripped, skip_validation=True)
-    return build_label_reply(label), label, "classified"
+    result = detection_service.predict_detailed(stripped, skip_validation=True)
+    label = str(result["label"])
+    return result["message"], label, "classified"
 
 
 def get_user_detections(db: Session, user_id: uuid.UUID) -> list[DetectionSummary]:
