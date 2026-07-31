@@ -23,7 +23,7 @@ export function ProtectedRoute({
     if (!user) {
       redirectTarget = "/login";
     } else if (!isAllowed) {
-      redirectTarget = user.role === "admin" ? "/dashboard" : "/chat";
+      redirectTarget = user.role === "admin" ? "/dashboard" : "/prediction";
     }
   }
 
