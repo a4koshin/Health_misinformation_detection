@@ -52,7 +52,10 @@ export function GlassTableHeaderCell({
 }: React.ComponentProps<"th">) {
   return (
     <th
-      className={cn("px-5 py-3.5 text-xs font-semibold tracking-wide uppercase", className)}
+      className={cn(
+        "px-3 py-3 text-xs font-medium tracking-normal text-[#475569] sm:px-5 sm:py-3.5",
+        className,
+      )}
       {...props}
     />
   );
@@ -62,5 +65,10 @@ export function GlassTableCell({
   className,
   ...props
 }: React.ComponentProps<"td">) {
-  return <td className={cn("px-5 py-3.5 text-[#0f172a]", className)} {...props} />;
+  return (
+    <td
+      className={cn("px-3 py-3 text-[#0f172a] sm:px-5 sm:py-3.5", className)}
+      {...props}
+    />
+  );
 }
