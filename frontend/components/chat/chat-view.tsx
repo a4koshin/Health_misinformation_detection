@@ -32,6 +32,10 @@ export function ChatView() {
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [greeting, setGreeting] = useState("");
   const [isUploadingDataset, setIsUploadingDataset] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<{
+    name: string;
+    size: number;
+  } | null>(null);
   const [datasetPreview, setDatasetPreview] = useState<{
     filename: string;
     result: DatasetPredictionResponse;
@@ -96,11 +100,12 @@ export function ChatView() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isSaving, isUploadingDataset, datasetPreview]);
+  }, [messages, isSaving, isUploadingDataset, pendingUpload, datasetPreview]);
 
   useEffect(() => {
     setEditingMessageId(null);
     setDatasetPreview(null);
+    setPendingUpload(null);
   }, [activeChatId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -129,6 +134,8 @@ export function ChatView() {
   async function handleDatasetUpload(file: File) {
     if (!token || isBusy) return;
 
+    setPendingUpload({ name: file.name, size: file.size });
+    setDatasetPreview(null);
     setIsUploadingDataset(true);
     try {
       const result = await predictDataset(token, file);
@@ -137,6 +144,7 @@ export function ChatView() {
         `Done — ${result.reliable_count} Reliable, ${result.misinformation_count} Misinformation.`,
       );
     } catch (error) {
+      setPendingUpload(null);
       const message =
         error instanceof ApiError
           ? error.message
@@ -155,12 +163,14 @@ export function ChatView() {
     messages.length === 0 &&
     !isLoadingConversation &&
     !isBusy &&
-    !datasetPreview;
+    !datasetPreview &&
+    !pendingUpload;
   const showConversation =
     messages.length > 0 ||
     isLoadingConversation ||
     isBusy ||
-    Boolean(datasetPreview);
+    Boolean(datasetPreview) ||
+    Boolean(pendingUpload);
   const displayName = user ? getDisplayName(user) : "there";
   const firstName = displayName.split(/\s+/)[0];
 
@@ -171,19 +181,19 @@ export function ChatView() {
   }, [showWelcome, firstName, greetingNonce]);
 
   return (
-    <main className="relative flex flex-1 flex-col overflow-hidden bg-white">
+    <main className="relative flex flex-1 flex-col overflow-hidden bg-white pt-12 lg:pt-0">
       <div className="flex min-h-0 flex-1 flex-col">
         {showWelcome ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-6 pb-28">
-            <h1 className="max-w-xl text-center text-3xl font-normal tracking-tight text-ink md:text-4xl">
+          <div className="flex flex-1 flex-col items-center justify-center px-5 pb-24 sm:px-6 sm:pb-28">
+            <h1 className="max-w-xl text-center text-2xl font-normal tracking-tight text-ink sm:text-3xl md:text-4xl">
               {renderGreeting(greeting, firstName)}
             </h1>
           </div>
         ) : null}
 
         {showConversation ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-6 md:px-8">
-            <div className="mx-auto flex w-full max-w-[600px] flex-col gap-5">
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-4 sm:py-6 md:px-8">
+            <div className="mx-auto flex w-full max-w-[600px] flex-col gap-4 sm:gap-5">
               {isLoadingConversation && sortedMessages.length === 0 ? (
                 <p className="text-sm text-ink-muted">Loading chat...</p>
               ) : null}
@@ -200,20 +210,38 @@ export function ChatView() {
                   onEditMessage={editMessage}
                 />
               ))}
+              {pendingUpload ? (
+                <UploadedFileBubble
+                  filename={pendingUpload.name}
+                  size={pendingUpload.size}
+                  isLoading={isUploadingDataset}
+                />
+              ) : null}
               {datasetPreview ? (
                 <DatasetPredictionCard
                   filename={datasetPreview.filename}
                   result={datasetPreview.result}
-                  onDismiss={() => setDatasetPreview(null)}
+                  onDismiss={() => {
+                    setDatasetPreview(null);
+                    setPendingUpload(null);
+                  }}
                 />
               ) : null}
-              {isSaving || isUploadingDataset ? <TypingIndicator /> : null}
+              {isSaving || isUploadingDataset ? (
+                <TypingIndicator
+                  label={
+                    isUploadingDataset
+                      ? "Waa la baadhayaa faylka..."
+                      : "Waa la baadhayaa..."
+                  }
+                />
+              ) : null}
               <div ref={bottomRef} />
             </div>
           </div>
         ) : null}
 
-        <div className="shrink-0 border-t border-gray-100 bg-white px-4 pt-3 pb-4 md:px-8">
+        <div className="shrink-0 border-t border-gray-100 bg-white px-3 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-4 md:px-8 md:pb-4">
           <form
             onSubmit={handleSubmit}
             className="mx-auto flex w-full max-w-[600px] flex-col gap-2"
@@ -290,19 +318,60 @@ export function ChatView() {
   );
 }
 
-function TypingIndicator() {
+function TypingIndicator({
+  label = "Waa la baadhayaa...",
+}: {
+  label?: string;
+}) {
   return (
     <div
       className="flex max-w-[80%] flex-col items-start gap-1.5"
       aria-live="polite"
-      aria-label="HealthAI is analyzing your claim"
+      aria-label={label}
     >
       <div className="inline-flex items-center gap-2 rounded-3xl rounded-bl-lg border border-orange-100 bg-[#ffefe6] px-4 py-3">
         <span className="size-1.5 animate-bounce rounded-full bg-brand [animation-delay:-0.2s]" />
         <span className="size-1.5 animate-bounce rounded-full bg-brand [animation-delay:-0.1s]" />
         <span className="size-1.5 animate-bounce rounded-full bg-brand" />
       </div>
-      <p className="pl-1 text-[11px] text-ink-muted">Waa la baadhayaa...</p>
+      <p className="pl-1 text-[11px] text-ink-muted">{label}</p>
+    </div>
+  );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function UploadedFileBubble({
+  filename,
+  size,
+  isLoading,
+}: {
+  filename: string;
+  size: number;
+  isLoading?: boolean;
+}) {
+  const extension = filename.includes(".")
+    ? filename.split(".").pop()?.toUpperCase()
+    : "FILE";
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <div className="flex max-w-[85%] items-center gap-3 rounded-3xl rounded-br-lg bg-[#ffefe6] px-3.5 py-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
+          <MaterialIcon name="description" size={22} />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-ink">{filename}</p>
+          <p className="text-[11px] text-ink-muted">
+            {extension} · {formatFileSize(size)}
+            {isLoading ? " · uploading..." : ""}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -319,23 +388,24 @@ function DatasetPredictionCard({
   const previewRows = result.results.slice(0, 5);
 
   return (
-    <div className="w-full rounded-3xl border border-orange-100 bg-[#ffefe6]/50 p-4">
+    <div className="w-full space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-ink">Dataset prediction</p>
-          <p className="truncate text-xs text-ink-muted">{filename}</p>
+          <p className="text-[15px] leading-7 text-ink">
+            Natiijada faylka <strong className="font-semibold">{filename}</strong>
+          </p>
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          className="flex size-7 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-white hover:text-brand"
+          className="flex size-7 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
           aria-label="Dismiss dataset results"
         >
           <MaterialIcon name="close" size={16} />
         </button>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-ink">
           {result.processed_rows}/{result.total_rows} processed
         </span>
@@ -343,7 +413,7 @@ function DatasetPredictionCard({
           {result.reliable_count} Reliable
         </span>
         <span className="inline-flex items-center rounded-full border border-red-500/25 bg-red-500/10 px-2.5 py-1 text-xs font-medium text-red-700">
-          {result.misinformation_count} Misinformation
+          {result.misinformation_count} Non-Reliable
         </span>
         {result.error_count > 0 ? (
           <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-ink-muted">
@@ -353,18 +423,19 @@ function DatasetPredictionCard({
       </div>
 
       {previewRows.length > 0 ? (
-        <ul className="mt-3 space-y-2">
+        <ul className="space-y-2">
           {previewRows.map((row) => (
             <li
               key={`${row.row}-${row.text.slice(0, 24)}`}
-              className="rounded-2xl border border-white/80 bg-white px-3 py-2"
+              className="border-l-2 border-gray-300 py-0.5 pl-4"
             >
-              <p className="line-clamp-2 text-xs leading-5 text-ink">{row.text}</p>
+              <p className="line-clamp-2 text-sm leading-6 text-ink">{row.text}</p>
               <p
-                className={`mt-1 text-[11px] font-medium ${
+                className={`mt-1 text-[13px] font-semibold ${
                   row.prediction === "Reliable"
                     ? "text-emerald-700"
-                    : row.prediction === "Misinformation"
+                    : row.prediction === "Misinformation" ||
+                        row.prediction === "Non-Reliable"
                       ? "text-red-700"
                       : "text-ink-muted"
                 }`}
@@ -377,7 +448,7 @@ function DatasetPredictionCard({
       ) : null}
 
       {result.results.length > previewRows.length ? (
-        <p className="mt-2 text-[11px] text-ink-muted">
+        <p className="text-[11px] text-ink-muted">
           Showing first {previewRows.length} of {result.results.length} rows.
         </p>
       ) : null}
@@ -441,7 +512,7 @@ function MessageBlock({
 
     return (
       <div className="flex flex-col items-end gap-1">
-        <div className="max-w-[80%] rounded-3xl rounded-br-lg bg-[#ffefe6] px-4 py-2.5 text-sm leading-relaxed text-ink">
+        <div className="max-w-[min(100%,80%)] rounded-3xl rounded-br-lg bg-[#ffefe6] px-3.5 py-2.5 text-sm leading-relaxed text-ink sm:px-4">
           {message.content}
         </div>
         <UserActions
@@ -454,7 +525,7 @@ function MessageBlock({
   }
 
   return (
-    <div className="flex max-w-[80%] flex-col items-start gap-1">
+    <div className="flex w-full max-w-full flex-col items-start gap-1 sm:max-w-[680px]">
       <AssistantVerdict content={message.content} />
       <AssistantActions content={message.content} />
     </div>
@@ -462,13 +533,9 @@ function MessageBlock({
 }
 
 function AssistantVerdict({ content }: { content: string }) {
-  const isNaturalReply = /Waad ku mahadsantahay/i.test(content);
-  if (isNaturalReply) {
-    return (
-      <div className="rounded-3xl rounded-bl-lg border border-gray-200 bg-white px-4 py-3 text-sm leading-6 whitespace-pre-line text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        {renderBoldPredictionTerms(content)}
-      </div>
-    );
+  const naturalReply = parseNaturalReply(content);
+  if (naturalReply) {
+    return <ChatGptStyleReply reply={naturalReply} />;
   }
 
   const isMisinformation =
@@ -478,7 +545,7 @@ function AssistantVerdict({ content }: { content: string }) {
 
   if (!isMisinformation && !isReliable) {
     return (
-      <div className="rounded-3xl rounded-bl-lg border border-gray-200 bg-white px-4 py-3 text-sm leading-6 text-ink shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="w-full text-[15px] leading-7 text-ink">
         {content}
       </div>
     );
@@ -518,31 +585,54 @@ function AssistantVerdict({ content }: { content: string }) {
   );
 }
 
-const BOLD_PREDICTION_TERMS = [
-  "Non-Reliable",
-  "Reliable",
-  "Mental Health Advice",
-  "Prevention Advice",
-  "Medication Advice",
-  "Lifestyle Advice",
-];
+type NaturalReply = {
+  thanks: string;
+  reliabilityPrompt: string;
+  reliabilityAnswer: string;
+  topicPrompt?: string;
+  topicAnswer?: string;
+};
 
-function renderBoldPredictionTerms(content: string) {
-  const pattern = new RegExp(
-    `(${BOLD_PREDICTION_TERMS.map((term) =>
-      term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    ).join("|")})`,
-    "g",
-  );
+function parseNaturalReply(content: string): NaturalReply | null {
+  if (!/Waad ku mahadsantahay/i.test(content)) return null;
 
-  return content.split(pattern).map((part, index) =>
-    BOLD_PREDICTION_TERMS.includes(part) ? (
-      <strong key={`${part}-${index}`} className="font-semibold text-ink">
-        {part}
-      </strong>
-    ) : (
-      <span key={`text-${index}`}>{part}</span>
-    ),
+  const lines = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length < 3) return null;
+
+  return {
+    thanks: lines[0],
+    reliabilityPrompt: lines[1],
+    reliabilityAnswer: lines[2],
+    topicPrompt: lines[3],
+    topicAnswer: lines[4],
+  };
+}
+
+function ChatGptStyleReply({ reply }: { reply: NaturalReply }) {
+  return (
+    <div className="w-full space-y-4 text-[15px] leading-7 text-ink">
+      <p>{reply.thanks}</p>
+
+      <div className="space-y-2">
+        <p>{reply.reliabilityPrompt}</p>
+        <blockquote className="border-l-2 border-gray-300 py-0.5 pl-4 font-semibold text-ink">
+          {reply.reliabilityAnswer}
+        </blockquote>
+      </div>
+
+      {reply.topicPrompt && reply.topicAnswer ? (
+        <div className="space-y-2">
+          <p>{reply.topicPrompt}</p>
+          <blockquote className="border-l-2 border-gray-300 py-0.5 pl-4 font-semibold text-ink">
+            {reply.topicAnswer}
+          </blockquote>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
