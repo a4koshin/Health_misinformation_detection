@@ -144,17 +144,20 @@ def predict_full_pipeline(text: str) -> dict[str, Any]:
 
 
 def build_response_message(label: str, topic: str | None = None) -> str:
-    """Wrap the raw prediction in a natural Somali reply."""
-    message = (
-        "Waad ku mahadsantahay weydiinta aad weydiisay. "
-        f"Markii aan fiirinay taladaan caafimaad, waxay u muuqataa mid {label}."
-    )
+    """Wrap the raw prediction in a natural Somali reply (prompt, then answer lines)."""
+    lines = [
+        "Waad ku mahadsantahay weydiinta aadna weydiisay.",
+        "Markii aan fiirinay taladaan caafimaad, waxay u muuqataa mid",
+        label,
+    ]
     if label == "Reliable" and topic:
-        message = (
-            f"{message}\n"
-            f"Taladaan caafimaad waxay soo hoos gasho mowduuca {topic}."
+        lines.extend(
+            [
+                "Taladaan caafimaad waxay soo hoos gashaa mowduuca",
+                topic,
+            ]
         )
-    return message
+    return "\n".join(lines)
 
 
 def predict(text: str, *, skip_validation: bool = False) -> str:
