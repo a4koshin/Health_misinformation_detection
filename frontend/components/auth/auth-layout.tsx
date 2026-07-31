@@ -17,14 +17,14 @@ export function AuthLayout({
   backHref?: string;
 }) {
   return (
-    <div className="liquid-bg flex min-h-screen items-center justify-center px-4 py-12">
+    <div className="liquid-bg flex min-h-dvh items-center justify-center px-4 py-8 sm:py-12">
       <div className="w-full max-w-[440px]">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between gap-3">
           <Logo />
           {backHref ? (
             <Link
               href={backHref}
-              className="flex size-10 items-center justify-center rounded-xl text-[#475569] transition-colors hover:bg-gray-100 hover:text-[#0f172a]"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl text-[#475569] transition-colors hover:bg-gray-100 hover:text-[#0f172a]"
               aria-label="Back to sign in"
             >
               <MaterialIcon name="arrow_back" size={20} />
@@ -32,16 +32,16 @@ export function AuthLayout({
           ) : (
             <Link
               href="/"
-              className="text-sm font-medium text-[#475569] transition-colors hover:text-[#ff5c00]"
+              className="shrink-0 text-sm font-medium text-[#475569] transition-colors hover:text-[#ff5c00]"
             >
               Back to home
             </Link>
           )}
         </div>
 
-        <div className="glass-strong rounded-3xl p-8 sm:p-9">
-          <header className="mb-8 space-y-2">
-            <h1 className="text-2xl font-normal tracking-tight text-[#0f172a]">
+        <div className="glass-strong rounded-3xl p-6 sm:p-9">
+          <header className="mb-6 space-y-2 sm:mb-8">
+            <h1 className="text-xl font-normal tracking-tight text-[#0f172a] sm:text-2xl">
               {title}
             </h1>
             <p className="text-sm leading-relaxed text-[#475569]">
