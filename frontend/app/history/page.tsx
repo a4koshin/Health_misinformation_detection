@@ -57,7 +57,7 @@ function HistoryContent() {
 
   function handleSelect(id: string) {
     selectChat(id);
-    router.push("/chat");
+    router.push("/prediction");
   }
 
   function handleDeleted(id: string) {
