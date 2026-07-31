@@ -1,8 +1,53 @@
 import { apiFetch } from "@/lib/api";
-import type { Conversation, Detection } from "@/types/api";
+import type {
+  Conversation,
+  Detection,
+  UserDashboardStats,
+  UserReportResponse,
+} from "@/types/api";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
 
 export async function getHistory(token: string): Promise<Detection[]> {
   return apiFetch<Detection[]>("/api/history", {}, token);
+}
+
+export async function getUserDashboardStats(
+  token: string,
+): Promise<UserDashboardStats> {
+  return apiFetch<UserDashboardStats>("/api/history/stats", {}, token);
+}
+
+export async function getUserReport(
+  token: string,
+): Promise<UserReportResponse> {
+  return apiFetch<UserReportResponse>("/api/history/report", {}, token);
+}
+
+export async function downloadUserReport(token: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/history/report/download`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to download report.");
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition");
+  const match = disposition?.match(/filename="?([^"]+)"?/i);
+  const filename = match?.[1] ?? "healthai-report.csv";
+
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 export async function getConversation(
