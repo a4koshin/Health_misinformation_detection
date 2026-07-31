@@ -46,7 +46,7 @@ export function LoginForm() {
       await login(email.trim(), password);
       toast.success("Welcome back!");
       const role = useAuthStore.getState().user?.role;
-      router.replace(role === "admin" ? "/dashboard" : "/chat");
+      router.replace(role === "admin" ? "/dashboard" : "/prediction");
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : "Unable to sign in.";
