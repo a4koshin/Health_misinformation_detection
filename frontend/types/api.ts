@@ -50,6 +50,28 @@ export type DashboardStats = {
   pending_count: number;
 };
 
+export type UserDashboardStats = {
+  total_predictions: number;
+  reliable_count: number;
+  non_reliable_count: number;
+  chat_count: number;
+};
+
+export type ReportRow = {
+  conversation_id: string;
+  claim: string;
+  label: string | null;
+  topic: string | null;
+  created_at: string;
+};
+
+export type UserReportResponse = {
+  total_rows: number;
+  reliable_count: number;
+  non_reliable_count: number;
+  rows: ReportRow[];
+};
+
 export type AdminUserCreate = {
   email: string;
   full_name?: string | null;
