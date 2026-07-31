@@ -32,6 +32,28 @@ class DetectionSummary(DetectionResponse):
     message_count: int
 
 
+class UserDashboardStats(BaseModel):
+    total_predictions: int
+    reliable_count: int
+    non_reliable_count: int
+    chat_count: int
+
+
+class ReportRow(BaseModel):
+    conversation_id: uuid.UUID
+    claim: str
+    label: str | None
+    topic: str | None
+    created_at: datetime
+
+
+class UserReportResponse(BaseModel):
+    total_rows: int
+    reliable_count: int
+    non_reliable_count: int
+    rows: list[ReportRow]
+
+
 class ChatMessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
