@@ -24,6 +24,7 @@ import type { Detection } from "@/types/api";
 
 type SidebarProps = {
   onClose?: () => void;
+  onNavigate?: () => void;
 };
 
 function NavItem({
@@ -43,8 +44,8 @@ function NavItem({
       onClick={onClick}
       className={
         active
-          ? "flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-full bg-brand/10 px-3.5 text-[13px] font-medium text-brand-deep transition-colors duration-200"
-          : "flex h-9 w-full cursor-pointer items-center gap-2.5 rounded-full px-3.5 text-[13px] text-ink transition-colors duration-200 hover:bg-orange-50"
+          ? "flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-full bg-brand/10 px-3.5 text-[13px] font-medium text-brand-deep transition-colors duration-200 sm:h-9"
+          : "flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-full px-3.5 text-[13px] text-ink transition-colors duration-200 hover:bg-orange-50 sm:h-9"
       }
     >
       <MaterialIcon
@@ -57,7 +58,7 @@ function NavItem({
   );
 }
 
-export function Sidebar({ onClose }: SidebarProps) {
+export function Sidebar({ onClose, onNavigate }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, token, logout } = useAuth();
@@ -70,7 +71,13 @@ export function Sidebar({ onClose }: SidebarProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const isAdmin = user?.role === "admin";
-  const showChatRecents = pathname === "/chat" || pathname.startsWith("/chat/");
+  const showChatRecents =
+    pathname === "/prediction" || pathname.startsWith("/prediction/");
+
+  function go(path: string) {
+    router.push(path);
+    onNavigate?.();
+  }
 
   useEffect(() => {
     let active = true;
@@ -114,18 +121,18 @@ export function Sidebar({ onClose }: SidebarProps) {
   function handleNewChat() {
     startNewChat();
     setSearchOpen(false);
-    router.push("/chat");
+    go("/prediction");
   }
 
   function handleSelectChat(id: string) {
     selectChat(id);
-    router.push("/chat");
+    go("/prediction");
   }
 
   function handleChatDeleted(id: string) {
     removeChat(id);
     if (activeChatId === id) {
-      router.push("/chat");
+      go("/prediction");
     }
   }
 
@@ -142,7 +149,7 @@ export function Sidebar({ onClose }: SidebarProps) {
 
   return (
     <>
-      <aside className="flex h-full w-[240px] shrink-0 flex-col rounded-3xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.1)]">
+      <aside className="flex h-full w-full max-w-[280px] shrink-0 flex-col rounded-3xl bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.1)] lg:w-[240px]">
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <button
             type="button"
@@ -156,112 +163,124 @@ export function Sidebar({ onClose }: SidebarProps) {
               aria-hidden="true"
             />
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
-            aria-label="Close sidebar"
-          >
-            <MaterialIcon name="left_panel_close" size={18} />
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="flex size-9 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
+              aria-label="Search chats"
+              title="Search chats"
+            >
+              <MaterialIcon name="search" size={20} />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex size-9 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
+              aria-label="Close sidebar"
+              title="Collapse sidebar"
+            >
+              <MaterialIcon name="left_panel_close" size={18} />
+            </button>
+          </div>
         </div>
 
-        <div className="px-3 pb-2">
-          <button
-            type="button"
-            onClick={handleNewChat}
-            className="flex h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-full bg-brand text-[13px] font-semibold text-white transition-colors hover:bg-[#e65300]"
-          >
-            <MaterialIcon name="edit_square" size={16} />
-            New chat
-          </button>
-        </div>
-
-        <div className="px-3 pt-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-2">
           <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
             Menu
           </p>
           <div className="space-y-0.5">
             <NavItem
+              icon="dashboard"
+              label="Dashboard"
+              active={pathname === "/my-dashboard"}
+              onClick={() => go("/my-dashboard")}
+            />
+            <NavItem
+              icon="psychology"
+              label="Prediction"
+              active={pathname === "/prediction"}
+              onClick={() => go("/prediction")}
+            />
+            <NavItem
               icon="history"
               label="History"
               active={pathname === "/history"}
-              onClick={() => router.push("/history")}
+              onClick={() => go("/history")}
             />
             <NavItem
-              icon="search"
-              label="Search chats"
-              onClick={() => setSearchOpen(true)}
+              icon="download"
+              label="Report"
+              active={pathname === "/report"}
+              onClick={() => go("/report")}
             />
           </div>
+
+          {isAdmin ? (
+            <div className="pt-3">
+              <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
+                Admin
+              </p>
+              <div className="space-y-0.5">
+                <NavItem
+                  icon="monitoring"
+                  label="Admin dashboard"
+                  active={pathname === "/dashboard"}
+                  onClick={() => go("/dashboard")}
+                />
+                <NavItem
+                  icon="group"
+                  label="Users"
+                  active={pathname === "/users"}
+                  onClick={() => go("/users")}
+                />
+                <NavItem
+                  icon="upload_file"
+                  label="Dataset"
+                  active={pathname === "/dataset"}
+                  onClick={() => go("/dataset")}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {showChatRecents ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-3">
+              <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
+                Recents
+              </p>
+
+              <div className="min-h-0 flex-1 overflow-y-auto pb-4">
+                {isLoadingHistory ? (
+                  <p className="px-3 py-1 text-sm text-ink-muted">Loading...</p>
+                ) : history.length === 0 ? (
+                  <p className="px-3 py-1 text-sm text-ink-muted">No chats yet</p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {history.map((item) => (
+                      <li key={item.id}>
+                        <ChatHistoryItem
+                          item={item}
+                          isActive={activeChatId === item.id}
+                          token={token}
+                          onSelect={handleSelectChat}
+                          onDeleted={handleChatDeleted}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
-
-        {isAdmin ? (
-          <div className="px-3 pt-3">
-            <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
-              Admin
-            </p>
-            <div className="space-y-0.5">
-              <NavItem
-                icon="dashboard"
-                label="Dashboard"
-                active={pathname === "/dashboard"}
-                onClick={() => router.push("/dashboard")}
-              />
-              <NavItem
-                icon="group"
-                label="Users"
-                active={pathname === "/users"}
-                onClick={() => router.push("/users")}
-              />
-              <NavItem
-                icon="upload_file"
-                label="Dataset"
-                active={pathname === "/dataset"}
-                onClick={() => router.push("/dataset")}
-              />
-            </div>
-          </div>
-        ) : null}
-
-        {showChatRecents ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 pt-3">
-            <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
-              Recents
-            </p>
-
-            <div className="min-h-0 flex-1 overflow-y-auto pb-4">
-              {isLoadingHistory ? (
-                <p className="px-3 py-1 text-sm text-ink-muted">Loading...</p>
-              ) : history.length === 0 ? (
-                <p className="px-3 py-1 text-sm text-ink-muted">No chats yet</p>
-              ) : (
-                <ul className="space-y-0.5">
-                  {history.map((item) => (
-                    <li key={item.id}>
-                      <ChatHistoryItem
-                        item={item}
-                        isActive={activeChatId === item.id}
-                        token={token}
-                        onSelect={handleSelectChat}
-                        onDeleted={handleChatDeleted}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1" />
-        )}
 
         <div className="border-t border-gray-200 p-2.5">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex w-full cursor-pointer items-center gap-2 rounded-full px-2 py-1 transition-colors hover:bg-orange-50"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-full px-2 py-1.5 transition-colors hover:bg-orange-50"
                 aria-label="Account menu"
               >
                 <Avatar size="sm" className="after:border-0">
@@ -307,14 +326,14 @@ export function Sidebar({ onClose }: SidebarProps) {
               <div className="py-1">
                 <DropdownMenuItem
                   className="cursor-pointer rounded-lg px-3 py-2"
-                  onClick={() => router.push("/profile")}
+                  onClick={() => go("/profile")}
                 >
                   <MaterialIcon name="person" size={18} />
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer rounded-lg px-3 py-2"
-                  onClick={() => router.push("/settings")}
+                  onClick={() => go("/settings")}
                 >
                   <MaterialIcon name="settings" size={18} />
                   Settings
@@ -326,7 +345,7 @@ export function Sidebar({ onClose }: SidebarProps) {
                 onClick={handleLogout}
                 className="cursor-pointer rounded-lg px-3 py-2"
               >
-                <MaterialIcon name="logout" size={18} />
+                <MaterialIcon name="logout" size={16} />
                 Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
