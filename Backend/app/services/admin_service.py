@@ -126,7 +126,7 @@ def get_dashboard_stats(db: Session) -> DashboardStats:
     )
     misinformation_count = (
         db.query(func.count(Detection.id))
-        .filter(Detection.label == "Misinformation")
+        .filter(Detection.label.in_(["Misinformation", "Non-Reliable"]))
         .scalar()
         or 0
     )
