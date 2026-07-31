@@ -4,7 +4,12 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.chat_message import ChatMessage
 from app.models.detection import Detection
-from app.schemas.detection import DetectionSummary
+from app.schemas.detection import (
+    DetectionSummary,
+    ReportRow,
+    UserDashboardStats,
+    UserReportResponse,
+)
 from app.services import detection_service
 from app.services.chat_intent_service import (
     maybe_conversational_reply,
@@ -17,6 +22,181 @@ from app.services.input_validation_service import validate_somali_text
 def build_label_reply(label: str, topic: str | None = None) -> str:
     """Prefer the shared Somali wrapper from detection_service."""
     return detection_service.build_response_message(label, topic)
+
+
+def _is_prediction_reply(content: str) -> bool:
+    text = content or ""
+    return (
+        "Waad ku mahadsantahay" in text
+        or "Natiijadu waa" in text
+        or text.startswith("Result:")
+    )
+
+
+def _classify_prediction_label(content: str) -> str | None:
+    text = content or ""
+    if "Non-Reliable" in text or "Misinformation" in text:
+        return "Non-Reliable"
+    if "Reliable" in text:
+        return "Reliable"
+    return None
+
+
+def _extract_topic(content: str) -> str | None:
+    lines = [line.strip() for line in (content or "").splitlines() if line.strip()]
+    for index, line in enumerate(lines):
+        if "mowduuca" in line.lower() and index + 1 < len(lines):
+            topic = lines[index + 1].strip()
+            if topic and topic not in {"Reliable", "Non-Reliable", "Misinformation"}:
+                return topic
+    return None
+
+
+def get_user_dashboard_stats(
+    db: Session,
+    user_id: uuid.UUID,
+) -> UserDashboardStats:
+    """Count this user's predictions from assistant classification replies."""
+    messages = (
+        db.query(ChatMessage)
+        .join(Detection, ChatMessage.detection_id == Detection.id)
+        .filter(
+            Detection.user_id == user_id,
+            ChatMessage.role == "assistant",
+        )
+        .all()
+    )
+
+    total_predictions = 0
+    reliable_count = 0
+    non_reliable_count = 0
+
+    for message in messages:
+        if not _is_prediction_reply(message.content):
+            continue
+        total_predictions += 1
+        label = _classify_prediction_label(message.content)
+        if label == "Reliable":
+            reliable_count += 1
+        elif label == "Non-Reliable":
+            non_reliable_count += 1
+
+    chat_count = (
+        db.query(Detection).filter(Detection.user_id == user_id).count()
+    )
+
+    return UserDashboardStats(
+        total_predictions=total_predictions,
+        reliable_count=reliable_count,
+        non_reliable_count=non_reliable_count,
+        chat_count=chat_count,
+    )
+
+
+def get_user_report(db: Session, user_id: uuid.UUID) -> UserReportResponse:
+    """Build a downloadable prediction report for one user."""
+    detections = (
+        db.query(Detection)
+        .options(joinedload(Detection.messages))
+        .filter(Detection.user_id == user_id)
+        .order_by(Detection.created_at.desc())
+        .all()
+    )
+
+    rows: list[ReportRow] = []
+    reliable_count = 0
+    non_reliable_count = 0
+
+    for detection in detections:
+        messages = sorted(
+            detection.messages,
+            key=lambda message: (
+                message.created_at,
+                0 if message.role == "user" else 1,
+                str(message.id),
+            ),
+        )
+
+        pending_claim: str | None = None
+        for message in messages:
+            if message.role == "user":
+                pending_claim = message.content.strip()
+                continue
+
+            if message.role != "assistant" or not pending_claim:
+                continue
+            if not _is_prediction_reply(message.content):
+                pending_claim = None
+                continue
+
+            label = _classify_prediction_label(message.content)
+            topic = _extract_topic(message.content) if label == "Reliable" else None
+            if label == "Reliable":
+                reliable_count += 1
+            elif label == "Non-Reliable":
+                non_reliable_count += 1
+
+            rows.append(
+                ReportRow(
+                    conversation_id=detection.id,
+                    claim=pending_claim,
+                    label=label,
+                    topic=topic,
+                    created_at=message.created_at,
+                )
+            )
+            pending_claim = None
+
+        # Legacy detections with a label but no chat-message pairs yet.
+        if not any(
+            row.conversation_id == detection.id for row in rows
+        ) and detection.label:
+            label = detection.label
+            if label == "Misinformation":
+                label = "Non-Reliable"
+            if label == "Reliable":
+                reliable_count += 1
+            elif label == "Non-Reliable":
+                non_reliable_count += 1
+            rows.append(
+                ReportRow(
+                    conversation_id=detection.id,
+                    claim=detection.input_text.strip(),
+                    label=label,
+                    topic=None,
+                    created_at=detection.created_at,
+                )
+            )
+
+    return UserReportResponse(
+        total_rows=len(rows),
+        reliable_count=reliable_count,
+        non_reliable_count=non_reliable_count,
+        rows=rows,
+    )
+
+
+def build_user_report_csv(report: UserReportResponse) -> str:
+    """Serialize the user report as CSV text."""
+    import csv
+    import io
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["claim", "label", "topic", "created_at", "conversation_id"]
+    )
+    for row in report.rows:
+        writer.writerow(
+            [
+                row.claim,
+                row.label or "",
+                row.topic or "",
+                row.created_at.isoformat(),
+                str(row.conversation_id),
+            ]
+        )
+    return buffer.getvalue()
 
 
 def resolve_user_message(text: str) -> tuple[str, str | None, str]:
