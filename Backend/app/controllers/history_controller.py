@@ -1,6 +1,8 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.controllers.deps import get_current_user
@@ -12,6 +14,8 @@ from app.schemas.detection import (
     DetectionSummary,
     MessageCreate,
     MessageUpdate,
+    UserDashboardStats,
+    UserReportResponse,
 )
 from app.services import history_service
 
@@ -24,6 +28,40 @@ def get_history(
     db: Session = Depends(get_db),
 ) -> list[DetectionSummary]:
     return history_service.get_user_detections(db, current_user.id)
+
+
+@router.get("/stats", response_model=UserDashboardStats)
+def get_user_stats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserDashboardStats:
+    return history_service.get_user_dashboard_stats(db, current_user.id)
+
+
+@router.get("/report", response_model=UserReportResponse)
+def get_user_report(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserReportResponse:
+    return history_service.get_user_report(db, current_user.id)
+
+
+@router.get("/report/download")
+def download_user_report(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    report = history_service.get_user_report(db, current_user.id)
+    csv_text = history_service.build_user_report_csv(report)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    filename = f"healthai-report-{stamp}.csv"
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 
 @router.get("/{detection_id}", response_model=ConversationResponse)
