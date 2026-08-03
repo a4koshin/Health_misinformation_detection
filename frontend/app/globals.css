@@ -250,3 +250,14 @@
     animation: none;
   }
 }
+/* Hide scrollbars while keeping scroll (private pages / dashboard). */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
