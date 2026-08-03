@@ -185,16 +185,20 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 pt-2">
-          <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
-            Menu
+        <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-3 pt-2">
+          <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
+            Workspace
           </p>
           <div className="space-y-0.5">
             <NavItem
               icon="dashboard"
               label="Dashboard"
-              active={pathname === "/my-dashboard"}
-              onClick={() => go("/my-dashboard")}
+              active={
+                pathname === "/dashboard" || pathname === "/my-dashboard"
+              }
+              onClick={() =>
+                go(isAdmin ? "/dashboard" : "/my-dashboard")
+              }
             />
             <NavItem
               icon="psychology"
@@ -217,17 +221,11 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
           </div>
 
           {isAdmin ? (
-            <div className="pt-3">
-              <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
-                Admin
+            <div className="pt-4">
+              <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
+                Manage
               </p>
               <div className="space-y-0.5">
-                <NavItem
-                  icon="monitoring"
-                  label="Admin dashboard"
-                  active={pathname === "/dashboard"}
-                  onClick={() => go("/dashboard")}
-                />
                 <NavItem
                   icon="group"
                   label="Users"
@@ -235,25 +233,45 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                   onClick={() => go("/users")}
                 />
                 <NavItem
-                  icon="upload_file"
-                  label="Dataset"
-                  active={pathname === "/dataset"}
-                  onClick={() => go("/dataset")}
+                  icon="model_training"
+                  label="Models"
+                  active={pathname === "/models" || pathname === "/dataset"}
+                  onClick={() => go("/models")}
+                />
+                <NavItem
+                  icon="policy"
+                  label="Audit log"
+                  active={pathname === "/audit-log"}
+                  onClick={() => go("/audit-log")}
                 />
               </div>
             </div>
           ) : null}
 
+          <div className="pt-4">
+            <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
+              Account
+            </p>
+            <div className="space-y-0.5">
+              <NavItem
+                icon="manage_accounts"
+                label="Account"
+                active={pathname === "/settings" || pathname === "/profile"}
+                onClick={() => go("/settings")}
+              />
+            </div>
+          </div>
+
           {showChatRecents ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-3">
-              <p className="px-2 pb-1 text-[10px] font-medium tracking-normal text-ink-muted">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-4">
+              <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
                 Recents
               </p>
 
-              <div className="min-h-0 flex-1 overflow-y-auto pb-4">
+              <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-4">
                 {isLoadingHistory ? (
                   <p className="px-3 py-1 text-sm text-ink-muted">Loading...</p>
-                ) : history.length === 0 ? (
+                ) : !Array.isArray(history) || history.length === 0 ? (
                   <p className="px-3 py-1 text-sm text-ink-muted">No chats yet</p>
                 ) : (
                   <ul className="space-y-0.5">
@@ -326,17 +344,10 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
               <div className="py-1">
                 <DropdownMenuItem
                   className="cursor-pointer rounded-lg px-3 py-2"
-                  onClick={() => go("/profile")}
-                >
-                  <MaterialIcon name="person" size={18} />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer rounded-lg px-3 py-2"
                   onClick={() => go("/settings")}
                 >
-                  <MaterialIcon name="settings" size={18} />
-                  Settings
+                  <MaterialIcon name="manage_accounts" size={18} />
+                  Account
                 </DropdownMenuItem>
               </div>
               <DropdownMenuSeparator />
