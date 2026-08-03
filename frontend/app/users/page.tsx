@@ -7,20 +7,29 @@ import { ProtectedRoute } from "@/components/auth/protected-route";
 import { PasswordInput } from "@/components/auth/password-input";
 import { GlassBadge } from "@/components/glass/glass-badge";
 import { GlassButton } from "@/components/glass/glass-button";
+import { DeleteAlertModal } from "@/components/glass/delete-alert-modal";
 import {
   GlassInput,
   GlassLabel,
   GlassSelect,
 } from "@/components/glass/glass-input";
 import { GlassModal } from "@/components/glass/glass-modal";
+import { DataTableCard } from "@/components/glass/data-table-card";
 import {
-  GlassTable,
   GlassTableBody,
   GlassTableCell,
   GlassTableHead,
   GlassTableHeaderCell,
   GlassTableRow,
 } from "@/components/glass/glass-table";
+import {
+  TableDeleteButton,
+  TableEditButton,
+} from "@/components/glass/table-icon-button";
+import {
+  TablePagination,
+  useTablePagination,
+} from "@/components/glass/table-pagination";
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -54,8 +63,11 @@ function UsersContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [showForm, setShowForm] = useState(false);
+  const pagination = useTablePagination(users, 10);
 
   async function loadUsers() {
     if (!token) return;
@@ -137,24 +149,26 @@ function UsersContent() {
     }
   }
 
-  async function handleDelete(user: User) {
-    if (!token) return;
-    if (user.id === currentUser?.id) {
+  async function handleDelete() {
+    if (!token || !pendingDelete) return;
+    if (pendingDelete.id === currentUser?.id) {
       toast.error("You cannot delete your own account.");
+      setPendingDelete(null);
       return;
     }
 
-    const confirmed = window.confirm(`Delete ${user.email}?`);
-    if (!confirmed) return;
-
+    setIsDeleting(true);
     try {
-      await deleteUser(token, user.id);
+      await deleteUser(token, pendingDelete.id);
       toast.success("User deleted.");
+      setPendingDelete(null);
       await loadUsers();
     } catch (error) {
       const message =
         error instanceof ApiError ? error.message : "Unable to delete user.";
       toast.error(message);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -184,18 +198,6 @@ function UsersContent() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <GlassLabel htmlFor="user-email">Email</GlassLabel>
-              <GlassInput
-                id="user-email"
-                type="email"
-                value={form.email}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, email: event.target.value }))
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2">
               <GlassLabel htmlFor="user-name">Full name</GlassLabel>
               <GlassInput
                 id="user-name"
@@ -206,6 +208,18 @@ function UsersContent() {
                     full_name: event.target.value,
                   }))
                 }
+              />
+            </div>
+            <div className="space-y-2">
+              <GlassLabel htmlFor="user-email">Email</GlassLabel>
+              <GlassInput
+                id="user-email"
+                type="email"
+                value={form.email}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, email: event.target.value }))
+                }
+                required
               />
             </div>
             <div className="space-y-2">
@@ -254,70 +268,105 @@ function UsersContent() {
         </form>
       </GlassModal>
 
-      {isLoading ? (
-        <div className="glass-strong space-y-3 rounded-3xl p-5">
-          {[0, 1, 2, 3].map((index) => (
-            <div key={index} className="h-11 animate-pulse rounded-xl bg-gray-100" />
-          ))}
-        </div>
-      ) : users.length === 0 ? (
-        <div className="glass-strong flex flex-col items-center gap-2 rounded-3xl px-4 py-12 text-center">
-          <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
-            <MaterialIcon name="group" size={24} />
-          </span>
-          <p className="text-sm font-medium text-[#0f172a]">No users found</p>
-          <p className="text-sm text-[#475569]">
-            Create the first account with the button above.
-          </p>
-        </div>
-      ) : (
-        <GlassTable>
-          <GlassTableHead>
-            <tr>
-              <GlassTableHeaderCell>Name</GlassTableHeaderCell>
-              <GlassTableHeaderCell>Email</GlassTableHeaderCell>
-              <GlassTableHeaderCell>Role</GlassTableHeaderCell>
-              <GlassTableHeaderCell>Actions</GlassTableHeaderCell>
-            </tr>
-          </GlassTableHead>
-          <GlassTableBody>
-            {users.map((user) => (
+      <DataTableCard
+        header={
+          <div>
+            <h2 className="text-base font-medium text-[#0f172a]">Users</h2>
+            <p className="text-sm text-[#475569]">
+              Manage accounts, roles, and access across HealthAI.
+            </p>
+          </div>
+        }
+        footer={
+          !isLoading && users.length > 0 ? (
+            <TablePagination
+              page={pagination.page}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              rangeStart={pagination.rangeStart}
+              rangeEnd={pagination.rangeEnd}
+              pageNumbers={pagination.pageNumbers}
+              onPageChange={pagination.setPage}
+              rowsPerPage={pagination.rowsPerPage}
+              onRowsPerPageChange={pagination.setRowsPerPage}
+            />
+          ) : undefined
+        }
+      >
+        <GlassTableHead>
+          <GlassTableRow>
+            <GlassTableHeaderCell>Name</GlassTableHeaderCell>
+            <GlassTableHeaderCell>Email</GlassTableHeaderCell>
+            <GlassTableHeaderCell>Role</GlassTableHeaderCell>
+            <GlassTableHeaderCell className="text-right">
+              Actions
+            </GlassTableHeaderCell>
+          </GlassTableRow>
+        </GlassTableHead>
+        <GlassTableBody>
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, index) => (
+              <GlassTableRow key={index}>
+                <GlassTableCell colSpan={4}>
+                  <div className="h-8 animate-pulse rounded-lg bg-gray-50" />
+                </GlassTableCell>
+              </GlassTableRow>
+            ))
+          ) : users.length === 0 ? (
+            <GlassTableRow>
+              <GlassTableCell colSpan={4}>
+                <div className="flex flex-col items-center gap-2 py-10 text-center">
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
+                    <MaterialIcon name="group" size={24} />
+                  </span>
+                  <p className="text-sm font-medium text-[#0f172a]">
+                    No users found
+                  </p>
+                  <p className="text-sm text-[#475569]">
+                    Create the first account with the button above.
+                  </p>
+                </div>
+              </GlassTableCell>
+            </GlassTableRow>
+          ) : (
+            pagination.pageItems.map((user) => (
               <GlassTableRow key={user.id}>
                 <GlassTableCell className="font-medium">
                   {user.full_name || "—"}
                 </GlassTableCell>
                 <GlassTableCell>{user.email}</GlassTableCell>
                 <GlassTableCell>
-                  <GlassBadge tone={user.role === "admin" ? "brand" : "neutral"}>
+                  <GlassBadge
+                    tone={user.role === "admin" ? "brand" : "neutral"}
+                    className="capitalize"
+                  >
                     {user.role}
                   </GlassBadge>
                 </GlassTableCell>
-                <GlassTableCell>
-                  <div className="flex gap-2">
-                    <GlassButton
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditForm(user)}
-                    >
-                      Edit
-                    </GlassButton>
-                    <GlassButton
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => void handleDelete(user)}
+                <GlassTableCell className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <TableEditButton onClick={() => openEditForm(user)} />
+                    <TableDeleteButton
+                      onClick={() => setPendingDelete(user)}
                       disabled={user.id === currentUser?.id}
-                    >
-                      Delete
-                    </GlassButton>
+                    />
                   </div>
                 </GlassTableCell>
               </GlassTableRow>
-            ))}
-          </GlassTableBody>
-        </GlassTable>
-      )}
+            ))
+          )}
+        </GlassTableBody>
+      </DataTableCard>
+
+      <DeleteAlertModal
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setPendingDelete(null);
+        }}
+        itemLabel={pendingDelete?.email}
+        isLoading={isDeleting}
+        onConfirm={handleDelete}
+      />
     </PrivatePage>
   );
 }
