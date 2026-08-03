@@ -6,10 +6,24 @@ import type {
   UserReportResponse,
 } from "@/types/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 export async function getHistory(token: string): Promise<Detection[]> {
-  return apiFetch<Detection[]>("/api/history", {}, token);
+  const data = await apiFetch<Detection[] | { items?: Detection[] }>(
+    "/api/history?per_page=100",
+    {},
+    token,
+  );
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (data && Array.isArray(data.items)) {
+    return data.items;
+  }
+
+  return [];
 }
 
 export async function getUserDashboardStats(
@@ -21,11 +35,11 @@ export async function getUserDashboardStats(
 export async function getUserReport(
   token: string,
 ): Promise<UserReportResponse> {
-  return apiFetch<UserReportResponse>("/api/history/report", {}, token);
+  return apiFetch<UserReportResponse>("/api/report", {}, token);
 }
 
 export async function downloadUserReport(token: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/history/report/download`, {
+  const response = await fetch(`${API_BASE}/api/report/download`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
