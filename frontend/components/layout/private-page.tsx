@@ -1,26 +1,35 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+
 export function PrivatePage({
   title,
   description,
   actions,
   children,
+  className,
 }: {
   title: string;
   description?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 overflow-y-auto px-4 pt-14 pb-6 sm:gap-6 sm:px-6 sm:pt-8 sm:pb-8 md:px-8">
+      <div
+        className={cn(
+          "scrollbar-none flex w-full flex-1 flex-col gap-5 overflow-y-auto px-4 pt-14 pb-6 sm:gap-6 sm:px-6 sm:pt-8 sm:pb-8 lg:px-8",
+          className,
+        )}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1 pr-12 sm:pr-0">
             <h1 className="text-xl font-normal tracking-tight text-[#0f172a] sm:text-2xl">
               {title}
             </h1>
             {description ? (
-              <p className="max-w-2xl text-sm leading-relaxed text-[#475569]">
+              <p className="max-w-3xl text-sm leading-relaxed text-[#475569]">
                 {description}
               </p>
             ) : null}
