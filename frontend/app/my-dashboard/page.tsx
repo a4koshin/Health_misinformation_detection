@@ -20,14 +20,19 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { GlassBadge } from "@/components/glass/glass-badge";
 import { GlassCard } from "@/components/glass/glass-card";
+import { DataTableCard } from "@/components/glass/data-table-card";
 import {
-  GlassTable,
   GlassTableBody,
   GlassTableCell,
   GlassTableHead,
   GlassTableHeaderCell,
   GlassTableRow,
 } from "@/components/glass/glass-table";
+import { TableIconButton } from "@/components/glass/table-icon-button";
+import {
+  TablePagination,
+  useTablePagination,
+} from "@/components/glass/table-pagination";
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -150,6 +155,7 @@ function UserDashboardContent() {
   const [stats, setStats] = useState<UserDashboardStats | null>(null);
   const [chats, setChats] = useState<Detection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const chatsPagination = useTablePagination(chats, 10);
 
   useEffect(() => {
     let active = true;
@@ -158,20 +164,36 @@ function UserDashboardContent() {
       if (!token) return;
       setIsLoading(true);
       try {
-        const [statsData, historyData] = await Promise.all([
+        const [statsResult, historyResult] = await Promise.allSettled([
           getUserDashboardStats(token),
           getHistory(token),
         ]);
-        if (active) {
-          setStats(statsData);
-          setChats(historyData);
+
+        if (!active) return;
+
+        if (statsResult.status === "fulfilled") {
+          setStats(statsResult.value);
+        } else {
+          setStats({
+            total_predictions: 0,
+            reliable_count: 0,
+            non_reliable_count: 0,
+            chat_count: 0,
+          });
+          const message =
+            statsResult.reason instanceof ApiError
+              ? statsResult.reason.message
+              : "Unable to load dashboard stats.";
+          toast.error(message);
         }
-      } catch (error) {
-        const message =
-          error instanceof ApiError
-            ? error.message
-            : "Unable to load your dashboard.";
-        toast.error(message);
+
+        if (historyResult.status === "fulfilled") {
+          setChats(
+            Array.isArray(historyResult.value) ? historyResult.value : [],
+          );
+        } else {
+          setChats([]);
+        }
       } finally {
         if (active) setIsLoading(false);
       }
@@ -236,22 +258,20 @@ function UserDashboardContent() {
       description="Your prediction activity with charts and a list of your chats."
     >
       {isLoading ? (
-        <>
+        <div className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {statCards.map((card) => (
               <StatSkeleton key={card.key} />
             ))}
           </div>
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <ChartSkeleton />
             <ChartSkeleton />
           </div>
-          <div className="mt-6">
-            <ChartSkeleton />
-          </div>
-        </>
+          <ChartSkeleton />
+        </div>
       ) : stats ? (
-        <>
+        <div className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {statCards.map((card) => (
               <StatCard
@@ -264,20 +284,15 @@ function UserDashboardContent() {
             ))}
           </div>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <GlassCard className="p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-normal text-[#0f172a]">
-                    Reliable vs Non-Reliable
-                  </h2>
-                  <p className="text-xs text-[#475569]">
-                    Share of your prediction outcomes
-                  </p>
-                </div>
-                <span className="flex size-9 items-center justify-center rounded-xl bg-[#ff5c00]/10 text-[#ff5c00]">
-                  <MaterialIcon name="pie_chart" size={20} />
-                </span>
+              <div className="mb-4">
+                <h2 className="text-base font-medium text-[#0f172a]">
+                  Reliable vs Non-Reliable
+                </h2>
+                <p className="text-sm text-[#475569]">
+                  Share of your prediction outcomes.
+                </p>
               </div>
 
               {pieData.length === 0 ? (
@@ -325,18 +340,13 @@ function UserDashboardContent() {
             </GlassCard>
 
             <GlassCard className="p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-normal text-[#0f172a]">
-                    Activity overview
-                  </h2>
-                  <p className="text-xs text-[#475569]">
-                    Predictions and chats at a glance
-                  </p>
-                </div>
-                <span className="flex size-9 items-center justify-center rounded-xl bg-[#ff5c00]/10 text-[#ff5c00]">
-                  <MaterialIcon name="bar_chart" size={20} />
-                </span>
+              <div className="mb-4">
+                <h2 className="text-base font-medium text-[#0f172a]">
+                  Activity overview
+                </h2>
+                <p className="text-sm text-[#475569]">
+                  Predictions and chats at a glance.
+                </p>
               </div>
 
               <div className="h-56 w-full sm:h-64">
@@ -378,82 +388,94 @@ function UserDashboardContent() {
             </GlassCard>
           </div>
 
-          <div className="mt-6">
-            <div className="mb-3 flex items-center justify-between">
+          <DataTableCard
+            header={
               <div>
-                <h2 className="text-base font-normal text-[#0f172a]">
+                <h2 className="text-base font-medium text-[#0f172a]">
                   Your chats
                 </h2>
-                <p className="text-xs text-[#475569]">
-                  Recent conversations and their latest labels
+                <p className="text-sm text-[#475569]">
+                  Recent conversations and their latest labels.
                 </p>
               </div>
-              <span className="flex size-9 items-center justify-center rounded-xl bg-[#ff5c00]/10 text-[#ff5c00]">
-                <MaterialIcon name="table_rows" size={20} />
-              </span>
-            </div>
-
-            {chats.length === 0 ? (
-              <GlassCard className="flex flex-col items-center gap-3 p-10 text-center">
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
-                  <MaterialIcon name="forum" size={24} />
-                </span>
-                <p className="text-sm font-medium text-[#0f172a]">
-                  No chats yet
-                </p>
-                <p className="text-sm text-[#475569]">
-                  Your analyzed health claims will appear here.
-                </p>
-              </GlassCard>
-            ) : (
-              <GlassTable>
-                <GlassTableHead>
-                  <GlassTableRow>
-                    <GlassTableHeaderCell>Chat</GlassTableHeaderCell>
-                    <GlassTableHeaderCell>Label</GlassTableHeaderCell>
-                    <GlassTableHeaderCell>Messages</GlassTableHeaderCell>
-                    <GlassTableHeaderCell>Updated</GlassTableHeaderCell>
-                    <GlassTableHeaderCell className="text-right">
-                      Action
-                    </GlassTableHeaderCell>
+            }
+            footer={
+              chats.length > 0 ? (
+                <TablePagination
+                  page={chatsPagination.page}
+                  totalPages={chatsPagination.totalPages}
+                  totalItems={chatsPagination.totalItems}
+                  rangeStart={chatsPagination.rangeStart}
+                  rangeEnd={chatsPagination.rangeEnd}
+                  pageNumbers={chatsPagination.pageNumbers}
+                  onPageChange={chatsPagination.setPage}
+                  rowsPerPage={chatsPagination.rowsPerPage}
+                  onRowsPerPageChange={chatsPagination.setRowsPerPage}
+                />
+              ) : undefined
+            }
+          >
+            <GlassTableHead>
+              <GlassTableRow>
+                <GlassTableHeaderCell>Chat</GlassTableHeaderCell>
+                <GlassTableHeaderCell>Label</GlassTableHeaderCell>
+                <GlassTableHeaderCell>Messages</GlassTableHeaderCell>
+                <GlassTableHeaderCell>Updated</GlassTableHeaderCell>
+                <GlassTableHeaderCell className="text-right">
+                  Action
+                </GlassTableHeaderCell>
+              </GlassTableRow>
+            </GlassTableHead>
+            <GlassTableBody>
+              {chats.length === 0 ? (
+                <GlassTableRow>
+                  <GlassTableCell colSpan={5}>
+                    <div className="flex flex-col items-center gap-3 py-10 text-center">
+                      <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
+                        <MaterialIcon name="forum" size={24} />
+                      </span>
+                      <p className="text-sm font-medium text-[#0f172a]">
+                        No chats yet
+                      </p>
+                      <p className="text-sm text-[#475569]">
+                        Your analyzed health claims will appear here.
+                      </p>
+                    </div>
+                  </GlassTableCell>
+                </GlassTableRow>
+              ) : (
+                chatsPagination.pageItems.map((chat) => (
+                  <GlassTableRow key={chat.id}>
+                    <GlassTableCell>
+                      <p className="max-w-xs truncate font-medium text-[#0f172a]">
+                        {getConversationTitle(chat)}
+                      </p>
+                    </GlassTableCell>
+                    <GlassTableCell>
+                      <GlassBadge tone={labelTone(chat.label)}>
+                        {displayLabel(chat.label)}
+                      </GlassBadge>
+                    </GlassTableCell>
+                    <GlassTableCell>
+                      {chat.message_count ?? "—"}
+                    </GlassTableCell>
+                    <GlassTableCell className="text-[#475569]">
+                      {formatRelativeTime(chat.created_at)}
+                    </GlassTableCell>
+                    <GlassTableCell className="text-right">
+                      <TableIconButton
+                        label="Open chat"
+                        icon="open_in_new"
+                        tone="brand"
+                        onClick={() => handleOpenChat(chat.id)}
+                      />
+                    </GlassTableCell>
                   </GlassTableRow>
-                </GlassTableHead>
-                <GlassTableBody>
-                  {chats.map((chat) => (
-                    <GlassTableRow key={chat.id}>
-                      <GlassTableCell>
-                        <p className="max-w-xs truncate font-medium text-[#0f172a]">
-                          {getConversationTitle(chat)}
-                        </p>
-                      </GlassTableCell>
-                      <GlassTableCell>
-                        <GlassBadge tone={labelTone(chat.label)}>
-                          {displayLabel(chat.label)}
-                        </GlassBadge>
-                      </GlassTableCell>
-                      <GlassTableCell>
-                        {chat.message_count ?? "—"}
-                      </GlassTableCell>
-                      <GlassTableCell className="text-[#475569]">
-                        {formatRelativeTime(chat.created_at)}
-                      </GlassTableCell>
-                      <GlassTableCell className="text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenChat(chat.id)}
-                          className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-[#ff5c00]/10 px-3 py-1.5 text-xs font-medium text-[#cc4a00] transition-colors hover:bg-[#ff5c00]/15"
-                        >
-                          Open
-                          <MaterialIcon name="arrow_forward" size={14} />
-                        </button>
-                      </GlassTableCell>
-                    </GlassTableRow>
-                  ))}
-                </GlassTableBody>
-              </GlassTable>
-            )}
-          </div>
-        </>
+                ))
+              )}
+            </GlassTableBody>
+          </DataTableCard>
+        </div>
       ) : (
         <GlassCard className="flex flex-col items-center gap-3 p-10 text-center">
           <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
