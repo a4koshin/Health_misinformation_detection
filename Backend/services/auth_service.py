@@ -54,7 +54,8 @@ def update_profile(
         next_email = email.strip().lower()
         if not next_email:
             raise ValueError("Email is required.")
-        clash = User.query.filter(User.email == next_email, User.id != user.id).first()
+        clash = User.query.filter(
+            User.email == next_email, User.id != user.id).first()
         if clash:
             raise ValueError("Email is already registered.")
         user.email = next_email
@@ -64,13 +65,15 @@ def update_profile(
 
     if new_password:
         if not current_password:
-            raise ValueError("Current password is required to set a new password.")
+            raise ValueError(
+                "Current password is required to set a new password.")
         if not user.check_password(current_password):
             raise ValueError("Current password is incorrect.")
         if len(new_password) < 6:
             raise ValueError("New password must be at least 6 characters.")
         if current_password == new_password:
-            raise ValueError("New password must be different from the current password.")
+            raise ValueError(
+                "New password must be different from the current password.")
         user.set_password(new_password)
 
     db.session.commit()
