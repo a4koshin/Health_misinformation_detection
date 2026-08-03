@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api";
 import type {
   AdminUserCreate,
   AdminUserUpdate,
+  AuditLog,
   DashboardStats,
   DatasetPredictionResponse,
   User,
@@ -13,6 +14,10 @@ export async function getDashboardStats(token: string): Promise<DashboardStats> 
 
 export async function listUsers(token: string): Promise<User[]> {
   return apiFetch<User[]>("/api/admin/users", {}, token);
+}
+
+export async function listAuditLogs(token: string): Promise<AuditLog[]> {
+  return apiFetch<AuditLog[]>("/api/admin/audit-logs", {}, token);
 }
 
 export async function createUser(
