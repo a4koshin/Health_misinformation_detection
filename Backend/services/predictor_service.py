@@ -64,12 +64,14 @@ def load_models() -> None:
     _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     _task_a_tokenizer = AutoTokenizer.from_pretrained(TASK_A_DIR)
-    _task_a_model = AutoModelForSequenceClassification.from_pretrained(TASK_A_DIR)
+    _task_a_model = AutoModelForSequenceClassification.from_pretrained(
+        TASK_A_DIR)
     _task_a_model.to(_device)
     _task_a_model.eval()
 
     _task_b_tokenizer = AutoTokenizer.from_pretrained(TASK_B_DIR)
-    _task_b_model = AutoModelForSequenceClassification.from_pretrained(TASK_B_DIR)
+    _task_b_model = AutoModelForSequenceClassification.from_pretrained(
+        TASK_B_DIR)
     _task_b_model.to(_device)
     _task_b_model.eval()
 
