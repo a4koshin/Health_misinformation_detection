@@ -17,7 +17,8 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default="user")
     # Neon already has avatar_path; expose as avatar_url in the API.
     avatar_url = db.Column("avatar_path", db.String(255), nullable=True)
-    language_preference = db.Column(db.String(10), nullable=False, default="so")
+    language_preference = db.Column(
+        db.String(10), nullable=False, default="so")
     created_at = db.Column(
         db.DateTime,
         nullable=False,
