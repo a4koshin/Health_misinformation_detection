@@ -1,6 +1,6 @@
 import type { RegisterPayload, TokenResponse, User } from "@/types/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 export class ApiError extends Error {
   status: number;
@@ -69,7 +69,11 @@ async function request<T>(
 
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
-    const data = (await response.json()) as { detail?: string | { msg?: string }[] };
+    const data = (await response.json()) as {
+      detail?: string | { msg?: string }[];
+      message?: string;
+    };
+    if (typeof data.message === "string") return data.message;
     if (typeof data.detail === "string") return data.detail;
     if (Array.isArray(data.detail) && data.detail[0]?.msg) {
       return data.detail[0].msg;
@@ -136,7 +140,12 @@ export async function getCurrentUser(token: string): Promise<User> {
 
 export async function updateCurrentUser(
   token: string,
-  payload: { email?: string; full_name?: string | null },
+  payload: {
+    email?: string;
+    full_name?: string | null;
+    current_password?: string;
+    new_password?: string;
+  },
 ): Promise<User> {
   return apiFetch<User>(
     "/api/auth/me",
