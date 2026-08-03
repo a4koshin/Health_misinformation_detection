@@ -9,12 +9,10 @@ export function GlassTable({
 }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("glass-strong overflow-hidden rounded-3xl", className)}
+      className={cn("glass-strong rounded-3xl", className)}
       {...props}
     >
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">{children}</table>
-      </div>
+      <table className="min-w-full text-left text-sm">{children}</table>
     </div>
   );
 }
