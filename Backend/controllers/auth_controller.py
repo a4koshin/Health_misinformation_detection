@@ -52,7 +52,8 @@ def register():
 
     token = create_token(user.id)
     body = user.to_dict()
-    body.update({"access_token": token, "token_type": "bearer", "user": user.to_dict()})
+    body.update({"access_token": token, "token_type": "bearer",
+                "user": user.to_dict()})
     return jsonify(body), 201
 
 
@@ -110,7 +111,8 @@ def update_me():
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
     has_full_name = "full_name" in data or "name" in data
-    full_name = data.get("full_name") if "full_name" in data else data.get("name")
+    full_name = data.get(
+        "full_name") if "full_name" in data else data.get("name")
 
     try:
         user = auth_service.update_profile(
@@ -119,7 +121,8 @@ def update_me():
             full_name=full_name,
             update_full_name=has_full_name,
             current_password=data.get("current_password") or None,
-            new_password=data.get("new_password") or data.get("password") or None,
+            new_password=data.get("new_password") or data.get(
+                "password") or None,
         )
     except LookupError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 404
