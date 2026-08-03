@@ -17,7 +17,8 @@ def get_history():
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 50, type=int)
 
-    result = db_service.get_user_predictions(user_id, page=page, per_page=per_page)
+    result = db_service.get_user_predictions(
+        user_id, page=page, per_page=per_page)
     return jsonify(result["items"]), 200
 
 
