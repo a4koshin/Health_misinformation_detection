@@ -3,12 +3,14 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { MediaRecorderModal } from "@/components/chat/media-recorder-modal";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { predictDataset } from "@/lib/admin";
 import { type ChatMessage, compareChatMessages } from "@/lib/chat";
 import { getConversation } from "@/lib/history";
 import { ApiError } from "@/lib/api";
 import { getRandomGreeting } from "@/lib/greetings";
+import { predictMedia, type MediaPredictionResponse } from "@/lib/predict";
 import { getDisplayName } from "@/lib/user";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
@@ -16,6 +18,11 @@ import type { DatasetPredictionResponse } from "@/types/api";
 
 const DATASET_ACCEPT =
   ".csv,.xlsx,.xlsm,.xls,.xltx,.xltm,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+const AUDIO_ACCEPT = "audio/*,.mp3,.wav,.m4a,.ogg,.webm,.aac,.flac";
+const VIDEO_ACCEPT = "video/*,.mp4,.mov,.webm,.mkv,.avi";
+
+type UploadKind = "dataset" | "audio" | "video";
 
 export function ChatView() {
   const { user, token } = useAuth();
@@ -31,20 +38,34 @@ export function ChatView() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
   const [greeting, setGreeting] = useState("");
-  const [isUploadingDataset, setIsUploadingDataset] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [pendingUpload, setPendingUpload] = useState<{
     name: string;
     size: number;
+    kind: UploadKind;
   } | null>(null);
   const [datasetPreview, setDatasetPreview] = useState<{
     filename: string;
     result: DatasetPredictionResponse;
   } | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<{
+    filename: string;
+    kind: "audio" | "video";
+    result: MediaPredictionResponse;
+  } | null>(null);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [recorderOpen, setRecorderOpen] = useState(false);
+  const [recorderKind, setRecorderKind] = useState<"audio" | "video" | null>(
+    null,
+  );
   const bottomRef = useRef<HTMLDivElement>(null);
+  const attachMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const datasetInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const sortedMessages = [...messages].sort(compareChatMessages);
-  const isBusy = isSaving || isUploadingDataset;
+  const isBusy = isSaving || isUploading;
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -100,13 +121,41 @@ export function ChatView() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isSaving, isUploadingDataset, pendingUpload, datasetPreview]);
+  }, [messages, isSaving, isUploading, pendingUpload, datasetPreview, mediaPreview]);
 
   useEffect(() => {
     setEditingMessageId(null);
     setDatasetPreview(null);
+    setMediaPreview(null);
     setPendingUpload(null);
+    setAttachMenuOpen(false);
+    setRecorderOpen(false);
+    setRecorderKind(null);
   }, [activeChatId]);
+
+  useEffect(() => {
+    if (!attachMenuOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        attachMenuRef.current &&
+        !attachMenuRef.current.contains(event.target as Node)
+      ) {
+        setAttachMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setAttachMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [attachMenuOpen]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -134,9 +183,10 @@ export function ChatView() {
   async function handleDatasetUpload(file: File) {
     if (!token || isBusy) return;
 
-    setPendingUpload({ name: file.name, size: file.size });
+    setPendingUpload({ name: file.name, size: file.size, kind: "dataset" });
     setDatasetPreview(null);
-    setIsUploadingDataset(true);
+    setMediaPreview(null);
+    setIsUploading(true);
     try {
       const result = await predictDataset(token, file);
       setDatasetPreview({ filename: file.name, result });
@@ -151,9 +201,45 @@ export function ChatView() {
           : "Unable to process dataset.";
       toast.error(message);
     } finally {
-      setIsUploadingDataset(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+      setIsUploading(false);
+      if (datasetInputRef.current) {
+        datasetInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function handleMediaUpload(file: File, kind: "audio" | "video") {
+    if (!token || isBusy) return;
+
+    setPendingUpload({ name: file.name, size: file.size, kind });
+    setDatasetPreview(null);
+    setMediaPreview(null);
+    setIsUploading(true);
+    try {
+      const result = await predictMedia(token, file, kind);
+      setMediaPreview({ filename: file.name, kind, result });
+      useChatStore.setState((state) => ({
+        historyRevision: state.historyRevision + 1,
+      }));
+      toast.success(
+        result.label
+          ? `Done — labeled ${result.label}.`
+          : "Done — media claim analyzed.",
+      );
+    } catch (error) {
+      setPendingUpload(null);
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : `Unable to process ${kind} file.`;
+      toast.error(message);
+    } finally {
+      setIsUploading(false);
+      if (kind === "audio" && audioInputRef.current) {
+        audioInputRef.current.value = "";
+      }
+      if (kind === "video" && videoInputRef.current) {
+        videoInputRef.current.value = "";
       }
     }
   }
@@ -164,12 +250,14 @@ export function ChatView() {
     !isLoadingConversation &&
     !isBusy &&
     !datasetPreview &&
+    !mediaPreview &&
     !pendingUpload;
   const showConversation =
     messages.length > 0 ||
     isLoadingConversation ||
     isBusy ||
     Boolean(datasetPreview) ||
+    Boolean(mediaPreview) ||
     Boolean(pendingUpload);
   const displayName = user ? getDisplayName(user) : "there";
   const firstName = displayName.split(/\s+/)[0];
@@ -214,7 +302,8 @@ export function ChatView() {
                 <UploadedFileBubble
                   filename={pendingUpload.name}
                   size={pendingUpload.size}
-                  isLoading={isUploadingDataset}
+                  kind={pendingUpload.kind}
+                  isLoading={isUploading}
                 />
               ) : null}
               {datasetPreview ? (
@@ -227,11 +316,26 @@ export function ChatView() {
                   }}
                 />
               ) : null}
-              {isSaving || isUploadingDataset ? (
+              {mediaPreview ? (
+                <MediaPredictionCard
+                  filename={mediaPreview.filename}
+                  kind={mediaPreview.kind}
+                  result={mediaPreview.result}
+                  onDismiss={() => {
+                    setMediaPreview(null);
+                    setPendingUpload(null);
+                  }}
+                />
+              ) : null}
+              {isSaving || isUploading ? (
                 <TypingIndicator
                   label={
-                    isUploadingDataset
-                      ? "Waa la baadhayaa faylka..."
+                    isUploading
+                      ? pendingUpload?.kind === "audio"
+                        ? "Waa la dhagaysanayaa maqalka..."
+                        : pendingUpload?.kind === "video"
+                          ? "Waa la daawanayaa muuqaalka..."
+                          : "Waa la baadhayaa faylka..."
                       : "Waa la baadhayaa..."
                   }
                 />
@@ -247,32 +351,108 @@ export function ChatView() {
             className="mx-auto flex w-full max-w-[600px] flex-col gap-2"
           >
             <input
-              ref={fileInputRef}
+              ref={datasetInputRef}
               type="file"
               accept={DATASET_ACCEPT}
               className="hidden"
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) {
-                  void handleDatasetUpload(file);
-                }
+                if (file) void handleDatasetUpload(file);
               }}
             />
-            <div className="grid grid-cols-[auto_1fr_auto] items-end gap-2 rounded-3xl border border-gray-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.08)] focus-within:border-brand/40 focus-within:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_16px_40px_-16px_rgba(255,92,0,0.22)]">
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={() => fileInputRef.current?.click()}
-                className="mb-0.5 flex size-8 shrink-0 cursor-pointer items-center justify-center self-end rounded-full text-ink-muted transition-colors hover:bg-[#ffefe6] hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Upload dataset to predict"
-                title="Upload CSV or Excel dataset"
-              >
-                {isUploadingDataset ? (
-                  <span className="size-3.5 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
-                ) : (
-                  <MaterialIcon name="add" size={20} />
-                )}
-              </button>
+            <input
+              ref={audioInputRef}
+              type="file"
+              accept={AUDIO_ACCEPT}
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleMediaUpload(file, "audio");
+              }}
+            />
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept={VIDEO_ACCEPT}
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleMediaUpload(file, "video");
+              }}
+            />
+            <div
+              ref={attachMenuRef}
+              className="relative grid grid-cols-[auto_1fr_auto] items-end gap-2 rounded-3xl border border-gray-200 bg-white px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.08)] focus-within:border-brand/40 focus-within:shadow-[0_1px_2px_rgba(15,23,42,0.05),0_16px_40px_-16px_rgba(255,92,0,0.22)]"
+            >
+              {attachMenuOpen ? (
+                <div className="absolute bottom-[calc(100%+12px)] left-0 right-0 z-30 overflow-hidden rounded-2xl border border-black/5 bg-white shadow-[0_8px_30px_rgba(0,0,0,0.12)]">
+                  <div className="p-1.5">
+                    <AttachMenuAction
+                      icon="videocam"
+                      iconTone="text-[#2563eb]"
+                      label="Upload video"
+                      description="Select from device"
+                      onClick={() => {
+                        setAttachMenuOpen(false);
+                        videoInputRef.current?.click();
+                      }}
+                    />
+                    <AttachMenuAction
+                      icon="audio_file"
+                      iconTone="text-[#7c3aed]"
+                      label="Upload audio"
+                      description="Select from device"
+                      onClick={() => {
+                        setAttachMenuOpen(false);
+                        audioInputRef.current?.click();
+                      }}
+                    />
+                    <AttachMenuAction
+                      icon="video_camera_front"
+                      iconTone="text-[#ea580c]"
+                      label="Record video"
+                      description="Use your camera"
+                      onClick={() => {
+                        setAttachMenuOpen(false);
+                        setRecorderKind("video");
+                        setRecorderOpen(true);
+                      }}
+                    />
+                    <AttachMenuAction
+                      icon="mic"
+                      iconTone="text-[#db2777]"
+                      label="Record audio"
+                      description="Use your microphone"
+                      onClick={() => {
+                        setAttachMenuOpen(false);
+                        setRecorderKind("audio");
+                        setRecorderOpen(true);
+                      }}
+                    />
+                    <AttachMenuAction
+                      icon="upload_file"
+                      iconTone="text-[#0f766e]"
+                      label="Upload dataset"
+                      description="CSV or Excel file"
+                      onClick={() => {
+                        setAttachMenuOpen(false);
+                        datasetInputRef.current?.click();
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mb-0.5 self-end">
+                <ComposerIconButton
+                  label={attachMenuOpen ? "Close attach menu" : "Open attach menu"}
+                  title="Upload or record media"
+                  icon={attachMenuOpen ? "close" : "add"}
+                  disabled={isBusy}
+                  loading={isUploading}
+                  onClick={() => setAttachMenuOpen((open) => !open)}
+                />
+              </div>
 
               <textarea
                 ref={textareaRef}
@@ -314,6 +494,18 @@ export function ChatView() {
           </form>
         </div>
       </div>
+
+      <MediaRecorderModal
+        open={recorderOpen}
+        kind={recorderKind}
+        onOpenChange={(open) => {
+          setRecorderOpen(open);
+          if (!open) setRecorderKind(null);
+        }}
+        onCapture={(file, kind) => {
+          void handleMediaUpload(file, kind);
+        }}
+      />
     </main>
   );
 }
@@ -345,13 +537,88 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function uploadIcon(kind: UploadKind) {
+  if (kind === "audio") return "mic";
+  if (kind === "video") return "videocam";
+  return "description";
+}
+
+function AttachMenuAction({
+  icon,
+  iconTone,
+  label,
+  description,
+  onClick,
+}: {
+  icon: string;
+  iconTone?: string;
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-black/[0.04]"
+    >
+      <span
+        className={`flex size-6 shrink-0 items-center justify-center ${iconTone ?? "text-ink"}`}
+      >
+        <MaterialIcon name={icon} size={18} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-[#0d0d0d]">
+        {label}
+        <span className="ml-1.5 text-[12px] font-normal text-[#8e8e93]">
+          {description}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function ComposerIconButton({
+  label,
+  title,
+  icon,
+  disabled,
+  loading,
+  onClick,
+}: {
+  label: string;
+  title: string;
+  icon: string;
+  disabled?: boolean;
+  loading?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex size-8 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-[#ffefe6] hover:text-brand disabled:cursor-not-allowed disabled:opacity-40"
+      aria-label={label}
+      title={title}
+    >
+      {loading ? (
+        <span className="size-3.5 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
+      ) : (
+        <MaterialIcon name={icon} size={20} />
+      )}
+    </button>
+  );
+}
+
 function UploadedFileBubble({
   filename,
   size,
+  kind = "dataset",
   isLoading,
 }: {
   filename: string;
   size: number;
+  kind?: UploadKind;
   isLoading?: boolean;
 }) {
   const extension = filename.includes(".")
@@ -362,7 +629,7 @@ function UploadedFileBubble({
     <div className="flex flex-col items-end gap-1">
       <div className="flex max-w-[85%] items-center gap-3 rounded-3xl rounded-br-lg bg-[#ffefe6] px-3.5 py-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
-          <MaterialIcon name="description" size={22} />
+          <MaterialIcon name={uploadIcon(kind)} size={22} />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">{filename}</p>
@@ -468,6 +735,75 @@ function renderGreeting(greeting: string, firstName: string) {
       <span className="text-brand">{firstName}</span>
       {parts.slice(1).join(firstName)}
     </>
+  );
+}
+
+
+function MediaPredictionCard({
+  filename,
+  kind,
+  result,
+  onDismiss,
+}: {
+  filename: string;
+  kind: "audio" | "video";
+  result: MediaPredictionResponse;
+  onDismiss: () => void;
+}) {
+  const label = result.label || (result.is_medical ? "Pending" : "Non-medical");
+  const tone =
+    label === "Reliable"
+      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-700"
+      : label === "Misinformation" || label === "Non-Reliable"
+        ? "border-red-500/25 bg-red-500/10 text-red-700"
+        : "border-gray-200 bg-white text-ink";
+
+  return (
+    <div className="w-full space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[15px] leading-7 text-ink">
+            Natiijada {kind === "video" ? "muuqaalka" : "maqalka"}{" "}
+            <strong className="font-semibold">{filename}</strong>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="flex size-7 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
+          aria-label="Dismiss media results"
+        >
+          <MaterialIcon name="close" size={16} />
+        </button>
+      </div>
+
+      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+        <p className="text-[11px] font-medium tracking-wide text-ink-muted uppercase">
+          Transcript
+        </p>
+        <p className="mt-1 text-sm leading-6 text-ink">{result.transcript}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <span
+          className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${tone}`}
+        >
+          {label === "Misinformation" ? "Non-Reliable" : label}
+        </span>
+        {result.topic ? (
+          <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-ink">
+            {result.topic}
+          </span>
+        ) : null}
+        {result.label_confidence != null ? (
+          <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-xs text-ink-muted">
+            {Math.round(result.label_confidence * 100)}% confidence
+          </span>
+        ) : null}
+      </div>
+
+      <p className="text-[15px] leading-7 text-ink">{result.message}</p>
+    </div>
   );
 }
 
