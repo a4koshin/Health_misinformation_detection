@@ -8,14 +8,18 @@ import { GlassBadge } from "@/components/glass/glass-badge";
 import { GlassButton } from "@/components/glass/glass-button";
 import { GlassCard } from "@/components/glass/glass-card";
 import { GlassInput, GlassLabel } from "@/components/glass/glass-input";
+import { DataTableCard } from "@/components/glass/data-table-card";
 import {
-  GlassTable,
   GlassTableBody,
   GlassTableCell,
   GlassTableHead,
   GlassTableHeaderCell,
   GlassTableRow,
 } from "@/components/glass/glass-table";
+import {
+  TablePagination,
+  useTablePagination,
+} from "@/components/glass/table-pagination";
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
@@ -59,6 +63,7 @@ function DatasetContent() {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<DatasetPredictionResponse | null>(null);
+  const resultsPagination = useTablePagination(result?.results ?? [], 10);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -188,17 +193,41 @@ function DatasetContent() {
             </p>
           ) : null}
 
-          <GlassTable>
+          <DataTableCard
+            header={
+              <div>
+                <h2 className="text-base font-medium text-[#0f172a]">
+                  Dataset results
+                </h2>
+                <p className="text-sm text-[#475569]">
+                  Row-level predictions from the uploaded file.
+                </p>
+              </div>
+            }
+            footer={
+              <TablePagination
+                page={resultsPagination.page}
+                totalPages={resultsPagination.totalPages}
+                totalItems={resultsPagination.totalItems}
+                rangeStart={resultsPagination.rangeStart}
+                rangeEnd={resultsPagination.rangeEnd}
+                pageNumbers={resultsPagination.pageNumbers}
+                onPageChange={resultsPagination.setPage}
+                rowsPerPage={resultsPagination.rowsPerPage}
+                onRowsPerPageChange={resultsPagination.setRowsPerPage}
+              />
+            }
+          >
             <GlassTableHead>
-              <tr>
+              <GlassTableRow>
                 <GlassTableHeaderCell>Row</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Text</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Prediction</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Error</GlassTableHeaderCell>
-              </tr>
+              </GlassTableRow>
             </GlassTableHead>
             <GlassTableBody>
-              {result.results.map((row) => (
+              {resultsPagination.pageItems.map((row) => (
                 <GlassTableRow key={`${row.row}-${row.text}`}>
                   <GlassTableCell className="text-ink-muted">
                     {row.row}
@@ -225,7 +254,7 @@ function DatasetContent() {
                 </GlassTableRow>
               ))}
             </GlassTableBody>
-          </GlassTable>
+          </DataTableCard>
         </div>
       ) : (
         <GlassCard className="flex flex-col items-center gap-2 p-12 text-center">
