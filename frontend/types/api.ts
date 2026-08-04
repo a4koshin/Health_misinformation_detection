@@ -37,6 +37,9 @@ export type Detection = {
   label: string | null;
   confidence: number | null;
   label_confidence?: number | null;
+  topic?: string | null;
+  topic_confidence?: number | null;
+  is_medical?: boolean;
   source?: string | null;
   somali_status: string;
   created_at: string;
