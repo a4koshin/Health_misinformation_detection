@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Fragment, useState } from "react";
 
 import { GlassButton } from "@/components/glass/glass-button";
+import { Logo } from "@/components/marketing/logo";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { getPrivateHomePath } from "@/lib/auth-routing";
 import { useAuth } from "@/store/auth-store";
@@ -40,22 +41,10 @@ export function GlassNavbar() {
     );
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/20 shadow-[0_1px_24px_-8px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/10 shadow-[0_1px_24px_-8px_rgba(15,23,42,0.08)] backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="flex h-16 items-center justify-between gap-6 sm:h-[72px]">
-          <Link
-            href="/"
-            className="flex items-center whitespace-nowrap text-xl font-extrabold tracking-tight sm:text-2xl"
-          >
-            <span className="text-[#0f172a]">Health</span>
-            <span className="text-[#ff5c00]">
-              AI
-            </span>
-            <span
-              className="mt-3 ml-0.5 size-1.5 rounded-full bg-[#ff5c00]"
-              aria-hidden="true"
-            />
-          </Link>
+        <div className="flex h-20 items-center justify-between gap-6 sm:h-24">
+          <Logo />
 
           <nav
             className="hidden items-center gap-4 lg:flex"
