@@ -24,6 +24,10 @@ export type MediaPredictionResponse = {
   message: string;
 };
 
+export type TranscribeVideoResponse = {
+  transcribed_text: string;
+};
+
 export async function predictText(
   token: string,
   text: string,
@@ -33,6 +37,24 @@ export async function predictText(
     {
       method: "POST",
       body: JSON.stringify({ text }),
+    },
+    token,
+  );
+}
+
+/** Upload a video → Somali text only (then call predictText with the result). */
+export async function transcribeVideo(
+  token: string,
+  file: File,
+): Promise<TranscribeVideoResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiFetch<TranscribeVideoResponse>(
+    "/api/transcribe",
+    {
+      method: "POST",
+      body: formData,
     },
     token,
   );
