@@ -19,7 +19,7 @@ export function DataTableCard({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white",
+        "flex min-w-0 flex-col overflow-x-clip rounded-3xl border border-gray-200 bg-white",
         className,
       )}
     >
@@ -33,7 +33,7 @@ export function DataTableCard({
           {toolbar}
         </div>
       ) : null}
-      <div className="min-w-0 overflow-x-auto">
+      <div className="min-w-0 overflow-x-auto overflow-y-clip">
         <table
           className={cn("w-full min-w-0 text-left text-sm", tableClassName)}
         >
