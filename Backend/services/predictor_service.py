@@ -160,69 +160,159 @@ def predict_topic(text: str) -> dict[str, Any]:
 
 def run_full_pipeline(text: str) -> dict[str, Any]:
     """
-    Gatekeeper -> Model A -> Model B (only if Reliable).
-    Always returns one flat dict so controllers stay simple.
+    Three-stage pipeline with hard early returns:
+
+      Stage 0 gatekeeper → Non-Medical: stop (no Model A/B)
+      Stage 1 Model A     → Non-Reliable: stop (no Model B)
+      Stage 2 Model B     → only if Model A returned Reliable
+
+    Example expected returns
+    ------------------------
+    # Non-medical sentence, e.g. "Maanta cimiladu waa fiican tahay."
+    # {
+    #   "is_medical": False,
+    #   "label": None,
+    #   "label_confidence": None,
+    #   "topic": None,
+    #   "topic_confidence": None,
+    #   "message": "Jumladaan ma aha mid caafimaad ku saabsan. Fadlan "
+    #              "geli xog caafimaad ku saabsan si loo baaro.",
+    # }
+
+    # Non-Reliable medical sentence, e.g. a health claim Model A rejects.
+    # {
+    #   "is_medical": True,
+    #   "label": "Non-Reliable",
+    #   "label_confidence": 0.91,
+    #   "topic": None,
+    #   "topic_confidence": None,
+    #   "message": "Waad ku mahadsantahay weydiinta aad weydiisay. "
+    #              "Markii aan fiirinay taladaan caafimaad, waxay u "
+    #              "muuqataa mid Non-Reliable.",
+    # }
+
+    # Reliable medical sentence, e.g. a valid health claim.
+    # {
+    #   "is_medical": True,
+    #   "label": "Reliable",
+    #   "label_confidence": 0.88,
+    #   "topic": "Prevention Advice",
+    #   "topic_confidence": 0.76,
+    #   "message": "Waad ku mahadsantahay weydiinta aad weydiisay. "
+    #              "Markii aan fiirinay taladaan caafimaad, waxay u "
+    #              "muuqataa mid Reliable.\\n\\n"
+    #              "Taladaan caafimaad waxay soo hoos gasho mowduuca "
+    #              "Prevention Advice.",
+    # }
     """
     cleaned = clean_text(text)
 
-    empty = {
-        "is_medical": False,
-        "label": None,
-        "label_confidence": None,
-        "topic": None,
-        "topic_confidence": None,
-        "cleaned_text": cleaned,
-    }
-
     if not cleaned:
-        return empty
-
-    is_medical = check_gatekeeper(cleaned)
-    if not is_medical:
         return {
-            **empty,
             "is_medical": False,
+            "label": None,
+            "label_confidence": None,
+            "topic": None,
+            "topic_confidence": None,
+            "cleaned_text": cleaned,
+            "message": (
+                "Jumladaan ma aha mid caafimaad ku saabsan. "
+                "Fadlan geli xog caafimaad ku saabsan si loo baaro."
+            ),
         }
 
+    # ------------------------------------------------------------------
+    # Stage 0 — Gatekeeper (LinearSVC + TF-IDF): Medical vs Non-Medical
+    # ------------------------------------------------------------------
+    is_medical = check_gatekeeper(cleaned)
+
+    if not is_medical:
+        # STOP HERE. Model A and Model B must not run.
+        return {
+            "is_medical": False,
+            "label": None,
+            "label_confidence": None,
+            "topic": None,
+            "topic_confidence": None,
+            "cleaned_text": cleaned,
+            "message": (
+                "Jumladaan ma aha mid caafimaad ku saabsan. "
+                "Fadlan geli xog caafimaad ku saabsan si loo baaro."
+            ),
+        }
+
+    # ------------------------------------------------------------------
+    # Stage 1 — SomBERTb Model A: Reliable vs Non-Reliable
+    # Only reached when gatekeeper returned Medical.
+    # ------------------------------------------------------------------
     reliability = predict_reliability(cleaned)
     label = reliability["label"]
-    label_confidence = reliability["confidence"]
+    label_confidence = float(reliability["confidence"])
 
     if label != "Reliable":
+        # STOP HERE. Model B must not run.
+        # Normalize any non-Reliable class name to "Non-Reliable".
         return {
             "is_medical": True,
-            "label": label,
+            "label": "Non-Reliable",
             "label_confidence": label_confidence,
             "topic": None,
             "topic_confidence": None,
             "cleaned_text": cleaned,
+            "message": (
+                "Waad ku mahadsantahay weydiinta aad weydiisay. "
+                "Markii aan fiirinay taladaan caafimaad, waxay u "
+                "muuqataa mid Non-Reliable."
+            ),
         }
 
+    # ------------------------------------------------------------------
+    # Stage 2 — SomBERTb Model B: Topic
+    # Only reached when Model A specifically returned "Reliable".
+    # ------------------------------------------------------------------
     topic_result = predict_topic(cleaned)
+    topic = topic_result["topic"]
+    topic_confidence = float(topic_result["confidence"])
+
     return {
         "is_medical": True,
-        "label": label,
+        "label": "Reliable",
         "label_confidence": label_confidence,
-        "topic": topic_result["topic"],
-        "topic_confidence": topic_result["confidence"],
+        "topic": topic,
+        "topic_confidence": topic_confidence,
         "cleaned_text": cleaned,
+        "message": (
+            "Waad ku mahadsantahay weydiinta aad weydiisay. "
+            "Markii aan fiirinay taladaan caafimaad, waxay u "
+            "muuqataa mid Reliable.\n\n"
+            f"Taladaan caafimaad waxay soo hoos gasho mowduuca {topic}."
+        ),
     }
 
 
 def build_message(is_medical: bool, label: str | None, topic: str | None) -> str:
+    """Somali user-facing copy — kept in sync with run_full_pipeline messages."""
     if not is_medical:
         return (
-            "Fikraddan ma aha mid caafimaad ku saabsan. "
+            "Jumladaan ma aha mid caafimaad ku saabsan. "
             "Fadlan geli xog caafimaad ku saabsan si loo baaro."
+        )
+
+    if label != "Reliable":
+        return (
+            "Waad ku mahadsantahay weydiinta aad weydiisay. "
+            "Markii aan fiirinay taladaan caafimaad, waxay u "
+            "muuqataa mid Non-Reliable."
         )
 
     message = (
         "Waad ku mahadsantahay weydiinta aad weydiisay. "
-        f"Markii aan fiirinay taladaan caafimaad, waxay u muuqataa mid {label}."
+        "Markii aan fiirinay taladaan caafimaad, waxay u "
+        "muuqataa mid Reliable."
     )
-    if label == "Reliable" and topic:
+    if topic:
         message = (
-            f"{message} "
+            f"{message}\n\n"
             f"Taladaan caafimaad waxay soo hoos gasho mowduuca {topic}."
         )
     return message
