@@ -4,9 +4,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { ChatHistoryItem } from "@/components/chat/chat-history-item";
 import { SearchChatsDialog } from "@/components/chat/search-chats-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { LogoMark } from "@/components/marketing/logo";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import {
   DropdownMenu,
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getHistory } from "@/lib/history";
+import { resolveAvatarUrl } from "@/lib/settings";
 import { getDisplayName, getInitials } from "@/lib/user";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
@@ -71,8 +72,6 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const isAdmin = user?.role === "admin";
-  const showChatRecents =
-    pathname === "/prediction" || pathname.startsWith("/prediction/");
 
   function go(path: string) {
     router.push(path);
@@ -146,6 +145,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
 
   const displayName = getDisplayName(user);
   const initials = getInitials(user);
+  const avatarSrc = resolveAvatarUrl(user.avatar_url);
 
   return (
     <>
@@ -154,14 +154,10 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
           <button
             type="button"
             onClick={handleNewChat}
-            className="flex cursor-pointer items-center text-[15px] font-extrabold tracking-tight"
+            className="min-w-0 cursor-pointer"
+            aria-label="SomAI — new chat"
           >
-            <span className="text-ink">Health</span>
-            <span className="text-brand">AI</span>
-            <span
-              className="mt-2.5 ml-0.5 size-1 rounded-full bg-brand"
-              aria-hidden="true"
-            />
+            <LogoMark className="h-11 sm:h-12" />
           </button>
           <div className="flex items-center gap-0.5">
             <button
@@ -261,36 +257,6 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
               />
             </div>
           </div>
-
-          {showChatRecents ? (
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-4">
-              <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
-                Recents
-              </p>
-
-              <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto pb-4">
-                {isLoadingHistory ? (
-                  <p className="px-3 py-1 text-sm text-ink-muted">Loading...</p>
-                ) : !Array.isArray(history) || history.length === 0 ? (
-                  <p className="px-3 py-1 text-sm text-ink-muted">No chats yet</p>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {history.map((item) => (
-                      <li key={item.id}>
-                        <ChatHistoryItem
-                          item={item}
-                          isActive={activeChatId === item.id}
-                          token={token}
-                          onSelect={handleSelectChat}
-                          onDeleted={handleChatDeleted}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          ) : null}
         </div>
 
         <div className="border-t border-gray-200 p-2.5">
@@ -301,7 +267,10 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                 className="flex w-full cursor-pointer items-center gap-2 rounded-full px-2 py-1.5 transition-colors hover:bg-orange-50"
                 aria-label="Account menu"
               >
-                <Avatar size="sm" className="after:border-0">
+                <Avatar className="size-8 after:border-0">
+                  {avatarSrc ? (
+                    <AvatarImage src={avatarSrc} alt={displayName} />
+                  ) : null}
                   <AvatarFallback className="bg-brand text-[11px] font-medium text-white">
                     {initials}
                   </AvatarFallback>
@@ -323,7 +292,10 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
             >
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-3 rounded-xl bg-[#ffefe6] px-3 py-3">
-                  <Avatar size="sm" className="after:border-0">
+                  <Avatar className="size-9 after:border-0">
+                    {avatarSrc ? (
+                      <AvatarImage src={avatarSrc} alt={displayName} />
+                    ) : null}
                     <AvatarFallback className="bg-brand text-xs font-medium text-white">
                       {initials}
                     </AvatarFallback>
