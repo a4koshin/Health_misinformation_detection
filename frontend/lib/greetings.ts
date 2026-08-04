@@ -1,11 +1,8 @@
 const GREETING_TEMPLATES = [
-  (name: string) => `Let's jump in, ${name}`,
-  (name: string) => `What can I help with, ${name}`,
-  (name: string) => `The mic is yours, ${name}`,
-  (name: string) => `Your move, ${name}`,
-  (name: string) => `What's the vibe, ${name}`,
-  (name: string) => `Hi ${name}, what's the move?`,
-  (name: string) => `What's next, ${name}`,
+  (name: string) => `Ready to check a claim, ${name}?`,
+  (name: string) => `Paste a Somali health claim, ${name}`,
+  (name: string) => `Let's verify a claim, ${name}`,
+  (name: string) => `What claim should we examine, ${name}?`,
 ] as const;
 
 export function getRandomGreeting(firstName: string): string {
