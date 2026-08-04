@@ -132,6 +132,11 @@ def _transcribe_with_local_whisper(audio_path: Path) -> str:
         text = (result.get("text") or "").strip()
     else:
         text = str(result or "").strip()
+    # Drop Whisper special tokens such as <|transcribe|> if they leak into text.
+    import re
+
+    text = re.sub(r"<\|[^|>]*\|>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
     if not text:
         raise RuntimeError("No speech was detected in this file.")
     return text
