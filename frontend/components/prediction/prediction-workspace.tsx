@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { MediaRecorderModal } from "@/components/chat/media-recorder-modal";
 import { GlassBadge } from "@/components/glass/glass-badge";
 import { GlassButton } from "@/components/glass/glass-button";
 import { DataTableCard } from "@/components/glass/data-table-card";
@@ -26,7 +27,13 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { predictDataset } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { getConversation, getHistory } from "@/lib/history";
-import { predictText, type TextPredictionResponse } from "@/lib/predict";
+import {
+  predictMedia,
+  predictText,
+  transcribeVideo,
+  type MediaPredictionResponse,
+  type TextPredictionResponse,
+} from "@/lib/predict";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
 import type { Detection } from "@/types/api";
@@ -35,6 +42,8 @@ import { cn } from "@/lib/utils";
 const MAX_CHARS = 2000;
 const FILE_ACCEPT =
   ".txt,.csv,.xlsx,.xlsm,.xls,.xltx,.xltm,text/plain,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const AUDIO_ACCEPT = "audio/*,.mp3,.wav,.m4a,.ogg,.webm,.aac,.flac";
+const VIDEO_ACCEPT = "video/*,.mp4,.mov,.webm,.mkv,.avi";
 
 type AnalysisResult = {
   claim: string;
@@ -96,8 +105,9 @@ function claimText(item: Detection) {
 }
 
 function toAnalysisResult(
-  response: TextPredictionResponse,
+  response: TextPredictionResponse | MediaPredictionResponse,
   claim: string,
+  source = "Manual check",
 ): AnalysisResult {
   const label = displayLabel(
     response.label || (response.is_medical ? "Pending" : "Non-medical"),
@@ -109,7 +119,7 @@ function toAnalysisResult(
     confidence: response.label_confidence,
     risk: riskFromLabel(label, response.is_medical),
     somaliReply: response.message,
-    source: "Manual check",
+    source,
   };
 }
 
@@ -126,7 +136,17 @@ export function PredictionWorkspace() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [history, setHistory] = useState<Detection[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [mediaBusyLabel, setMediaBusyLabel] = useState<string | null>(null);
+  const [recorderOpen, setRecorderOpen] = useState(false);
+  const [recorderKind, setRecorderKind] = useState<"audio" | "video" | null>(
+    null,
+  );
+  const [inputMode, setInputMode] = useState<
+    "text" | "audio" | "video" | "file"
+  >("text");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -258,6 +278,82 @@ export function PredictionWorkspace() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  async function handleMediaUpload(file: File, kind: "audio" | "video") {
+    if (!token || isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    setMediaBusyLabel(
+      kind === "video"
+        ? "Transcribing video…"
+        : "Transcribing audio…",
+    );
+    try {
+      if (kind === "video") {
+        // Video → /api/transcribe → same /api/predict pipeline as typed text.
+        const { transcribed_text } = await transcribeVideo(token, file);
+        const claim = (transcribed_text || "").trim();
+        if (!claim) {
+          toast.error("No speech could be transcribed from that video.");
+          return;
+        }
+        const clipped = claim.slice(0, MAX_CHARS);
+        setDraft(clipped);
+        setMediaBusyLabel("Analyzing claim…");
+        const response = await predictText(token, clipped);
+        setResult(toAnalysisResult(response, clipped, "Video upload"));
+        bumpHistory();
+        toast.success(
+          response.label
+            ? `Done — labeled ${displayLabel(response.label)}.`
+            : "Done — video claim analyzed.",
+        );
+        return;
+      }
+
+      const response = await predictMedia(token, file, kind);
+      const claim = (response.transcript || "").trim();
+      if (!claim) {
+        toast.error("No speech could be transcribed from that file.");
+        return;
+      }
+      const clipped = claim.slice(0, MAX_CHARS);
+      setDraft(clipped);
+      setResult(
+        toAnalysisResult(
+          response,
+          clipped,
+          "Audio upload",
+        ),
+      );
+      bumpHistory();
+      toast.success(
+        response.label
+          ? `Done — labeled ${displayLabel(response.label)}.`
+          : "Done — media claim analyzed.",
+      );
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : `Unable to process ${kind} file.`;
+      toast.error(message);
+    } finally {
+      setIsAnalyzing(false);
+      setMediaBusyLabel(null);
+      if (kind === "audio" && audioInputRef.current) {
+        audioInputRef.current.value = "";
+      }
+      if (kind === "video" && videoInputRef.current) {
+        videoInputRef.current.value = "";
+      }
+    }
+  }
+
+  function openRecorder(kind: "audio" | "video") {
+    setRecorderKind(kind);
+    setRecorderOpen(true);
+  }
+
   async function openHistoryItem(item: Detection) {
     if (!token) return;
     const claim = claimText(item);
@@ -292,9 +388,9 @@ export function PredictionWorkspace() {
 
   return (
     <PrivatePage
-      title="Prediction"
-      description="Analyze Somali health claims and review your recent saved results."
-      className="w-full max-w-none gap-4 sm:gap-5"
+      title="Check a claim"
+      description="Paste Somali health text, or bring audio, video, or a dataset — SomAI runs medical gatekeeping, reliability, and topic classification."
+      className="w-full max-w-none gap-5 sm:gap-6"
     >
       <input
         ref={fileInputRef}
@@ -306,169 +402,303 @@ export function PredictionWorkspace() {
           if (file) void handleFileUpload(file);
         }}
       />
+      <input
+        ref={audioInputRef}
+        type="file"
+        accept={AUDIO_ACCEPT}
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void handleMediaUpload(file, "audio");
+        }}
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept={VIDEO_ACCEPT}
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void handleMediaUpload(file, "video");
+        }}
+      />
 
-      <div className="grid gap-4 lg:grid-cols-2 lg:gap-4">
-        {/* Analyze card */}
-        <section className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-100 px-4 py-3.5 sm:px-5">
-            <h2 className="text-sm font-medium text-ink">Analyze a claim</h2>
-            <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">
-              Enter text below, or upload a .txt / .csv / .xlsx file.
+      {/* Pipeline identity */}
+      <section className="overflow-hidden rounded-2xl border border-brand/15 bg-gradient-to-r from-[#ffefe6] via-white to-white px-4 py-3.5 sm:px-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-brand uppercase">
+              Detection pipeline
+            </p>
+            <p className="mt-0.5 text-sm text-ink-muted">
+              Three stages — only medical claims reach reliability and topic models.
             </p>
           </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-ink">
+            <PipelineStep icon="health_and_safety" label="Medical gate" />
+            <span className="text-ink/25" aria-hidden="true">
+              →
+            </span>
+            <PipelineStep icon="verified" label="Reliable / Non-Reliable" />
+            <span className="text-ink/25" aria-hidden="true">
+              →
+            </span>
+            <PipelineStep icon="category" label="Topic" />
+          </div>
+        </div>
+      </section>
 
-          <div className="flex flex-1 flex-col gap-3 px-4 py-4 sm:px-5">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="claim-input"
-                className="text-xs font-medium text-ink sm:text-sm"
-              >
-                Health claim
-              </label>
-              <div className="relative">
-                <textarea
-                  id="claim-input"
-                  value={draft}
-                  onChange={(event) =>
-                    setDraft(event.target.value.slice(0, MAX_CHARS))
-                  }
-                  rows={5}
-                  disabled={isAnalyzing}
-                  placeholder="Paste a Somali health claim here…"
-                  className="min-h-[120px] w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm leading-5 text-ink outline-none transition-shadow placeholder:text-ink-muted/70 focus:border-brand/40 focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
-                />
-                <p className="pointer-events-none absolute right-2.5 bottom-2.5 text-[10px] tabular-nums text-ink-muted">
-                  {charCount}/{MAX_CHARS}
+      {/* Composer */}
+      <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-[0_8px_24px_-20px_rgba(15,23,42,0.35)]">
+        <div className="flex flex-wrap gap-1 border-b border-gray-100 bg-gray-50/80 p-1.5 sm:p-2">
+          {(
+            [
+              { id: "text", icon: "edit_note", label: "Text" },
+              { id: "audio", icon: "mic", label: "Audio" },
+              { id: "video", icon: "videocam", label: "Video" },
+              { id: "file", icon: "upload_file", label: "Dataset" },
+            ] as const
+          ).map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              disabled={isAnalyzing}
+              onClick={() => setInputMode(mode.id)}
+              className={cn(
+                "inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                inputMode === mode.id
+                  ? "bg-white text-brand shadow-sm ring-1 ring-black/5"
+                  : "text-ink-muted hover:bg-white/70 hover:text-ink",
+              )}
+            >
+              <MaterialIcon name={mode.icon} size={18} />
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+          {inputMode === "text" ? (
+            <>
+              <div className="space-y-2">
+                <label
+                  htmlFor="claim-input"
+                  className="text-sm font-medium text-ink"
+                >
+                  Somali health claim
+                </label>
+                <div className="relative">
+                  <textarea
+                    id="claim-input"
+                    value={draft}
+                    onChange={(event) =>
+                      setDraft(event.target.value.slice(0, MAX_CHARS))
+                    }
+                    rows={6}
+                    disabled={isAnalyzing}
+                    placeholder="Tusaale: Tallaalka COVID-19 wuu ammaan yahay…"
+                    className="min-h-[140px] w-full resize-y rounded-2xl border border-gray-200 bg-white px-4 py-3 text-[15px] leading-6 text-ink outline-none transition-shadow placeholder:text-ink-muted/70 focus:border-brand/40 focus:ring-3 focus:ring-brand/15 disabled:opacity-60"
+                  />
+                  <p className="pointer-events-none absolute right-3 bottom-3 text-[11px] tabular-nums text-ink-muted">
+                    {charCount}/{MAX_CHARS}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <GlassButton
+                  type="button"
+                  onClick={() => void handleAnalyze()}
+                  disabled={isAnalyzing || !draft.trim()}
+                  className="bg-brand bg-none hover:bg-[#e65300]"
+                >
+                  {isAnalyzing && !mediaBusyLabel ? (
+                    <span className="size-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  ) : (
+                    <MaterialIcon name="fact_check" size={18} />
+                  )}
+                  Run detection
+                </GlassButton>
+                <GlassButton
+                  type="button"
+                  variant="ghost"
+                  disabled={isAnalyzing || (!draft && !result)}
+                  onClick={handleClear}
+                >
+                  Clear
+                </GlassButton>
+              </div>
+            </>
+          ) : null}
+
+          {inputMode === "audio" ? (
+            <MediaModePanel
+              title="Audio claim"
+              description="Upload a recording or capture speech with your microphone. SomAI transcribes it, then runs the same detection pipeline."
+              busyLabel={mediaBusyLabel}
+              disabled={isAnalyzing}
+              primaryLabel="Upload audio"
+              primaryIcon="audio_file"
+              onPrimary={() => audioInputRef.current?.click()}
+              secondaryLabel="Record audio"
+              secondaryIcon="mic"
+              onSecondary={() => openRecorder("audio")}
+            />
+          ) : null}
+
+          {inputMode === "video" ? (
+            <MediaModePanel
+              title="Video claim"
+              description="Upload or record a short video. Audio is extracted and transcribed to Somali, then classified with the full pipeline."
+              busyLabel={mediaBusyLabel}
+              disabled={isAnalyzing}
+              primaryLabel="Upload video"
+              primaryIcon="videocam"
+              onPrimary={() => videoInputRef.current?.click()}
+              secondaryLabel="Record video"
+              secondaryIcon="video_camera_front"
+              onSecondary={() => openRecorder("video")}
+            />
+          ) : null}
+
+          {inputMode === "file" ? (
+            <MediaModePanel
+              title="Batch dataset"
+              description="Upload a .txt claim file, or a CSV / Excel sheet for batch labeling."
+              busyLabel={isAnalyzing ? "Processing file…" : null}
+              disabled={isAnalyzing}
+              primaryLabel="Upload .txt / .csv / .xlsx"
+              primaryIcon="upload_file"
+              onPrimary={() => fileInputRef.current?.click()}
+            />
+          ) : null}
+        </div>
+      </section>
+
+      {/* Verdict */}
+      <section
+        className={cn(
+          "overflow-hidden rounded-2xl border transition-colors",
+          result
+            ? result.label === "Reliable"
+              ? "border-emerald-500/25 bg-gradient-to-b from-emerald-50/80 to-white"
+              : result.label === "Non-Reliable"
+                ? "border-red-500/25 bg-gradient-to-b from-red-50/70 to-white"
+                : "border-slate-200 bg-gradient-to-b from-slate-50 to-white"
+            : "border-dashed border-gray-200 bg-white",
+        )}
+      >
+        {!result ? (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center sm:py-16">
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-brand/10 text-brand">
+              <MaterialIcon name="policy" size={26} />
+            </span>
+            <div className="max-w-md space-y-1">
+              <p className="text-base font-medium text-ink">
+                Verdict appears here
+              </p>
+              <p className="text-sm leading-6 text-ink-muted">
+                After you run detection, you&apos;ll see the label, confidence,
+                topic (when Reliable), risk level, and a Somali explanation.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="animate-[fade-up_0.35s_ease-out]">
+            <div className="flex flex-col gap-4 border-b border-black/[0.04] px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6 sm:py-5">
+              <div className="min-w-0 space-y-3">
+                <p className="text-[11px] font-semibold tracking-[0.16em] text-ink-muted uppercase">
+                  Verdict
                 </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <GlassBadge
+                    tone={labelTone(result.label)}
+                    className="px-3 py-1 text-sm"
+                  >
+                    <MaterialIcon
+                      name={
+                        result.label === "Reliable"
+                          ? "verified"
+                          : result.label === "Non-Reliable"
+                            ? "report"
+                            : "info"
+                      }
+                      size={16}
+                    />
+                    {result.label}
+                  </GlassBadge>
+                  {result.topic ? (
+                    <span className="inline-flex items-center rounded-full border border-brand/20 bg-[#ffefe6] px-3 py-1 text-xs font-medium text-brand-deep">
+                      {result.topic}
+                    </span>
+                  ) : null}
+                  <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-ink-muted">
+                    Risk: {result.risk}
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-ink-muted">
+                    {result.source}
+                  </span>
+                </div>
+              </div>
+
+              {result.confidence != null &&
+              result.label !== "Non-medical" &&
+              !(result.confidence === 0) ? (
+                <div className="min-w-[132px] rounded-2xl border border-black/5 bg-white/90 px-4 py-3">
+                  <p className="text-[11px] font-medium text-ink-muted">
+                    Confidence
+                  </p>
+                  <p className="mt-0.5 text-2xl font-semibold tracking-tight text-ink">
+                    {formatConfidence(result.confidence)}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-4 px-4 py-4 sm:grid-cols-2 sm:px-6 sm:py-5">
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-semibold tracking-[0.14em] text-ink-muted uppercase">
+                  Claim
+                </p>
+                <p className="text-sm leading-6 text-ink">{result.claim}</p>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-semibold tracking-[0.14em] text-ink-muted uppercase">
+                  Somali reply
+                </p>
+                <div className="rounded-2xl border border-black/5 bg-white/80 px-4 py-3 text-sm leading-6 text-ink whitespace-pre-wrap">
+                  {result.somaliReply}
+                </div>
               </div>
             </div>
 
-            <div className="mt-auto flex flex-wrap items-center gap-2 pt-0.5">
-              <GlassButton
-                type="button"
-                size="sm"
-                onClick={() => void handleAnalyze()}
-                disabled={isAnalyzing || !draft.trim()}
-                className="bg-brand bg-none hover:bg-[#e65300]"
-              >
-                {isAnalyzing ? (
-                  <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                ) : (
-                  <MaterialIcon name="autorenew" size={16} />
-                )}
-                Analyze claim
-              </GlassButton>
-
-              <GlassButton
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={isAnalyzing}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <MaterialIcon name="upload" size={16} />
-                Upload file
-              </GlassButton>
-
+            <div className="flex flex-wrap gap-2 border-t border-black/[0.04] px-4 py-3 sm:px-6">
               <GlassButton
                 type="button"
                 size="sm"
                 variant="ghost"
-                disabled={isAnalyzing || (!draft && !result)}
                 onClick={handleClear}
               >
-                Clear
+                Check another claim
               </GlassButton>
             </div>
           </div>
-        </section>
+        )}
+      </section>
 
-        {/* Result card */}
-        <section className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
-          <div className="border-b border-gray-100 px-4 py-3.5 sm:px-5">
-            <h2 className="text-sm font-medium text-ink">Result</h2>
-            <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">
-              Label, topic, and confidence appear here after analysis.
-            </p>
-          </div>
-
-          <div className="flex flex-1 flex-col px-4 py-4 sm:px-5">
-            {!result ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-10 text-center">
-                <span className="flex size-10 items-center justify-center rounded-xl bg-brand/10 text-brand">
-                  <MaterialIcon name="analytics" size={20} />
-                </span>
-                <p className="text-sm font-medium text-ink">No result yet</p>
-                <p className="max-w-xs text-xs text-ink-muted sm:text-sm">
-                  Analyze a claim to see the label, topic, confidence, and Somali
-                  reply.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3.5">
-                <div className="grid grid-cols-2 gap-2">
-                  <MetricTile label="Label">
-                    <GlassBadge tone={labelTone(result.label)} className="px-2.5 py-0.5">
-                      {result.label}
-                    </GlassBadge>
-                  </MetricTile>
-                  <MetricTile label="Topic">
-                    <p className="text-sm font-medium text-ink">
-                      {result.topic || "—"}
-                    </p>
-                  </MetricTile>
-                  <MetricTile label="Confidence">
-                    <p className="text-sm font-semibold tabular-nums text-ink">
-                      {formatConfidence(result.confidence)}
-                    </p>
-                  </MetricTile>
-                  <MetricTile label="Risk">
-                    <p
-                      className={cn(
-                        "text-sm font-medium",
-                        result.risk === "High"
-                          ? "text-red-700"
-                          : result.risk === "Low"
-                            ? "text-emerald-700"
-                            : "text-ink",
-                      )}
-                    >
-                      {result.risk}
-                    </p>
-                  </MetricTile>
-                </div>
-
-                <DetailBlock label="Claim">{result.claim}</DetailBlock>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase">
-                    Somali reply
-                  </p>
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm leading-5 text-ink whitespace-pre-wrap">
-                    {result.somaliReply}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Previous predictions */}
+      {/* Recent checks */}
       <DataTableCard
-        className="min-w-0 rounded-2xl [&_>div:first-child]:px-4 [&_>div:first-child]:py-3.5 sm:[&_>div:first-child]:px-5"
+        className="min-w-0 shrink-0 rounded-2xl [&_>div:first-child]:px-4 [&_>div:first-child]:py-3.5 sm:[&_>div:first-child]:px-5"
         tableClassName="table-fixed w-full text-[13px]"
         header={
           <div className="flex flex-col gap-2.5 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0">
-              <h2 className="text-sm font-medium text-ink">
-                Previous predictions
-              </h2>
+              <h2 className="text-sm font-medium text-ink">Recent checks</h2>
               <p className="mt-0.5 text-xs text-ink-muted sm:text-sm">
-                Your recent saved results from this account.
+                Tap a row to reload that claim and verdict above.
               </p>
             </div>
             <div className="w-full max-w-[120px] space-y-1 sm:shrink-0">
-              <GlassLabel htmlFor="prediction-rows">Rows per page</GlassLabel>
+              <GlassLabel htmlFor="prediction-rows">Rows</GlassLabel>
               <GlassSelect
                 id="prediction-rows"
                 value={String(pagination.rowsPerPage)}
@@ -547,10 +777,10 @@ export function PredictionWorkspace() {
                     className="text-brand-light"
                   />
                   <p className="text-sm font-medium text-ink">
-                    No predictions yet
+                    No checks yet
                   </p>
                   <p className="text-sm text-ink-muted">
-                    Analyze a claim to see it listed here.
+                    Run detection to build your history here.
                   </p>
                 </div>
               </GlassTableCell>
@@ -595,34 +825,88 @@ export function PredictionWorkspace() {
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <MediaRecorderModal
+        open={recorderOpen}
+        kind={recorderKind}
+        onOpenChange={(open) => {
+          setRecorderOpen(open);
+          if (!open) setRecorderKind(null);
+        }}
+        onCapture={(file, kind) => {
+          void handleMediaUpload(file, kind);
+        }}
+      />
     </PrivatePage>
   );
 }
 
-function MetricTile({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function PipelineStep({ icon, label }: { icon: string; label: string }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5">
-      <p className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase">
-        {label}
-      </p>
-      <div className="mt-1.5">{children}</div>
-    </div>
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-black/5 bg-white px-2.5 py-1 shadow-sm">
+      <MaterialIcon name={icon} size={14} className="text-brand" />
+      {label}
+    </span>
   );
 }
 
-function DetailBlock({ label, children }: { label: string; children: string }) {
+function MediaModePanel({
+  title,
+  description,
+  busyLabel,
+  disabled,
+  primaryLabel,
+  primaryIcon,
+  onPrimary,
+  secondaryLabel,
+  secondaryIcon,
+  onSecondary,
+}: {
+  title: string;
+  description: string;
+  busyLabel: string | null;
+  disabled: boolean;
+  primaryLabel: string;
+  primaryIcon: string;
+  onPrimary: () => void;
+  secondaryLabel?: string;
+  secondaryIcon?: string;
+  onSecondary?: () => void;
+}) {
   return (
-    <div className="space-y-1">
-      <p className="text-[10px] font-semibold tracking-[0.14em] text-ink-muted uppercase">
-        {label}
-      </p>
-      <p className="text-sm leading-5 text-ink">{children}</p>
+    <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50/60 px-4 py-6 sm:px-6">
+      <div className="max-w-xl space-y-1">
+        <p className="text-sm font-medium text-ink">{title}</p>
+        <p className="text-sm leading-6 text-ink-muted">{description}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <GlassButton
+          type="button"
+          disabled={disabled}
+          onClick={onPrimary}
+          className="bg-brand bg-none hover:bg-[#e65300]"
+        >
+          <MaterialIcon name={primaryIcon} size={18} />
+          {primaryLabel}
+        </GlassButton>
+        {secondaryLabel && onSecondary && secondaryIcon ? (
+          <GlassButton
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            onClick={onSecondary}
+          >
+            <MaterialIcon name={secondaryIcon} size={18} />
+            {secondaryLabel}
+          </GlassButton>
+        ) : null}
+      </div>
+      {busyLabel ? (
+        <p className="flex items-center gap-2 text-sm text-ink-muted">
+          <span className="size-3.5 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
+          {busyLabel}
+        </p>
+      ) : null}
     </div>
   );
 }
