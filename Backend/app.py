@@ -10,6 +10,7 @@ from routes.history_routes import history_bp
 from routes.predict_routes import predict_bp
 from routes.report_routes import report_bp
 from routes.settings_routes import settings_bp
+from routes.transcription_routes import transcription_bp
 
 
 def create_app() -> Flask:
@@ -26,6 +27,7 @@ def create_app() -> Flask:
     app.register_blueprint(report_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(settings_bp)
+    app.register_blueprint(transcription_bp)
 
     # Import models so SQLAlchemy knows the tables.
     from models import AuditLog, Prediction, User  # noqa: F401
@@ -55,8 +57,6 @@ def create_app() -> Flask:
         return jsonify(
             {"error": True, "message": "Something went wrong. Please try again."}
         ), 500
-        app.logger.exception("Unhandled error")
-        return jsonify({"error": True, "message": "Something went wrong. Please try again."}), 500
 
     return app
 
