@@ -1,6 +1,7 @@
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
+from extensions import db
 from services import audit_service, auth_service, db_service, predictor_service
 from services import media_service
 
@@ -13,7 +14,7 @@ def _client_ip() -> str | None:
 
 
 def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
-    message = predictor_service.build_message(
+    message = result.get("message") or predictor_service.build_message(
         result["is_medical"],
         result["label"],
         result["topic"],
@@ -30,6 +31,8 @@ def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
         cleaned_text=result.get("cleaned_text"),
         source=source,
     )
+    prediction.summary = message
+    db.session.commit()
 
     label_text = result["label"] or (
         "Non-medical" if not result["is_medical"] else "Pending"
