@@ -13,18 +13,28 @@ def save_prediction(
     cleaned_text: str | None = None,
     source: str | None = None,
 ) -> Prediction:
+    # Neon NOT NULL: label, confidence, risk, source — gatekeeper exits omit Model A/B.
+    resolved_label = label or ("Non-medical" if not is_medical else "Pending")
+    resolved_confidence = float(label_confidence) if label_confidence is not None else 0.0
+    if resolved_label == "Reliable":
+        resolved_risk = "low"
+    elif resolved_label in {"Non-Reliable", "Misinformation"}:
+        resolved_risk = "high"
+    else:
+        resolved_risk = "none"
+    resolved_source = source or ("pipeline" if is_medical else "non_medical")
+
     prediction = Prediction(
         user_id=user_id,
         claim_text=claim_text,
         cleaned_text=cleaned_text,
-        label=label,
-        confidence=label_confidence,
+        label=resolved_label,
+        confidence=resolved_confidence,
         label_confidence=label_confidence,
         topic=topic,
         topic_confidence=topic_confidence,
-        source=source
-        or ("pipeline" if is_medical else "non_medical"),
-        risk="low" if label == "Reliable" else ("high" if label else None),
+        source=resolved_source,
+        risk=resolved_risk,
     )
     db.session.add(prediction)
     db.session.commit()
