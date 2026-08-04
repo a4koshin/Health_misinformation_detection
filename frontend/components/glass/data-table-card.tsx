@@ -7,17 +7,19 @@ export function DataTableCard({
   children,
   footer,
   className,
+  tableClassName,
 }: {
   header?: React.ReactNode;
   toolbar?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
+  tableClassName?: string;
 }) {
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white",
+        "flex min-w-0 flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white",
         className,
       )}
     >
@@ -31,8 +33,12 @@ export function DataTableCard({
           {toolbar}
         </div>
       ) : null}
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">{children}</table>
+      <div className="min-w-0 overflow-x-auto">
+        <table
+          className={cn("w-full min-w-0 text-left text-sm", tableClassName)}
+        >
+          {children}
+        </table>
       </div>
       {footer}
     </div>
