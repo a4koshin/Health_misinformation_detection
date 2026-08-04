@@ -4,9 +4,13 @@ import "./globals.css";
 import { AppProviders } from "@/components/providers/app-providers";
 
 export const metadata: Metadata = {
-  title: "HealthAI — Somali Health Misinformation Detection",
+  title: "SomAI — Somali Health Misinformation Detection",
   description:
     "Detect and classify health-related misinformation in Somali text.",
+  icons: {
+    icon: [{ url: "/logo.png", type: "image/png" }],
+    apple: [{ url: "/logo.png", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
