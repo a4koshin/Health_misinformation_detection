@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { Logo } from "@/components/marketing/logo";
+
 const footerLinks = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About us" },
@@ -37,19 +39,7 @@ export function GlassFooter() {
       <div className="relative mx-auto max-w-7xl px-5 sm:px-8">
         {/* Top row: brand + pill nav links */}
         <div className="flex flex-col items-center justify-between gap-6 pt-12 lg:flex-row">
-          <Link
-            href="/"
-            className="flex items-center text-xl font-extrabold tracking-tight"
-          >
-            <span className="text-[#0f172a]">Health</span>
-            <span className="text-[#ff5c00]">
-              AI
-            </span>
-            <span
-              className="mt-3 ml-0.5 size-1.5 rounded-full bg-[#ff5c00]"
-              aria-hidden="true"
-            />
-          </Link>
+          <Logo />
 
           <nav
             className="flex flex-wrap items-center justify-center gap-3"
@@ -73,7 +63,7 @@ export function GlassFooter() {
           aria-hidden="true"
         >
           <span className="translate-y-[18%] bg-gradient-to-b from-[#0f172a]/[0.06] to-[#0f172a]/[0.015] bg-clip-text text-[24vw] leading-none font-extrabold tracking-tight text-transparent uppercase lg:text-[19rem]">
-            HealthAI
+            SomAI
           </span>
         </div>
 
@@ -81,7 +71,7 @@ export function GlassFooter() {
         <div className="relative flex flex-col items-center justify-between gap-4 pb-8 sm:flex-row">
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-[#64748b]">
             <p>
-              © {new Date().getFullYear()} HealthAI. All Rights Reserved.
+              © {new Date().getFullYear()} SomAI. All Rights Reserved.
             </p>
             <Link
               href="/privacy"
