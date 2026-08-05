@@ -16,7 +16,7 @@ def _assistant_message(result: dict) -> str:
     return result.get("message") or predictor_service.build_message(
         result["is_medical"],
         result["label"],
-        result["topic"],
+        result.get("category"),
     )
 
 
@@ -51,8 +51,8 @@ def _run_and_save(user, text: str, *, source: str = "Manual check"):
         is_medical=result["is_medical"],
         label=result["label"],
         label_confidence=result["label_confidence"],
-        topic=result["topic"],
-        topic_confidence=result["topic_confidence"],
+        topic=result.get("category"),
+        topic_confidence=None,
         cleaned_text=result.get("cleaned_text"),
         source="non_medical" if not result["is_medical"] else source,
     )
@@ -207,8 +207,8 @@ def edit_message(prediction_id: int, message_id: str):
     prediction.label = resolved_label
     prediction.confidence = resolved_confidence
     prediction.label_confidence = conf
-    prediction.topic = result["topic"]
-    prediction.topic_confidence = result["topic_confidence"]
+    prediction.topic = result.get("category")
+    prediction.topic_confidence = None
     prediction.source = (
         "non_medical" if not result["is_medical"] else (prediction.source or "pipeline")
     )
