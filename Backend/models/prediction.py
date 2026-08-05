@@ -44,8 +44,9 @@ class Prediction(db.Model):
             "is_medical": is_medical,
             "label": self.label,
             "label_confidence": confidence,
+            "category": self.topic,
             "topic": self.topic,
-            "topic_confidence": self.topic_confidence,
+            "topic_confidence": None,
             "source": source_label,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             # Frontend Detection compatibility
