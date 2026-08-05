@@ -28,6 +28,7 @@ class Config:
     }
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "mehelpus")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_MINUTES", "60"))
     )
