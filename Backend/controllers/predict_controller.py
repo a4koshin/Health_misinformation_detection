@@ -14,10 +14,11 @@ def _client_ip() -> str | None:
 
 
 def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
+    category = result.get("category")
     message = result.get("message") or predictor_service.build_message(
         result["is_medical"],
         result["label"],
-        result["topic"],
+        category,
     )
 
     prediction = db_service.save_prediction(
@@ -26,8 +27,9 @@ def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
         is_medical=result["is_medical"],
         label=result["label"],
         label_confidence=result["label_confidence"],
-        topic=result["topic"],
-        topic_confidence=result["topic_confidence"],
+        # Persist keyword category in the existing DB `topic` column.
+        topic=category,
+        topic_confidence=None,
         cleaned_text=result.get("cleaned_text"),
         source=source,
     )
@@ -77,8 +79,7 @@ def predict():
             "is_medical": result["is_medical"],
             "label": result["label"],
             "label_confidence": result["label_confidence"],
-            "topic": result["topic"],
-            "topic_confidence": result["topic_confidence"],
+            "category": result.get("category"),
             "message": message,
             "transcript": text,
         }
@@ -129,8 +130,7 @@ def predict_media():
             "is_medical": result["is_medical"],
             "label": result["label"],
             "label_confidence": result["label_confidence"],
-            "topic": result["topic"],
-            "topic_confidence": result["topic_confidence"],
+            "category": result.get("category"),
             "message": message,
         }
     ), 200
