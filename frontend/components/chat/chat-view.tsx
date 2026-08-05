@@ -11,7 +11,7 @@ import { type ChatMessage, compareChatMessages } from "@/lib/chat";
 import { getConversation } from "@/lib/history";
 import { ApiError } from "@/lib/api";
 import { getRandomGreeting } from "@/lib/greetings";
-import { predictMedia, type MediaPredictionResponse } from "@/lib/predict";
+import { transcribeMedia } from "@/lib/predict";
 import { getDisplayName } from "@/lib/user";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
@@ -64,11 +64,6 @@ export function ChatView() {
   const [datasetPreview, setDatasetPreview] = useState<{
     filename: string;
     result: DatasetPredictionResponse;
-  } | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<{
-    filename: string;
-    kind: "audio" | "video";
-    result: MediaPredictionResponse;
   } | null>(null);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [recorderOpen, setRecorderOpen] = useState(false);
@@ -138,12 +133,11 @@ export function ChatView() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isSaving, isUploading, pendingUpload, datasetPreview, mediaPreview]);
+  }, [messages, isSaving, isUploading, pendingUpload, datasetPreview]);
 
   useEffect(() => {
     setEditingMessageId(null);
     setDatasetPreview(null);
-    setMediaPreview(null);
     setPendingUpload(null);
     setAttachMenuOpen(false);
     setRecorderOpen(false);
@@ -202,13 +196,15 @@ export function ChatView() {
 
     setPendingUpload({ name: file.name, size: file.size, kind: "dataset" });
     setDatasetPreview(null);
-    setMediaPreview(null);
     setIsUploading(true);
     try {
       const result = await predictDataset(token, file);
       setDatasetPreview({ filename: file.name, result });
+      useChatStore.setState((state) => ({
+        historyRevision: state.historyRevision + 1,
+      }));
       toast.success(
-        `Done — ${result.reliable_count} Reliable, ${result.misinformation_count} Misinformation.`,
+        `Done — ${result.reliable_count} Reliable, ${result.misinformation_count} Non-Reliable.`,
       );
     } catch (error) {
       setPendingUpload(null);
@@ -229,26 +225,28 @@ export function ChatView() {
     if (!token || isBusy) return;
 
     setPendingUpload({ name: file.name, size: file.size, kind });
-    setDatasetPreview(null);
-    setMediaPreview(null);
     setIsUploading(true);
     try {
-      const result = await predictMedia(token, file, kind);
-      setMediaPreview({ filename: file.name, kind, result });
-      useChatStore.setState((state) => ({
-        historyRevision: state.historyRevision + 1,
-      }));
+      // Somali ASR only — user must press Send to predict.
+      const { transcribed_text } = await transcribeMedia(token, file, kind);
+      const claim = (transcribed_text || "").trim();
+      if (!claim) {
+        toast.error(`No speech could be transcribed from that ${kind} file.`);
+        setPendingUpload(null);
+        return;
+      }
+      setDraft(claim);
+      setPendingUpload(null);
       toast.success(
-        result.label
-          ? `Done — labeled ${result.label}.`
-          : "Done — media claim analyzed.",
+        "Somali transcript ready — review the text, then press Send.",
       );
+      requestAnimationFrame(() => textareaRef.current?.focus());
     } catch (error) {
       setPendingUpload(null);
       const message =
         error instanceof ApiError
           ? error.message
-          : `Unable to process ${kind} file.`;
+          : `Unable to transcribe ${kind} file.`;
       toast.error(message);
     } finally {
       setIsUploading(false);
@@ -267,14 +265,12 @@ export function ChatView() {
     !isLoadingConversation &&
     !isBusy &&
     !datasetPreview &&
-    !mediaPreview &&
     !pendingUpload;
   const showConversation =
     messages.length > 0 ||
     isLoadingConversation ||
     isBusy ||
     Boolean(datasetPreview) ||
-    Boolean(mediaPreview) ||
     Boolean(pendingUpload);
   const displayName = user ? getDisplayName(user) : "there";
   const firstName = displayName.split(/\s+/)[0];
@@ -310,8 +306,8 @@ export function ChatView() {
                 {renderGreeting(greeting, firstName)}
               </h1>
               <p className="mt-3 max-w-lg text-sm leading-6 text-ink-muted sm:text-[15px] animate-[fade-up_0.65s_ease-out]">
-                Paste a Somali health claim. SomAI checks medical relevance,
-                reliability, and topic — then returns a clear verdict.
+                Type a Somali health claim, or attach audio/video to transcribe
+                first — then press Send for Reliable / Non-Reliable.
               </p>
 
               <div className="mt-8 grid w-full gap-2.5 sm:grid-cols-3 animate-[fade-up_0.7s_ease-out]">
@@ -390,27 +386,16 @@ export function ChatView() {
                   }}
                 />
               ) : null}
-              {mediaPreview ? (
-                <MediaPredictionCard
-                  filename={mediaPreview.filename}
-                  kind={mediaPreview.kind}
-                  result={mediaPreview.result}
-                  onDismiss={() => {
-                    setMediaPreview(null);
-                    setPendingUpload(null);
-                  }}
-                />
-              ) : null}
               {isSaving || isUploading ? (
                 <TypingIndicator
                   label={
                     isUploading
                       ? pendingUpload?.kind === "audio"
-                        ? "Waa la dhagaysanayaa maqalka..."
+                        ? "Transcribing audio to Somali…"
                         : pendingUpload?.kind === "video"
-                          ? "Waa la daawanayaa muuqaalka..."
-                          : "Waa la baadhayaa faylka..."
-                      : "Waa la baadhayaa sheegashada..."
+                          ? "Transcribing video to Somali…"
+                          : "Checking dataset…"
+                      : "Checking your claim…"
                   }
                 />
               ) : null}
@@ -465,7 +450,7 @@ export function ChatView() {
                       icon="videocam"
                       iconTone="text-[#2563eb]"
                       label="Upload video"
-                      description="Select from device"
+                      description="Transcribe to Somali text"
                       onClick={() => {
                         setAttachMenuOpen(false);
                         videoInputRef.current?.click();
@@ -475,7 +460,7 @@ export function ChatView() {
                       icon="audio_file"
                       iconTone="text-[#7c3aed]"
                       label="Upload audio"
-                      description="Select from device"
+                      description="Transcribe to Somali text"
                       onClick={() => {
                         setAttachMenuOpen(false);
                         audioInputRef.current?.click();
@@ -485,7 +470,7 @@ export function ChatView() {
                       icon="video_camera_front"
                       iconTone="text-[#ea580c]"
                       label="Record video"
-                      description="Use your camera"
+                      description="Transcribe, then Send to check"
                       onClick={() => {
                         setAttachMenuOpen(false);
                         setRecorderKind("video");
@@ -496,7 +481,7 @@ export function ChatView() {
                       icon="mic"
                       iconTone="text-[#db2777]"
                       label="Record audio"
-                      description="Use your microphone"
+                      description="Transcribe, then Send to check"
                       onClick={() => {
                         setAttachMenuOpen(false);
                         setRecorderKind("audio");
@@ -507,7 +492,7 @@ export function ChatView() {
                       icon="upload_file"
                       iconTone="text-[#0f766e]"
                       label="Upload dataset"
-                      description="CSV or Excel file"
+                      description="Batch check CSV or Excel"
                       onClick={() => {
                         setAttachMenuOpen(false);
                         datasetInputRef.current?.click();
@@ -523,7 +508,7 @@ export function ChatView() {
                 </p>
                 <ComposerIconButton
                   label={attachMenuOpen ? "Close attach menu" : "Open attach menu"}
-                  title="Upload or record media"
+                  title="Attach audio, video, or dataset"
                   icon={attachMenuOpen ? "close" : "add"}
                   disabled={isBusy}
                   loading={isUploading}
@@ -563,8 +548,8 @@ export function ChatView() {
                     <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   ) : (
                     <>
-                      <MaterialIcon name="fact_check" size={18} />
-                      <span className="hidden sm:inline">Analyze</span>
+                      <MaterialIcon name="send" size={18} />
+                      <span className="hidden sm:inline">Send</span>
                     </>
                   )}
                 </button>
@@ -572,8 +557,8 @@ export function ChatView() {
             </div>
 
             <p className="text-center text-[11px] leading-4 text-ink-muted">
-              SomAI can make mistakes. Always confirm serious health decisions
-              with a clinician.
+              Audio/video transcribe to Somali first — press Send to check the
+              claim. Always confirm serious health decisions with a clinician.
             </p>
           </form>
         </div>
@@ -720,6 +705,8 @@ function UploadedFileBubble({
   const extension = filename.includes(".")
     ? filename.split(".").pop()?.toUpperCase()
     : "FILE";
+  const loadingLabel =
+    kind === "dataset" ? "processing..." : "transcribing…";
 
   return (
     <div className="flex flex-col items-end gap-1 animate-[fade-up_0.35s_ease-out]">
@@ -731,7 +718,7 @@ function UploadedFileBubble({
           <p className="truncate text-sm font-medium text-ink">{filename}</p>
           <p className="text-[11px] text-ink-muted">
             {extension} · {formatFileSize(size)}
-            {isLoading ? " · uploading..." : ""}
+            {isLoading ? ` · ${loadingLabel}` : ""}
           </p>
         </div>
       </div>
@@ -832,61 +819,6 @@ function renderGreeting(greeting: string, firstName: string) {
       <span className="text-brand">{firstName}</span>
       {parts.slice(1).join(firstName)}
     </>
-  );
-}
-
-
-function MediaPredictionCard({
-  filename,
-  kind,
-  result,
-  onDismiss,
-}: {
-  filename: string;
-  kind: "audio" | "video";
-  result: MediaPredictionResponse;
-  onDismiss: () => void;
-}) {
-  const label = result.label || (result.is_medical ? "Pending" : "Non-medical");
-
-  return (
-    <div className="w-full space-y-3 animate-[fade-up_0.4s_ease-out]">
-      <div className="overflow-hidden rounded-3xl border border-black/5 bg-white/90 shadow-[0_12px_32px_-20px_rgba(15,23,42,0.25)] backdrop-blur-sm">
-        <div className="flex items-start justify-between gap-3 border-b border-black/[0.04] px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold tracking-[0.14em] text-brand uppercase">
-              {kind === "video" ? "Video claim" : "Audio claim"}
-            </p>
-            <p className="mt-1 truncate text-sm font-medium text-ink">{filename}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="flex size-8 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
-            aria-label="Dismiss media results"
-          >
-            <MaterialIcon name="close" size={16} />
-          </button>
-        </div>
-
-        <div className="space-y-4 px-4 py-4 sm:px-5">
-          <div>
-            <p className="text-[11px] font-semibold tracking-[0.14em] text-ink-muted uppercase">
-              Transcript
-            </p>
-            <p className="mt-1.5 text-sm leading-6 text-ink">{result.transcript}</p>
-          </div>
-
-          <VerdictPanel
-            label={label}
-            confidence={result.label_confidence}
-            topic={result.topic}
-            message={result.message}
-            isMedical={result.is_medical}
-          />
-        </div>
-      </div>
-    </div>
   );
 }
 
