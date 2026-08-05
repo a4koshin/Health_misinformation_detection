@@ -120,14 +120,33 @@ def _transcribe_with_openai(audio_path: Path) -> str | None:
         result = client.audio.transcriptions.create(
             model="whisper-1",
             file=handle,
+            language="so",
         )
     text = (getattr(result, "text", None) or "").strip()
     return text or None
 
 
 def _transcribe_with_local_whisper(audio_path: Path) -> str:
+    # Prefer the Somali-tuned Paza Whisper used by /api/transcribe.
+    try:
+        from services import transcription_service
+
+        return transcription_service.transcribe_audio(str(audio_path))
+    except RuntimeError:
+        # e.g. no speech detected — do not hide behind tiny Whisper.
+        raise
+    except Exception as exc:
+        # Model load / unexpected ASR failure → try tiny Whisper fallback.
+        print(f"[media_service] Paza Whisper unavailable, falling back: {exc}")
+
     asr = _get_asr_pipeline()
-    result = asr(str(audio_path))
+    try:
+        result = asr(
+            str(audio_path),
+            generate_kwargs={"language": "so", "task": "transcribe"},
+        )
+    except TypeError:
+        result = asr(str(audio_path))
     if isinstance(result, dict):
         text = (result.get("text") or "").strip()
     else:
