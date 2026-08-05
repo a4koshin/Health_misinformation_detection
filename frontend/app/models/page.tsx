@@ -39,10 +39,11 @@ function ModelsContent() {
             <div>
               <h2 className="text-base font-medium text-[#0f172a]">SomBERTb</h2>
               <p className="mt-1 text-sm text-[#475569]">
-                Task A reliability and Task B topic classifiers.
+                Task A reliability classifier. Categories use keyword matching
+                (no Task B).
               </p>
               <p className="mt-3 text-xs font-medium text-emerald-700">
-                best_model_task_a / best_model_task_b
+                best_model_task_a
               </p>
             </div>
           </div>
