@@ -5,10 +5,12 @@ export type TextPredictionResponse = {
   is_medical: boolean;
   label: string | null;
   label_confidence: number | null;
-  topic: string | null;
-  topic_confidence: number | null;
+  category: string | null;
   message: string;
   transcript: string;
+  /** @deprecated Use category — kept for older API payloads. */
+  topic?: string | null;
+  topic_confidence?: number | null;
 };
 
 export type MediaPredictionResponse = {
@@ -19,14 +21,19 @@ export type MediaPredictionResponse = {
   is_medical: boolean;
   label: string | null;
   label_confidence: number | null;
-  topic: string | null;
-  topic_confidence: number | null;
+  category: string | null;
   message: string;
+  /** @deprecated Use category — kept for older API payloads. */
+  topic?: string | null;
+  topic_confidence?: number | null;
 };
 
-export type TranscribeVideoResponse = {
+export type TranscribeMediaResponse = {
   transcribed_text: string;
 };
+
+/** @deprecated Prefer transcribeMedia — kept for callers that still import this name. */
+export type TranscribeVideoResponse = TranscribeMediaResponse;
 
 export async function predictText(
   token: string,
@@ -42,15 +49,17 @@ export async function predictText(
   );
 }
 
-/** Upload a video → Somali text only (then call predictText with the result). */
-export async function transcribeVideo(
+/** Upload audio or video → Somali text only (then call predictText with the result). */
+export async function transcribeMedia(
   token: string,
   file: File,
-): Promise<TranscribeVideoResponse> {
+  kind: "audio" | "video" = "video",
+): Promise<TranscribeMediaResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("kind", kind);
 
-  return apiFetch<TranscribeVideoResponse>(
+  return apiFetch<TranscribeMediaResponse>(
     "/api/transcribe",
     {
       method: "POST",
@@ -58,6 +67,14 @@ export async function transcribeVideo(
     },
     token,
   );
+}
+
+/** @deprecated Use transcribeMedia(token, file, "video"). */
+export async function transcribeVideo(
+  token: string,
+  file: File,
+): Promise<TranscribeMediaResponse> {
+  return transcribeMedia(token, file, "video");
 }
 
 export async function predictMedia(
