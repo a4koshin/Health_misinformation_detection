@@ -1,4 +1,4 @@
-"""HTTP handlers for video transcription → Somali text."""
+"""HTTP handlers for audio/video transcription → Somali text."""
 
 from __future__ import annotations
 
@@ -12,23 +12,28 @@ from werkzeug.datastructures import FileStorage
 
 from services import transcription_service
 
-ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv"}
-MAX_VIDEO_BYTES = 100 * 1024 * 1024  # 100 MB
+ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
+ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg", ".webm", ".aac", ".flac"}
+ALLOWED_EXTENSIONS = ALLOWED_VIDEO_EXTENSIONS | ALLOWED_AUDIO_EXTENSIONS
+MAX_MEDIA_BYTES = 100 * 1024 * 1024  # 100 MB
 
 
 def _extension(filename: str) -> str:
     return Path(filename).suffix.lower()
 
 
-def _validate_video(file: FileStorage | None) -> tuple[str, int]:
+def _validate_media(file: FileStorage | None) -> tuple[str, str]:
+    """Return (filename, kind) where kind is 'audio' or 'video'."""
     if not file or not file.filename:
-        raise ValueError("No video file was uploaded.")
+        raise ValueError("No audio or video file was uploaded.")
 
     filename = file.filename
     ext = _extension(filename)
-    if ext not in ALLOWED_VIDEO_EXTENSIONS:
+    if ext not in ALLOWED_EXTENSIONS:
         raise ValueError(
-            "Unsupported video format. Allowed: "
+            "Unsupported format. Allowed audio: "
+            + ", ".join(sorted(ALLOWED_AUDIO_EXTENSIONS))
+            + ". Allowed video: "
             + ", ".join(sorted(ALLOWED_VIDEO_EXTENSIONS))
         )
 
@@ -37,38 +42,57 @@ def _validate_video(file: FileStorage | None) -> tuple[str, int]:
     file.stream.seek(0)
 
     if size <= 0:
-        raise ValueError("The uploaded video file is empty or corrupted.")
+        raise ValueError("The uploaded file is empty or corrupted.")
 
-    if size > MAX_VIDEO_BYTES:
-        raise ValueError("Video must be 100MB or smaller.")
+    if size > MAX_MEDIA_BYTES:
+        raise ValueError("File must be 100MB or smaller.")
 
-    return filename, size
+    # .webm can be audio or video — prefer the explicit form field, else video.
+    kind_hint = (request.form.get("kind") or "").strip().lower()
+    if kind_hint in {"audio", "video"}:
+        kind = kind_hint
+    elif ext in ALLOWED_AUDIO_EXTENSIONS - ALLOWED_VIDEO_EXTENSIONS:
+        kind = "audio"
+    elif ext in ALLOWED_VIDEO_EXTENSIONS - ALLOWED_AUDIO_EXTENSIONS:
+        kind = "video"
+    else:
+        # Ambiguous (.webm): treat as video unless kind=audio was set above.
+        kind = "video"
+
+    return filename, kind
 
 
 @jwt_required()
 def transcribe():
-    """POST /api/transcribe — multipart video → {"transcribed_text": "..."}."""
-    file = request.files.get("file") or request.files.get("video")
+    """POST /api/transcribe — multipart audio/video → {"transcribed_text": "..."}."""
+    file = (
+        request.files.get("file")
+        or request.files.get("video")
+        or request.files.get("audio")
+    )
 
     try:
-        filename, _size = _validate_video(file)
+        filename, kind = _validate_media(file)
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
 
     assert file is not None  # validated above
     ext = _extension(filename)
-    video_path: str | None = None
+    media_path: str | None = None
 
     try:
-        fd, video_path = tempfile.mkstemp(suffix=ext)
+        fd, media_path = tempfile.mkstemp(suffix=ext)
         os.close(fd)
-        file.save(video_path)
+        file.save(media_path)
 
-        text = transcription_service.transcribe_video(video_path)
+        if kind == "audio":
+            text = transcription_service.transcribe_audio_file(media_path)
+        else:
+            text = transcription_service.transcribe_video(media_path)
+
         return jsonify({"transcribed_text": text}), 200
 
     except ValueError as exc:
-        # e.g. no audio track
         return jsonify({"error": True, "message": str(exc)}), 400
     except FileNotFoundError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
@@ -81,16 +105,16 @@ def transcribe():
                 {
                     "error": True,
                     "message": (
-                        "Unable to transcribe this video. "
-                        "The file may be corrupted or unsupported."
+                        "Unable to transcribe this file. "
+                        "It may be corrupted or unsupported."
                     ),
                 }
             ),
             500,
         )
     finally:
-        if video_path:
+        if media_path:
             try:
-                Path(video_path).unlink(missing_ok=True)
+                Path(media_path).unlink(missing_ok=True)
             except OSError:
                 pass
