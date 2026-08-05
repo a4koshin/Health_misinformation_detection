@@ -114,9 +114,73 @@ def transcribe_audio(audio_path: str) -> str:
 
     if not text:
         raise RuntimeError(
-            "No speech was detected in this video. Try a clearer recording."
+            "No speech was detected in this recording. Try a clearer audio file."
         )
     return text
+
+
+def normalize_audio_to_wav(audio_path: str) -> str:
+    """Convert any audio file to mono 16 kHz WAV for Whisper.
+
+    Returns a temp .wav path. Caller must delete it.
+    """
+    path = Path(audio_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+    fd, wav_path = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(path),
+                "-vn",
+                "-acodec",
+                "pcm_s16le",
+                "-ar",
+                "16000",
+                "-ac",
+                "1",
+                wav_path,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        Path(wav_path).unlink(missing_ok=True)
+        raise RuntimeError(
+            "Audio transcription requires ffmpeg. Install ffmpeg and try again."
+        ) from exc
+
+    if result.returncode != 0 or not Path(wav_path).is_file():
+        Path(wav_path).unlink(missing_ok=True)
+        raise RuntimeError(
+            "Could not read this audio file. Try MP3 or WAV instead."
+        )
+
+    return wav_path
+
+
+def transcribe_audio_file(audio_path: str) -> str:
+    """Normalize an uploaded audio file to WAV, then transcribe as Somali."""
+    wav_path: str | None = None
+    try:
+        # Already-WAV uploads still get normalized to 16 kHz mono.
+        wav_path = normalize_audio_to_wav(audio_path)
+        return transcribe_audio(wav_path)
+    finally:
+        if wav_path:
+            try:
+                Path(wav_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 def transcribe_video(video_path: str) -> str:
