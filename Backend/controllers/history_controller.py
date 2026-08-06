@@ -3,6 +3,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from models.prediction import Prediction
 from services import audit_service, auth_service, db_service, predictor_service
+from services.claim_validation_service import validate_somali_claim_input
 
 
 def _client_ip() -> str | None:
@@ -16,7 +17,6 @@ def _assistant_message(result: dict) -> str:
     return result.get("message") or predictor_service.build_message(
         result["is_medical"],
         result["label"],
-        result.get("category"),
     )
 
 
@@ -42,6 +42,10 @@ def _prediction_to_conversation(prediction: Prediction, message: str) -> dict:
 
 
 def _run_and_save(user, text: str, *, source: str = "Manual check"):
+    ok, error_message = validate_somali_claim_input(text)
+    if not ok:
+        raise ValueError(error_message or "Invalid claim text.")
+
     result = predictor_service.run_full_pipeline(text)
     message = _assistant_message(result)
 
@@ -51,8 +55,6 @@ def _run_and_save(user, text: str, *, source: str = "Manual check"):
         is_medical=result["is_medical"],
         label=result["label"],
         label_confidence=result["label_confidence"],
-        topic=result.get("category"),
-        topic_confidence=None,
         cleaned_text=result.get("cleaned_text"),
         source="non_medical" if not result["is_medical"] else source,
     )
@@ -105,6 +107,8 @@ def create_conversation():
 
     try:
         prediction, message = _run_and_save(user, text)
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"error": True, "message": str(exc)}), 503
     except FileNotFoundError as exc:
@@ -135,7 +139,6 @@ def get_conversation(prediction_id: int):
     message = prediction.summary or predictor_service.build_message(
         prediction.source != "non_medical",
         prediction.label,
-        prediction.topic,
     )
     return jsonify(_prediction_to_conversation(prediction, message)), 200
 
@@ -159,6 +162,8 @@ def append_message(prediction_id: int):
 
     try:
         prediction, message = _run_and_save(user, text)
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
     except RuntimeError as exc:
         return jsonify({"error": True, "message": str(exc)}), 503
     except FileNotFoundError as exc:
@@ -173,6 +178,10 @@ def edit_message(prediction_id: int, message_id: str):
     text = (data.get("content") or data.get("input_text") or data.get("text") or "").strip()
     if not text:
         return jsonify({"error": True, "message": "Text is required."}), 400
+
+    ok, error_message = validate_somali_claim_input(text)
+    if not ok:
+        return jsonify({"error": True, "message": error_message}), 400
 
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
@@ -207,8 +216,6 @@ def edit_message(prediction_id: int, message_id: str):
     prediction.label = resolved_label
     prediction.confidence = resolved_confidence
     prediction.label_confidence = conf
-    prediction.topic = result.get("category")
-    prediction.topic_confidence = None
     prediction.source = (
         "non_medical" if not result["is_medical"] else (prediction.source or "pipeline")
     )
