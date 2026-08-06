@@ -52,13 +52,6 @@ const COLORS = {
   muted: "#475569",
 } as const;
 
-const TOPIC_ICON_TONES = [
-  { icon: "self_improvement", tone: "bg-blue-500/10 text-blue-700" },
-  { icon: "medication", tone: "bg-violet-500/10 text-violet-700" },
-  { icon: "psychology", tone: "bg-[#ff5c00]/10 text-[#ff5c00]" },
-  { icon: "health_and_safety", tone: "bg-emerald-500/10 text-emerald-700" },
-] as const;
-
 function StatCard({
   label,
   value,
@@ -152,24 +145,6 @@ function DashboardContent() {
     ].filter((item) => item.value > 0);
   }, [stats]);
 
-  const topicCards = useMemo(() => {
-    if (!stats?.topic_cards?.length) return [];
-    const preferred = [
-      "Lifestyle Advice",
-      "Medication Safety Advice",
-      "Mental Health Advice",
-      "Preventive Care Advice",
-    ];
-    const byName = new Map(stats.topic_cards.map((t) => [t.name, t.count]));
-    const cards = preferred.map((name) => ({
-      name,
-      count: byName.get(name) ?? 0,
-    }));
-    const hasAny = cards.some((c) => c.count > 0);
-    if (hasAny) return cards;
-    return stats.topic_cards.slice(0, 4);
-  }, [stats]);
-
   const usersPagination = useTablePagination(stats?.users_table ?? [], 10);
 
   return (
@@ -220,7 +195,7 @@ function DashboardContent() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <GlassCard className="p-6">
+            <GlassCard className="p-6 lg:col-span-2">
               <div className="mb-4">
                 <h2 className="text-base font-medium text-[#0f172a]">
                   Reliable vs Non-Reliable
@@ -264,46 +239,6 @@ function DashboardContent() {
                   Non-Reliable (
                   {stats.non_reliable_count ?? stats.misinformation_count})
                 </span>
-              </div>
-            </GlassCard>
-
-            <GlassCard className="p-6">
-              <div className="mb-4">
-                <h2 className="text-base font-medium text-[#0f172a]">Topics</h2>
-                <p className="text-sm text-[#475569]">
-                  Reliable claims by SomBERT topic.
-                </p>
-              </div>
-              <div className="h-64">
-                {(stats.topics ?? []).length === 0 ? (
-                  <p className="flex h-full items-center justify-center text-sm text-[#475569]">
-                    No topic data yet.
-                  </p>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats.topics}>
-                      <CartesianGrid stroke={COLORS.grid} vertical={false} />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fill: COLORS.muted, fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        allowDecimals={false}
-                        tick={{ fill: COLORS.muted, fontSize: 11 }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip />
-                      <Bar
-                        dataKey="count"
-                        fill={COLORS.brand}
-                        radius={[8, 8, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
               </div>
             </GlassCard>
           </div>
@@ -401,39 +336,6 @@ function DashboardContent() {
               )}
             </div>
           </GlassCard>
-
-          <div>
-            <div className="mb-3">
-              <h2 className="text-base font-medium text-[#0f172a]">
-                Topics across all users
-              </h2>
-              <p className="text-sm text-[#475569]">
-                How often each SomBERT topic appears in predictions.
-              </p>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {topicCards.map((topic, index) => {
-                const style = TOPIC_ICON_TONES[index % TOPIC_ICON_TONES.length];
-                return (
-                  <GlassCard key={topic.name} className="p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm text-[#475569]">{topic.name}</p>
-                        <p className="mt-2 text-3xl font-normal tracking-tight text-[#0f172a]">
-                          {topic.count}
-                        </p>
-                      </div>
-                      <span
-                        className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${style.tone}`}
-                      >
-                        <MaterialIcon name={style.icon} size={20} />
-                      </span>
-                    </div>
-                  </GlassCard>
-                );
-              })}
-            </div>
-          </div>
 
           <DataTableCard
             header={
