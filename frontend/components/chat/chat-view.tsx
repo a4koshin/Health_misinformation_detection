@@ -336,8 +336,6 @@ export function ChatView() {
                 <PipelineChip icon="shield" label="Medical gate" />
                 <span className="text-ink/20">→</span>
                 <PipelineChip icon="verified" label="Reliability" />
-                <span className="text-ink/20">→</span>
-                <PipelineChip icon="category" label="Topic" />
               </div>
             </div>
           </div>
@@ -899,7 +897,6 @@ function resolveVerdictLabel(
 ): {
   label: string;
   confidence: number | null;
-  topic: string | null;
   isMedical: boolean;
 } {
   const rawLabel = conversation?.label || conversation?.somali_status || null;
@@ -914,7 +911,6 @@ function resolveVerdictLabel(
       label: normalized,
       confidence:
         conversation?.label_confidence ?? conversation?.confidence ?? null,
-      topic: conversation?.topic ?? null,
       isMedical:
         conversation?.is_medical ??
         !/non[-\s]?medical/i.test(normalized),
@@ -925,19 +921,16 @@ function resolveVerdictLabel(
     return {
       label: "Non-medical",
       confidence: null,
-      topic: null,
       isMedical: false,
     };
   }
 
   const isMisinformation = /misinformation|non[-\s]?reliable/i.test(content);
   const isReliable = !isMisinformation && /\breliable\b/i.test(content);
-  const topicMatch = content.match(/(?:mowduuca)\s+(.+?)\.?$/i);
 
   return {
     label: isReliable ? "Reliable" : isMisinformation ? "Non-Reliable" : "Result",
     confidence: null,
-    topic: topicMatch?.[1]?.trim() ?? null,
     isMedical: isReliable || isMisinformation,
   };
 }
@@ -955,7 +948,6 @@ function AssistantVerdict({
     <VerdictPanel
       label={verdict.label}
       confidence={verdict.confidence}
-      topic={verdict.topic}
       message={content}
       isMedical={verdict.isMedical}
     />
@@ -965,13 +957,11 @@ function AssistantVerdict({
 function VerdictPanel({
   label,
   confidence,
-  topic,
   message,
   isMedical,
 }: {
   label: string;
   confidence?: number | null;
-  topic?: string | null;
   message: string;
   isMedical?: boolean;
 }) {
@@ -1032,11 +1022,6 @@ function VerdictPanel({
               <MaterialIcon name={tone.icon} size={16} />
               {displayLabel}
             </span>
-            {topic ? (
-              <span className="inline-flex items-center rounded-full border border-brand/20 bg-[#ffefe6] px-3 py-1 text-xs font-medium text-brand-deep">
-                {topic}
-              </span>
-            ) : null}
           </div>
           <p className="mt-2 text-sm font-medium text-ink">{tone.title}</p>
         </div>
