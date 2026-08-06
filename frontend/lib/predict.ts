@@ -5,12 +5,9 @@ export type TextPredictionResponse = {
   is_medical: boolean;
   label: string | null;
   label_confidence: number | null;
-  category: string | null;
   message: string;
   transcript: string;
-  /** @deprecated Use category — kept for older API payloads. */
-  topic?: string | null;
-  topic_confidence?: number | null;
+  sources?: { title: string; url: string }[];
 };
 
 export type MediaPredictionResponse = {
@@ -21,11 +18,8 @@ export type MediaPredictionResponse = {
   is_medical: boolean;
   label: string | null;
   label_confidence: number | null;
-  category: string | null;
   message: string;
-  /** @deprecated Use category — kept for older API payloads. */
-  topic?: string | null;
-  topic_confidence?: number | null;
+  sources?: { title: string; url: string }[];
 };
 
 export type TranscribeMediaResponse = {
