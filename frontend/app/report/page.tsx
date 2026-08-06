@@ -114,8 +114,6 @@ function ReportContent() {
 
   const rows = report?.rows ?? [];
   const pagination = useTablePagination(rows, 10);
-  const reliableTopics = report?.reliable_topics ?? [];
-  const topicsPagination = useTablePagination(reliableTopics, 10);
 
   async function handleDownload() {
     if (!token) return;
@@ -210,75 +208,12 @@ function ReportContent() {
             header={
               <div>
                 <h2 className="text-base font-medium text-[#0f172a]">
-                  Topics among Reliable claims
-                </h2>
-                <p className="text-sm text-[#475569]">
-                  Model-B topics are counted only for Reliable predictions
-                  {isAdmin ? " across all users" : ""}.
-                </p>
-              </div>
-            }
-            footer={
-              reliableTopics.length > 0 ? (
-                <TablePagination
-                  page={topicsPagination.page}
-                  totalPages={topicsPagination.totalPages}
-                  totalItems={topicsPagination.totalItems}
-                  rangeStart={topicsPagination.rangeStart}
-                  rangeEnd={topicsPagination.rangeEnd}
-                  pageNumbers={topicsPagination.pageNumbers}
-                  onPageChange={topicsPagination.setPage}
-                  rowsPerPage={topicsPagination.rowsPerPage}
-                  onRowsPerPageChange={topicsPagination.setRowsPerPage}
-                />
-              ) : undefined
-            }
-          >
-            <GlassTableHead>
-              <GlassTableRow>
-                <GlassTableHeaderCell>Topic</GlassTableHeaderCell>
-                <GlassTableHeaderCell>Count</GlassTableHeaderCell>
-                <GlassTableHeaderCell>
-                  Share of Reliable
-                </GlassTableHeaderCell>
-              </GlassTableRow>
-            </GlassTableHead>
-            <GlassTableBody>
-              {reliableTopics.length === 0 ? (
-                <GlassTableRow>
-                  <GlassTableCell
-                    colSpan={3}
-                    className="py-10 text-center text-sm text-[#475569]"
-                  >
-                    No Reliable topic data yet.
-                  </GlassTableCell>
-                </GlassTableRow>
-              ) : (
-                topicsPagination.pageItems.map((topic) => (
-                  <GlassTableRow key={topic.topic}>
-                    <GlassTableCell className="font-medium text-[#0f172a]">
-                      {topic.topic}
-                    </GlassTableCell>
-                    <GlassTableCell>{topic.count}</GlassTableCell>
-                    <GlassTableCell className="text-[#475569]">
-                      {topic.share.toFixed(1)}%
-                    </GlassTableCell>
-                  </GlassTableRow>
-                ))
-              )}
-            </GlassTableBody>
-          </DataTableCard>
-
-          <DataTableCard
-            header={
-              <div>
-                <h2 className="text-base font-medium text-[#0f172a]">
                   Prediction reports
                 </h2>
                 <p className="text-sm text-[#475569]">
                   {isAdmin
                     ? "Every claim checked on the platform, with the user who submitted it."
-                    : "Every claim you checked, with label and topic when available."}
+                    : "Every claim you checked, with label when available."}
                 </p>
               </div>
             }
@@ -303,14 +238,13 @@ function ReportContent() {
                 <GlassTableHeaderCell>User</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Claim</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Label</GlassTableHeaderCell>
-                <GlassTableHeaderCell>Topic</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Date</GlassTableHeaderCell>
               </GlassTableRow>
             </GlassTableHead>
             <GlassTableBody>
               {rows.length === 0 ? (
                 <GlassTableRow>
-                  <GlassTableCell colSpan={5}>
+                  <GlassTableCell colSpan={4}>
                     <div className="flex flex-col items-center gap-3 py-12 text-center">
                       <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                         <MaterialIcon name="description" size={24} />
@@ -350,9 +284,6 @@ function ReportContent() {
                       <GlassBadge tone={labelTone(row.label)}>
                         {displayLabel(row.label)}
                       </GlassBadge>
-                    </GlassTableCell>
-                    <GlassTableCell className="text-[#475569]">
-                      {row.topic ?? "—"}
                     </GlassTableCell>
                     <GlassTableCell className="whitespace-nowrap text-[#475569]">
                       {row.created_at
