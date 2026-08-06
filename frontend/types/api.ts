@@ -37,8 +37,6 @@ export type Detection = {
   label: string | null;
   confidence: number | null;
   label_confidence?: number | null;
-  topic?: string | null;
-  topic_confidence?: number | null;
   is_medical?: boolean;
   source?: string | null;
   somali_status: string;
@@ -59,8 +57,6 @@ export type DashboardStats = {
   misinformation_count: number;
   non_reliable_count: number;
   pending_count: number;
-  topics: { name: string; full_name?: string; count: number }[];
-  topic_cards: { name: string; count: number }[];
   daily: { date: string; label: string; count: number }[];
   active_users: { name: string; count: number }[];
   users_table: {
@@ -90,7 +86,6 @@ export type ReportRow = {
   user_email?: string;
   claim: string;
   label: string | null;
-  topic: string | null;
   created_at: string;
 };
 
@@ -102,8 +97,6 @@ export type UserReportResponse = {
   non_reliable_count: number;
   reliable_percent?: number;
   non_reliable_percent?: number;
-  reliable_topics?: { topic: string; count: number; share: number }[];
-  topic_breakdown?: Record<string, number>;
   rows: ReportRow[];
 };
 
