@@ -13,94 +13,11 @@ GATEKEEPER_MODEL_PATH = ML_DIR / "gatekeeper_model.pkl"
 GATEKEEPER_TFIDF_PATH = ML_DIR / "gatekeeper_tfidf.pkl"
 TASK_A_DIR = ML_DIR / "best_model_task_a"
 
+# Task A checkpoint only stores LABEL_0 / LABEL_1. This is the app mapping:
+#   class 0 -> Reliable
+#   class 1 -> Non-Reliable
 LABEL_TO_ID = {"Reliable": 0, "Non-Reliable": 1}
-ID_TO_LABEL = {index: label for label, index in LABEL_TO_ID.items()}
-
-# Keyword lists for category matching (Somali + English). Used for BOTH
-# Reliable and Non-Reliable branches — not a trained classifier.
-CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "Medication Advice": (
-        "daawo",
-        "dawo",
-        "dawada",
-        "medication",
-        "medicine",
-        "drug",
-        "tablet",
-        "pill",
-        "dose",
-        "dosage",
-        "antibiotic",
-        "aspirin",
-        "paracetamol",
-        "ibuprofen",
-        "insulin",
-        "kiniin",
-        "kaniini",
-        "cab",
-        "qaado",
-    ),
-    "Prevention Advice": (
-        "tallaal",
-        "tallaalka",
-        "vaccine",
-        "vaccination",
-        "prevention",
-        "prevent",
-        "ilaali",
-        "ka hortag",
-        "ka-hortag",
-        "mask",
-        "gacmo dhaqid",
-        "handwash",
-        "hand wash",
-        "hygiene",
-        "nadiifin",
-        "covid",
-        "immuni",
-    ),
-    "Lifestyle Advice": (
-        "cunto",
-        "diet",
-        "nutrition",
-        "exercise",
-        "jimicsi",
-        "buurnaan",
-        "weight",
-        "sleep",
-        "hurdo",
-        "lifestyle",
-        "tobacco",
-        "sigaar",
-        "alcohol",
-        "khamr",
-        "biyo",
-        "hydration",
-        "walk",
-        "socod",
-    ),
-    "Mental Health Advice": (
-        "maskax",
-        "mental",
-        "depression",
-        "niyad-jab",
-        "niyad jab",
-        "anxiety",
-        "walwal",
-        "stress",
-        "walaac",
-        "therapy",
-        "counsel",
-        "suicide",
-        "is-dilid",
-        "is dilid",
-        "trauma",
-        "psychiatric",
-        "nafs",
-    ),
-}
-
-DEFAULT_CATEGORY = "General Health Advice"
+ID_TO_LABEL = {0: "Reliable", 1: "Non-Reliable"}
 
 _device: torch.device | None = None
 _gatekeeper_model = None
@@ -138,8 +55,11 @@ def load_models() -> None:
 
     _task_a_tokenizer = AutoTokenizer.from_pretrained(TASK_A_DIR)
     _task_a_model = AutoModelForSequenceClassification.from_pretrained(
-        TASK_A_DIR
+        TASK_A_DIR,
+        num_labels=2,
     )
+    _task_a_model.config.id2label = dict(ID_TO_LABEL)
+    _task_a_model.config.label2id = dict(LABEL_TO_ID)
     _task_a_model.to(_device)
     _task_a_model.eval()
 
@@ -162,31 +82,6 @@ def clean_text(text: str) -> str:
     return cleaned
 
 
-def infer_topic_category(text: str) -> str:
-    """Keyword-match a health category for Reliable and Non-Reliable claims.
-
-    Returns one of: Medication Advice, Prevention Advice, Lifestyle Advice,
-    Mental Health Advice, or General Health Advice when nothing matches.
-    """
-    haystack = clean_text(text)
-    if not haystack:
-        return DEFAULT_CATEGORY
-
-    scores: dict[str, int] = {name: 0 for name in CATEGORY_KEYWORDS}
-    for category, keywords in CATEGORY_KEYWORDS.items():
-        for keyword in keywords:
-            key = keyword.lower().strip()
-            if not key:
-                continue
-            if key in haystack:
-                scores[category] += 1
-
-    best_category = max(scores, key=scores.get)
-    if scores[best_category] <= 0:
-        return DEFAULT_CATEGORY
-    return best_category
-
-
 def check_gatekeeper(text: str) -> bool:
     """Return True if the text is medical, False otherwise."""
     _ensure_loaded()
@@ -196,7 +91,7 @@ def check_gatekeeper(text: str) -> bool:
     if isinstance(prediction, str):
         return prediction.lower() in {"medical", "health", "true", "yes"}
 
-    # This gatekeeper was trained with 0 = medical, 1 = non-medical.
+    # Gatekeeper training: 0 = medical, 1 = non-medical.
     return int(prediction) == 0
 
 
@@ -221,9 +116,16 @@ def _predict_with_transformer(
         pred_id = int(torch.argmax(probs).item())
         confidence = float(probs[pred_id].item())
 
+    label = id_to_label.get(pred_id)
+    if label is None:
+        # Fallback if an unexpected class id appears.
+        label = "Non-Reliable" if pred_id != 0 else "Reliable"
+
     return {
-        "label": id_to_label[pred_id],
+        "label": label,
         "confidence": confidence,
+        "pred_id": pred_id,
+        "probs": [float(p) for p in probs.tolist()],
     }
 
 
@@ -236,7 +138,10 @@ def predict_reliability(text: str) -> dict[str, Any]:
         text,
         ID_TO_LABEL,
     )
-    return {"label": result["label"], "confidence": result["confidence"]}
+    return {
+        "label": result["label"],
+        "confidence": result["confidence"],
+    }
 
 
 def run_full_pipeline(text: str) -> dict[str, Any]:
@@ -244,10 +149,9 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
     Pipeline:
 
       Input claim_text (direct text or transcription)
-      Stage 0 gatekeeper → Non-Medical: STOP
-      Stage 1 Model A → Reliable / Non-Reliable
-      Keyword category for BOTH branches
-      Gemini phrases the result for that category
+      Stage 0 gatekeeper -> Non-Medical: STOP
+      Stage 1 Model A -> Reliable / Non-Reliable
+      Gemini phrases the result (optional grounded sources)
     """
     from services import explanation_service
 
@@ -259,17 +163,15 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
             "is_medical": False,
             "label": None,
             "label_confidence": None,
-            "category": None,
             "cleaned_text": cleaned,
             "message": (
                 "Jumladaan ma aha mid caafimaad ku saabsan. "
                 "Fadlan geli xog caafimaad ku saabsan si loo baaro."
             ),
+            "sources": [],
         }
 
-    # ------------------------------------------------------------------
     # Stage 0 — Gatekeeper: Medical vs Non-Medical
-    # ------------------------------------------------------------------
     is_medical = check_gatekeeper(cleaned)
 
     if not is_medical:
@@ -277,53 +179,46 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
             "is_medical": False,
             "label": None,
             "label_confidence": None,
-            "category": None,
             "cleaned_text": cleaned,
             "message": (
                 "Jumladaan ma aha mid caafimaad ku saabsan. "
                 "Fadlan geli xog caafimaad ku saabsan si loo baaro."
             ),
+            "sources": [],
         }
 
-    # ------------------------------------------------------------------
     # Stage 1 — SomBERTb Model A: Reliable vs Non-Reliable
-    # ------------------------------------------------------------------
     reliability = predict_reliability(cleaned)
     label = reliability["label"]
     label_confidence = float(reliability["confidence"])
-    if label != "Reliable":
+    if label not in {"Reliable", "Non-Reliable"}:
         label = "Non-Reliable"
 
-    # ------------------------------------------------------------------
-    # Category — keyword match for BOTH Reliable and Non-Reliable
-    # ------------------------------------------------------------------
-    category = infer_topic_category(claim_text)
-
     if label == "Reliable":
-        message = explanation_service.generate_reliable_explanation(
-            claim_text,
-            category,
-        )
+        explanation = explanation_service.generate_reliable_explanation(claim_text)
     else:
-        message = explanation_service.generate_unreliable_explanation(
-            claim_text,
-            category,
-        )
+        explanation = explanation_service.generate_unreliable_explanation(claim_text)
+
+    message = (
+        explanation.get("message") if isinstance(explanation, dict) else explanation
+    )
+    sources = (
+        explanation.get("sources", []) if isinstance(explanation, dict) else []
+    )
 
     return {
         "is_medical": True,
         "label": label,
         "label_confidence": label_confidence,
-        "category": category,
         "cleaned_text": cleaned,
         "message": message,
+        "sources": sources,
     }
 
 
 def build_message(
     is_medical: bool,
     label: str | None,
-    category: str | None,
 ) -> str:
     """Somali user-facing copy — kept in sync with run_full_pipeline messages."""
     if not is_medical:
@@ -333,29 +228,20 @@ def build_message(
         )
 
     if label != "Reliable":
-        message = (
+        return (
             "Waad ku mahadsantahay weydiinta aad weydiisay. "
             "Markii aan fiirinay taladaan caafimaad, waxay u "
             "muuqataa mid Non-Reliable."
         )
-        if category:
-            message = f"{message} Qaybta: {category}."
-        return message
 
-    message = (
+    return (
         "Waad ku mahadsantahay weydiinta aad weydiisay. "
         "Markii aan fiirinay taladaan caafimaad, waxay u "
         "muuqataa mid Reliable."
     )
-    if category:
-        message = (
-            f"{message}\n\n"
-            f"Taladaan caafimaad waxay soo hoos gasho mowduuca {category}."
-        )
-    return message
 
 
 try:
     load_models()
-except Exception as exc:  # noqa: BLE001 — allow app boot without weights
+except Exception as exc:  # noqa: BLE001 - allow app boot without weights
     print(f"[predictor_service] Models not loaded yet: {exc}")
