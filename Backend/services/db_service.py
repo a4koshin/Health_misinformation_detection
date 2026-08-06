@@ -8,12 +8,11 @@ def save_prediction(
     is_medical: bool,
     label: str | None = None,
     label_confidence: float | None = None,
-    topic: str | None = None,
-    topic_confidence: float | None = None,
     cleaned_text: str | None = None,
     source: str | None = None,
 ) -> Prediction:
     # Neon NOT NULL: label, confidence, risk, source — gatekeeper exits omit Model A/B.
+    # Topic/category is retired — DB columns are kept only for schema compatibility.
     resolved_label = label or ("Non-medical" if not is_medical else "Pending")
     resolved_confidence = float(label_confidence) if label_confidence is not None else 0.0
     if resolved_label == "Reliable":
@@ -31,8 +30,6 @@ def save_prediction(
         label=resolved_label,
         confidence=resolved_confidence,
         label_confidence=label_confidence,
-        topic=topic,
-        topic_confidence=topic_confidence,
         source=resolved_source,
         risk=resolved_risk,
     )
@@ -132,22 +129,6 @@ def _build_report_payload(rows: list[Prediction], scope_user_id: int | None) -> 
         for user in User.query.filter(User.id.in_(user_ids)).all()
     } if user_ids else {}
 
-    topic_counts: dict[str, int] = {}
-    for row in reliable_rows:
-        if row.topic:
-            topic_counts[row.topic] = topic_counts.get(row.topic, 0) + 1
-
-    reliable_topics = []
-    for topic, count in sorted(topic_counts.items(), key=lambda item: (-item[1], item[0])):
-        share = round((count / reliable_count) * 100, 1) if reliable_count else 0.0
-        reliable_topics.append(
-            {
-                "topic": topic,
-                "count": count,
-                "share": share,
-            }
-        )
-
     report_rows = []
     for row in rows:
         user = users_by_id.get(row.user_id)
@@ -163,7 +144,6 @@ def _build_report_payload(rows: list[Prediction], scope_user_id: int | None) -> 
                 "user_email": user.email if user else "",
                 "claim": row.claim_text,
                 "label": label,
-                "topic": row.topic if label == "Reliable" else None,
                 "created_at": row.created_at.isoformat() if row.created_at else None,
             }
         )
@@ -180,10 +160,6 @@ def _build_report_payload(rows: list[Prediction], scope_user_id: int | None) -> 
         "non_reliable_percent": round((non_reliable_count / total_claims) * 100, 1)
         if total_claims
         else 0.0,
-        "reliable_topics": reliable_topics,
-        "topic_breakdown": {
-            item["topic"]: item["share"] for item in reliable_topics
-        },
         "rows": report_rows,
     }
 
@@ -195,7 +171,7 @@ def build_report_csv(report: dict) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
-        ["user_name", "user_email", "claim", "label", "topic", "created_at"]
+        ["user_name", "user_email", "claim", "label", "created_at"]
     )
     for row in report.get("rows", []):
         writer.writerow(
@@ -204,17 +180,7 @@ def build_report_csv(report: dict) -> str:
                 row.get("user_email", ""),
                 row.get("claim", ""),
                 row.get("label", ""),
-                row.get("topic") or "",
                 row.get("created_at") or "",
             ]
         )
     return buffer.getvalue()
-
-    return {
-        "total_checked": total_checked,
-        "reliable_count": reliable_count,
-        "non_reliable_count": non_reliable_count,
-        "reliable_percent": round((reliable_count / total_checked) * 100, 2),
-        "non_reliable_percent": round((non_reliable_count / total_checked) * 100, 2),
-        "topic_breakdown": topic_breakdown,
-    }
