@@ -48,40 +48,6 @@ def get_admin_dashboard_stats() -> dict:
         or 0
     )
 
-    topic_counts: dict[str, int] = defaultdict(int)
-    for row in predictions:
-        if row.label == "Reliable" and row.topic:
-            # Normalize long topic names for chart labels
-            topic_counts[row.topic] += 1
-
-    topics = [
-        {"name": _short_topic(name), "full_name": name, "count": count}
-        for name, count in sorted(topic_counts.items(), key=lambda item: (-item[1], item[0]))
-    ]
-
-    topic_totals: dict[str, int] = defaultdict(int)
-    for row in predictions:
-        if row.topic:
-            topic_totals[row.topic] += 1
-
-    topic_cards = [
-        {"name": name, "count": count}
-        for name, count in sorted(topic_totals.items(), key=lambda item: (-item[1], item[0]))
-    ]
-    # Ensure the four common topics appear even at zero.
-    known = [
-        "Lifestyle Advice",
-        "Medication Safety Advice",
-        "Medication Advice",
-        "Mental Health Advice",
-        "Prevention Advice",
-        "Preventive Care Advice",
-    ]
-    present = {card["name"] for card in topic_cards}
-    for name in known:
-        if name not in present:
-            topic_cards.append({"name": name, "count": 0})
-
     # Last 14 days daily volume
     today = datetime.now(timezone.utc).date()
     start = today - timedelta(days=13)
@@ -145,24 +111,10 @@ def get_admin_dashboard_stats() -> dict:
         "misinformation_count": non_reliable_count,
         "non_reliable_count": non_reliable_count,
         "pending_count": pending_count,
-        "topics": topics,
-        "topic_cards": topic_cards,
         "daily": daily,
         "active_users": active_users,
         "users_table": users_table,
     }
-
-
-def _short_topic(name: str) -> str:
-    mapping = {
-        "Lifestyle Advice": "Lifestyle",
-        "Medication Advice": "Medication",
-        "Medication Safety Advice": "Medication Safety",
-        "Mental Health Advice": "Mental Health",
-        "Prevention Advice": "Preventive Care",
-        "Preventive Care Advice": "Preventive Care",
-    }
-    return mapping.get(name, name.replace(" Advice", ""))
 
 
 def list_users() -> list[dict]:
