@@ -4,6 +4,7 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from extensions import db
 from services import audit_service, auth_service, db_service, predictor_service
 from services import media_service
+from services.claim_validation_service import validate_somali_claim_input
 
 
 def _client_ip() -> str | None:
@@ -14,11 +15,9 @@ def _client_ip() -> str | None:
 
 
 def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
-    category = result.get("category")
     message = result.get("message") or predictor_service.build_message(
         result["is_medical"],
         result["label"],
-        category,
     )
 
     prediction = db_service.save_prediction(
@@ -27,9 +26,6 @@ def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
         is_medical=result["is_medical"],
         label=result["label"],
         label_confidence=result["label_confidence"],
-        # Persist keyword category in the existing DB `topic` column.
-        topic=category,
-        topic_confidence=None,
         cleaned_text=result.get("cleaned_text"),
         source=source,
     )
@@ -57,8 +53,9 @@ def predict():
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
 
-    if not text:
-        return jsonify({"error": True, "message": "Text is required."}), 400
+    ok, error_message = validate_somali_claim_input(text)
+    if not ok:
+        return jsonify({"error": True, "message": error_message}), 400
 
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
@@ -79,8 +76,8 @@ def predict():
             "is_medical": result["is_medical"],
             "label": result["label"],
             "label_confidence": result["label_confidence"],
-            "category": result.get("category"),
             "message": message,
+            "sources": result.get("sources") or [],
             "transcript": text,
         }
     ), 200
@@ -130,7 +127,7 @@ def predict_media():
             "is_medical": result["is_medical"],
             "label": result["label"],
             "label_confidence": result["label_confidence"],
-            "category": result.get("category"),
             "message": message,
+            "sources": result.get("sources") or [],
         }
     ), 200
