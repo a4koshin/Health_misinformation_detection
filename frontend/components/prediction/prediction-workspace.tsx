@@ -8,6 +8,10 @@ import { GlassButton } from "@/components/glass/glass-button";
 import { predictDataset } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import {
+  CLAIM_INPUT_NOT_ALLOWED_MESSAGE,
+  validateSomaliClaimInput,
+} from "@/lib/claim-validation";
+import {
   predictText,
   transcribeMedia,
   type TextPredictionResponse,
@@ -32,7 +36,6 @@ const INPUT_MODES = [
 type AnalysisResult = {
   claim: string;
   label: string;
-  category: string | null;
   confidence: number | null;
   risk: string;
   somaliReply: string;
@@ -69,7 +72,6 @@ function toAnalysisResult(
   return {
     claim,
     label,
-    category: response.category ?? response.topic ?? null,
     confidence: response.label_confidence,
     risk: riskFromLabel(label, response.is_medical),
     somaliReply: response.message,
@@ -85,6 +87,7 @@ export function PredictionWorkspace() {
     }));
 
   const [draft, setDraft] = useState("");
+  const [inputError, setInputError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [mediaBusyLabel, setMediaBusyLabel] = useState<string | null>(null);
@@ -104,15 +107,21 @@ export function PredictionWorkspace() {
   async function analyzeClaim(text: string) {
     if (!token) return;
     const claim = text.trim();
-    if (!claim) {
-      toast.error("Enter a health claim to analyze.");
+    const validation = validateSomaliClaimInput(claim);
+    if (!validation.ok) {
+      const message = validation.message || CLAIM_INPUT_NOT_ALLOWED_MESSAGE;
+      setInputError(message);
+      toast.error(message);
       return;
     }
     if (claim.length > MAX_CHARS) {
-      toast.error(`Claim must be ${MAX_CHARS} characters or fewer.`);
+      const message = `Claim must be ${MAX_CHARS} characters or fewer.`;
+      setInputError(message);
+      toast.error(message);
       return;
     }
 
+    setInputError(null);
     setIsAnalyzing(true);
     try {
       const response = await predictText(token, claim);
@@ -125,6 +134,12 @@ export function PredictionWorkspace() {
         error instanceof ApiError
           ? error.message
           : "Unable to analyze this claim.";
+      if (
+        error instanceof ApiError &&
+        message.toLowerCase().includes("not allowed")
+      ) {
+        setInputError(message);
+      }
       toast.error(message);
     } finally {
       setIsAnalyzing(false);
@@ -143,8 +158,20 @@ export function PredictionWorkspace() {
 
   function handleClear() {
     setDraft("");
+    setInputError(null);
     setResult(null);
     requestAnimationFrame(() => textareaRef.current?.focus());
+  }
+
+  function handleDraftChange(value: string) {
+    const next = value.slice(0, MAX_CHARS);
+    setDraft(next);
+    if (!next.trim()) {
+      setInputError(null);
+      return;
+    }
+    const validation = validateSomaliClaimInput(next);
+    setInputError(validation.ok ? null : validation.message || null);
   }
 
   async function handleFileUpload(file: File) {
@@ -340,14 +367,33 @@ export function PredictionWorkspace() {
                   ref={textareaRef}
                   id="claim-input"
                   value={draft}
-                  onChange={(event) =>
-                    setDraft(event.target.value.slice(0, MAX_CHARS))
-                  }
+                  onChange={(event) => handleDraftChange(event.target.value)}
                   rows={5}
                   disabled={isAnalyzing}
+                  aria-invalid={Boolean(inputError)}
+                  aria-describedby={inputError ? "claim-input-error" : undefined}
                   placeholder="Tusaale: Tallaalka COVID-19 wuu ammaan yahay…"
-                  className="min-h-28 w-full resize-y rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[15px] leading-relaxed text-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-ink-muted/50 focus:border-brand/50 focus:ring-2 focus:ring-brand/15 disabled:opacity-60"
+                  className={cn(
+                    "min-h-28 w-full resize-y rounded-xl border bg-white px-3 py-2.5 text-[15px] leading-relaxed text-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-ink-muted/50 focus:ring-2 disabled:opacity-60",
+                    inputError
+                      ? "border-red-400 focus:border-red-500 focus:ring-red-500/15"
+                      : "border-gray-200 focus:border-brand/50 focus:ring-brand/15",
+                  )}
                 />
+                {inputError ? (
+                  <p
+                    id="claim-input-error"
+                    role="alert"
+                    className="text-sm text-red-600"
+                  >
+                    {inputError}
+                  </p>
+                ) : (
+                  <p className="text-xs text-ink-muted">
+                    Enter a Somali health claim. Full sentences of numbers,
+                    special characters, English, or Arabic are not allowed.
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                   <p className="text-xs tabular-nums text-ink-muted">
                     {charCount}/{MAX_CHARS}
@@ -367,7 +413,7 @@ export function PredictionWorkspace() {
                       type="button"
                       size="sm"
                       onClick={() => void handleAnalyze()}
-                      disabled={isAnalyzing || !draft.trim()}
+                      disabled={isAnalyzing || !draft.trim() || Boolean(inputError)}
                       className="bg-brand bg-none shadow-none hover:bg-[#e65300] hover:shadow-none"
                     >
                       {isAnalyzing && !mediaBusyLabel ? (
@@ -459,12 +505,6 @@ export function PredictionWorkspace() {
                   Risk{" "}
                   <span className="text-ink">{result.risk}</span>
                 </p>
-                {result.category ? (
-                  <p className="text-ink-muted">
-                    Category{" "}
-                    <span className="text-ink">{result.category}</span>
-                  </p>
-                ) : null}
               </div>
 
               <div className="space-y-1.5">
