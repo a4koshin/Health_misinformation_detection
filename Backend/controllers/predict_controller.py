@@ -78,7 +78,11 @@ def predict():
             "label_confidence": result["label_confidence"],
             "message": message,
             "sources": result.get("sources") or [],
+            "similar_terms": result.get("similar_terms") or [],
             "transcript": text,
+            "model": result.get("model"),
+            "pred_id": result.get("pred_id"),
+            "class_probs": result.get("class_probs"),
         }
     ), 200
 
@@ -129,5 +133,9 @@ def predict_media():
             "label_confidence": result["label_confidence"],
             "message": message,
             "sources": result.get("sources") or [],
+            "similar_terms": result.get("similar_terms") or [],
+            "model": result.get("model"),
+            "pred_id": result.get("pred_id"),
+            "class_probs": result.get("class_probs"),
         }
     ), 200
