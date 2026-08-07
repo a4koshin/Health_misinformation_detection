@@ -11,7 +11,7 @@ def save_prediction(
     cleaned_text: str | None = None,
     source: str | None = None,
 ) -> Prediction:
-    # Neon NOT NULL: label, confidence, risk, source — gatekeeper exits omit Model A/B.
+    # Neon NOT NULL: label, confidence, risk, source — non-medical exits omit Task A.
     # Topic/category is retired — DB columns are kept only for schema compatibility.
     resolved_label = label or ("Non-medical" if not is_medical else "Pending")
     resolved_confidence = float(label_confidence) if label_confidence is not None else 0.0
