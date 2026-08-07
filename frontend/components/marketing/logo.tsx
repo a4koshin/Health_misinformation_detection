@@ -13,7 +13,10 @@ export function LogoMark({ className }: { className?: string }) {
       width={1536}
       height={1024}
       priority
-      className={cn("h-12 w-auto object-contain object-left sm:h-14 md:h-16", className)}
+      className={cn(
+        "h-12 w-auto object-contain object-left sm:h-14 md:h-16",
+        className,
+      )}
     />
   );
 }
@@ -21,9 +24,11 @@ export function LogoMark({ className }: { className?: string }) {
 export function Logo({
   href = "/",
   className,
+  markClassName,
 }: {
   href?: string;
   className?: string;
+  markClassName?: string;
 }) {
   return (
     <Link
@@ -31,7 +36,7 @@ export function Logo({
       className={cn("inline-flex items-center", className)}
       aria-label="SomAI home"
     >
-      <LogoMark />
+      <LogoMark className={markClassName} />
     </Link>
   );
 }
