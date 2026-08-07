@@ -29,6 +29,11 @@ class Config:
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "mehelpus")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+    # LLM providers (Cerebras primary, Groq backup by default)
+    CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "").strip()
+    GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+    # cerebras (default) or groq — which provider to try first
+    LLM_PRIMARY = (os.getenv("LLM_PRIMARY", "cerebras") or "cerebras").strip().lower()
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_MINUTES", "60"))
     )
