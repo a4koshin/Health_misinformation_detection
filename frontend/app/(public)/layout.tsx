@@ -9,7 +9,7 @@ export default function PublicLayout({
   return (
     <div className="liquid-bg flex min-h-screen flex-col">
       <GlassNavbar />
-      <main className="flex-1 pt-24 pb-24 sm:pt-28">{children}</main>
+      <main className="flex-1 pt-16 pb-24 sm:pt-20">{children}</main>
       <GlassFooter />
     </div>
   );
