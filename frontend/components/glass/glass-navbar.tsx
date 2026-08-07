@@ -43,8 +43,11 @@ export function GlassNavbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-50 border-b border-gray-200 bg-white/10 shadow-[0_1px_24px_-8px_rgba(15,23,42,0.08)] backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-5 sm:px-8">
-        <div className="flex h-20 items-center justify-between gap-6 sm:h-24">
-          <Logo />
+        <div className="flex h-14 items-center justify-between gap-6 sm:h-16">
+          <Logo
+            className="relative z-10 overflow-visible"
+            markClassName="h-9 w-auto origin-left scale-[1.55] object-contain object-left sm:h-10 sm:scale-[1.65] md:h-10"
+          />
 
           <nav
             className="hidden items-center gap-4 lg:flex"
