@@ -4,13 +4,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-import joblib
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 ML_DIR = Path(__file__).resolve().parents[1] / "ml_models"
-GATEKEEPER_MODEL_PATH = ML_DIR / "gatekeeper_model.pkl"
-GATEKEEPER_TFIDF_PATH = ML_DIR / "gatekeeper_tfidf.pkl"
 TASK_A_DIR = ML_DIR / "best_model_task_a"
 
 # Task A checkpoint only stores LABEL_0 / LABEL_1. This is the app mapping:
@@ -20,36 +17,21 @@ LABEL_TO_ID = {"Reliable": 0, "Non-Reliable": 1}
 ID_TO_LABEL = {0: "Reliable", 1: "Non-Reliable"}
 
 _device: torch.device | None = None
-_gatekeeper_model = None
-_gatekeeper_tfidf = None
 _task_a_model = None
 _task_a_tokenizer = None
 _models_loaded = False
 
 
 def load_models() -> None:
-    """Load gatekeeper + SomBERTb Task A (reliability) only — no Task B."""
+    """Load SomBERTb Task A (reliability). Gatekeeper uses CEREBRAS_API_KEY / GROQ_API_KEY."""
     global _device
-    global _gatekeeper_model, _gatekeeper_tfidf
     global _task_a_model, _task_a_tokenizer
     global _models_loaded
 
-    missing = []
-    for path in (
-        GATEKEEPER_MODEL_PATH,
-        GATEKEEPER_TFIDF_PATH,
-        TASK_A_DIR,
-    ):
-        if not path.exists():
-            missing.append(path.name)
-
-    if missing:
+    if not TASK_A_DIR.exists():
         raise FileNotFoundError(
-            f"Missing model file(s)/folder(s): {', '.join(missing)} in {ML_DIR}"
+            f"Missing model folder: {TASK_A_DIR.name} in {ML_DIR}"
         )
-
-    _gatekeeper_model = joblib.load(GATEKEEPER_MODEL_PATH)
-    _gatekeeper_tfidf = joblib.load(GATEKEEPER_TFIDF_PATH)
 
     _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -74,7 +56,7 @@ def _ensure_loaded() -> None:
 
 
 def clean_text(text: str) -> str:
-    """Light cleaning for transformer / TF-IDF input."""
+    """Light cleaning for transformer input."""
     cleaned = (text or "").lower()
     cleaned = re.sub(r"https?://\S+|www\.\S+", " ", cleaned)
     cleaned = re.sub(r"@\w+", " ", cleaned)
@@ -83,16 +65,10 @@ def clean_text(text: str) -> str:
 
 
 def check_gatekeeper(text: str) -> bool:
-    """Return True if the text is medical, False otherwise."""
-    _ensure_loaded()
-    features = _gatekeeper_tfidf.transform([text])
-    prediction = _gatekeeper_model.predict(features)[0]
+    """Return True if the text is medical, False otherwise (GPT gatekeeper)."""
+    from services.gatekeeper_service import check_is_medical
 
-    if isinstance(prediction, str):
-        return prediction.lower() in {"medical", "health", "true", "yes"}
-
-    # Gatekeeper training: 0 = medical, 1 = non-medical.
-    return int(prediction) == 0
+    return check_is_medical(text)
 
 
 def _predict_with_transformer(
@@ -130,8 +106,16 @@ def _predict_with_transformer(
 
 
 def predict_reliability(text: str) -> dict[str, Any]:
-    """Run SomBERTb task A. Returns {label, confidence}."""
+    """Run SomBERTb Task A from ml_models/best_model_task_a.
+
+    Returns {label, confidence, pred_id, probs, model}.
+    """
     _ensure_loaded()
+    if _task_a_model is None or _task_a_tokenizer is None:
+        raise RuntimeError(
+            "best_model_task_a is not loaded. Check Backend/ml_models/best_model_task_a."
+        )
+
     result = _predict_with_transformer(
         _task_a_model,
         _task_a_tokenizer,
@@ -141,6 +125,9 @@ def predict_reliability(text: str) -> dict[str, Any]:
     return {
         "label": result["label"],
         "confidence": result["confidence"],
+        "pred_id": result["pred_id"],
+        "probs": result["probs"],
+        "model": "best_model_task_a",
     }
 
 
@@ -149,51 +136,56 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
     Pipeline:
 
       Input claim_text (direct text or transcription)
-      Stage 0 gatekeeper -> Non-Medical: STOP
-      Stage 1 Model A -> Reliable / Non-Reliable
-      Gemini phrases the result (optional grounded sources)
+      Stage 0 GPT gatekeeper -> Non-Medical: STOP
+      Stage 1 best_model_task_a -> Reliable / Non-Reliable  (ALWAYS for medical)
+      Explanation phrasing via Cerebras/Groq + web search (does NOT change label)
     """
     from services import explanation_service
 
     cleaned = clean_text(text)
     claim_text = (text or "").strip()
 
-    if not cleaned:
-        return {
-            "is_medical": False,
-            "label": None,
-            "label_confidence": None,
-            "cleaned_text": cleaned,
-            "message": (
-                "Jumladaan ma aha mid caafimaad ku saabsan. "
-                "Fadlan geli xog caafimaad ku saabsan si loo baaro."
-            ),
-            "sources": [],
-        }
+    empty = {
+        "is_medical": False,
+        "label": None,
+        "label_confidence": None,
+        "cleaned_text": cleaned,
+        "message": (
+            "Jumladaan ma aha mid caafimaad ku saabsan. "
+            "Fadlan geli xog caafimaad ku saabsan si loo baaro."
+        ),
+        "sources": [],
+        "similar_terms": [],
+        "model": None,
+        "pred_id": None,
+        "class_probs": None,
+    }
 
-    # Stage 0 — Gatekeeper: Medical vs Non-Medical
-    is_medical = check_gatekeeper(cleaned)
+    if not cleaned:
+        return empty
+
+    # Stage 0 — GPT gatekeeper: Medical vs Non-Medical
+    is_medical = check_gatekeeper(claim_text)
 
     if not is_medical:
-        return {
-            "is_medical": False,
-            "label": None,
-            "label_confidence": None,
-            "cleaned_text": cleaned,
-            "message": (
-                "Jumladaan ma aha mid caafimaad ku saabsan. "
-                "Fadlan geli xog caafimaad ku saabsan si loo baaro."
-            ),
-            "sources": [],
-        }
+        return empty
 
-    # Stage 1 — SomBERTb Model A: Reliable vs Non-Reliable
+    # Stage 1 — ALWAYS SomBERTb best_model_task_a (never skip / never hardcode label)
     reliability = predict_reliability(cleaned)
     label = reliability["label"]
     label_confidence = float(reliability["confidence"])
+    pred_id = int(reliability["pred_id"])
+    class_probs = reliability["probs"]
     if label not in {"Reliable", "Non-Reliable"}:
         label = "Non-Reliable"
 
+    print(
+        f"[best_model_task_a] pred_id={pred_id} label={label} "
+        f"conf={label_confidence:.4f} probs={class_probs} "
+        f"text={cleaned[:80]!r}"
+    )
+
+    # Explanation only phrases the verdict via Cerebras/Groq + web search.
     if label == "Reliable":
         explanation = explanation_service.generate_reliable_explanation(claim_text)
     else:
@@ -205,6 +197,11 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
     sources = (
         explanation.get("sources", []) if isinstance(explanation, dict) else []
     )
+    similar_terms = (
+        explanation.get("similar_terms", [])
+        if isinstance(explanation, dict) and label == "Non-Reliable"
+        else []
+    )
 
     return {
         "is_medical": True,
@@ -213,6 +210,10 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
         "cleaned_text": cleaned,
         "message": message,
         "sources": sources,
+        "similar_terms": similar_terms,
+        "model": "best_model_task_a",
+        "pred_id": pred_id,
+        "class_probs": class_probs,
     }
 
 
