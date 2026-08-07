@@ -1,5 +1,15 @@
 import { apiFetch } from "@/lib/api";
 
+export type SourcePlatform = "facebook" | "youtube" | "web";
+
+export type PredictionSource = {
+  title: string;
+  url: string;
+  platform?: SourcePlatform | string;
+  image?: string | null;
+  profile?: string | null;
+};
+
 export type TextPredictionResponse = {
   prediction_id: number | string;
   is_medical: boolean;
@@ -7,7 +17,11 @@ export type TextPredictionResponse = {
   label_confidence: number | null;
   message: string;
   transcript: string;
-  sources?: { title: string; url: string }[];
+  sources?: PredictionSource[];
+  similar_terms?: string[];
+  model?: string | null;
+  pred_id?: number | null;
+  class_probs?: number[] | null;
 };
 
 export type MediaPredictionResponse = {
@@ -19,7 +33,11 @@ export type MediaPredictionResponse = {
   label: string | null;
   label_confidence: number | null;
   message: string;
-  sources?: { title: string; url: string }[];
+  sources?: PredictionSource[];
+  similar_terms?: string[];
+  model?: string | null;
+  pred_id?: number | null;
+  class_probs?: number[] | null;
 };
 
 export type TranscribeMediaResponse = {
