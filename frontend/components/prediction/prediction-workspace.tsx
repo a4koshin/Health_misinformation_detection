@@ -14,6 +14,7 @@ import {
 import {
   predictText,
   transcribeMedia,
+  type PredictionSource,
   type TextPredictionResponse,
 } from "@/lib/predict";
 import { useAuth } from "@/store/auth-store";
@@ -40,7 +41,105 @@ type AnalysisResult = {
   risk: string;
   somaliReply: string;
   source: string;
+  sources: PredictionSource[];
+  similarTerms: string[];
+  model: string | null;
 };
+
+function platformLabel(platform?: string) {
+  const value = (platform || "web").toLowerCase();
+  if (value === "facebook") return "Facebook";
+  if (value === "youtube") return "YouTube";
+  return "Web";
+}
+
+function platformFromUrl(url: string) {
+  const lower = (url || "").toLowerCase();
+  if (lower.includes("facebook.com") || lower.includes("fb.com")) {
+    return "facebook";
+  }
+  if (lower.includes("youtube.com") || lower.includes("youtu.be")) {
+    return "youtube";
+  }
+  return "web";
+}
+
+function displayModelName(model?: string | null) {
+  if (!model) return null;
+  // Folder checkpoint is best_model_task_a; show product name in UI.
+  if (model === "best_model_task_a" || model.toLowerCase().includes("sombert")) {
+    return "SomBERTb";
+  }
+  return model;
+}
+
+function youtubeVideoId(url: string) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") {
+      return parsed.pathname.replace(/^\//, "").split("/")[0] || "";
+    }
+    if (host.includes("youtube.com")) {
+      const v = parsed.searchParams.get("v");
+      if (v) return v;
+      const parts = parsed.pathname.split("/").filter(Boolean);
+      if (
+        parts[0] &&
+        ["embed", "shorts", "live", "v"].includes(parts[0]) &&
+        parts[1]
+      ) {
+        return parts[1];
+      }
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function sourceImage(item: PredictionSource) {
+  if (item.image) return item.image;
+  const platform = (item.platform || platformFromUrl(item.url)).toLowerCase();
+  if (platform === "youtube") {
+    const id = youtubeVideoId(item.url);
+    if (id) return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+  }
+  try {
+    const host = new URL(item.url).hostname.replace(/^www\./, "");
+    if (host) {
+      return `https://www.google.com/s2/favicons?domain=${host}&sz=128`;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function sourceProfile(item: PredictionSource) {
+  if (item.profile) return item.profile;
+  const platform = (item.platform || platformFromUrl(item.url)).toLowerCase();
+  const title = (item.title || "").trim();
+  const lower = title.toLowerCase();
+
+  for (const marker of [
+    " - facebook",
+    " | facebook",
+    " - youtube",
+    " | youtube",
+  ]) {
+    if (lower.includes(marker)) {
+      const name = title.slice(0, lower.indexOf(marker)).trim();
+      if (name) return name;
+    }
+  }
+
+  try {
+    return new URL(item.url).hostname.replace(/^www\./, "") || platformLabel(platform);
+  } catch {
+    return platformLabel(platform);
+  }
+}
 
 function displayLabel(label: string | null | undefined) {
   if (!label) return "Pending";
@@ -76,6 +175,10 @@ function toAnalysisResult(
     risk: riskFromLabel(label, response.is_medical),
     somaliReply: response.message,
     source,
+    sources: response.sources ?? [],
+    similarTerms:
+      label === "Non-Reliable" ? (response.similar_terms ?? []) : [],
+    model: response.model ?? null,
   };
 }
 
@@ -500,6 +603,15 @@ export function PredictionWorkspace() {
                 ) : null}
               </div>
 
+              {displayModelName(result.model) ? (
+                <p className="text-xs text-ink-muted">
+                  Model{" "}
+                  <span className="font-medium text-ink">
+                    {displayModelName(result.model)}
+                  </span>
+                </p>
+              ) : null}
+
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <p className="text-ink-muted">
                   Risk{" "}
@@ -513,6 +625,88 @@ export function PredictionWorkspace() {
                   {result.somaliReply}
                 </p>
               </div>
+
+              {result.label === "Non-Reliable" &&
+              result.similarTerms.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-ink-muted">
+                    Similar reliable words from Facebook, YouTube & Web
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {result.similarTerms.map((term) => (
+                      <span
+                        key={term}
+                        className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-sm text-ink"
+                      >
+                        {term}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {(result.label === "Non-Reliable" ||
+                result.label === "Reliable") &&
+              result.sources.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-ink-muted">
+                    {result.label === "Reliable"
+                      ? "Supporting posts (image, profile, title & link)"
+                      : "Reliable posts (image, profile, title & link)"}
+                  </p>
+                  <ul className="space-y-3">
+                    {result.sources.map((item) => {
+                      const platform = platformLabel(
+                        item.platform || platformFromUrl(item.url),
+                      );
+                      const image = sourceImage(item);
+                      const profile = sourceProfile(item);
+                      return (
+                        <li key={item.url}>
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex gap-3 rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:border-brand/40 hover:bg-orange-50/40"
+                          >
+                            <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                              {image ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={image}
+                                  alt=""
+                                  className="size-full object-cover"
+                                  loading="lazy"
+                                  referrerPolicy="no-referrer"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = "none";
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded border border-gray-200 bg-gray-50 px-1.5 py-0.5 text-[11px] text-ink-muted">
+                                  {platform}
+                                </span>
+                                <span className="truncate text-xs font-medium text-ink">
+                                  {profile}
+                                </span>
+                              </div>
+                              <p className="line-clamp-2 text-sm text-brand">
+                                {item.title || item.url}
+                              </p>
+                              <p className="truncate text-[11px] text-ink-muted">
+                                {item.url}
+                              </p>
+                            </div>
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
 
               <button
                 type="button"
