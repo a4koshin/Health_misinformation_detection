@@ -7,11 +7,13 @@ import { MediaRecorderModal } from "@/components/chat/media-recorder-modal";
 import { GlassButton } from "@/components/glass/glass-button";
 import { predictDataset } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
+import type { DatasetPredictionResponse } from "@/types/api";
 import {
   CLAIM_INPUT_NOT_ALLOWED_MESSAGE,
   validateSomaliClaimInput,
 } from "@/lib/claim-validation";
 import {
+  enrichPrediction,
   predictText,
   transcribeMedia,
   type PredictionSource,
@@ -192,7 +194,13 @@ export function PredictionWorkspace() {
   const [draft, setDraft] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isEnriching, setIsEnriching] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [datasetResult, setDatasetResult] =
+    useState<DatasetPredictionResponse | null>(null);
+  const [datasetEmptyMessage, setDatasetEmptyMessage] = useState<string | null>(
+    null,
+  );
   const [mediaBusyLabel, setMediaBusyLabel] = useState<string | null>(null);
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [recorderKind, setRecorderKind] = useState<"audio" | "video" | null>(
@@ -206,6 +214,7 @@ export function PredictionWorkspace() {
   const videoInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const analysisSeq = useRef(0);
 
   async function analyzeClaim(text: string) {
     if (!token) return;
@@ -225,13 +234,55 @@ export function PredictionWorkspace() {
     }
 
     setInputError(null);
+    const seq = ++analysisSeq.current;
     setIsAnalyzing(true);
+    setIsEnriching(false);
     try {
       const response = await predictText(token, claim);
+      if (seq !== analysisSeq.current) return;
+      setDatasetResult(null);
       setResult(toAnalysisResult(response, claim));
       bumpHistory();
-      toast.success("Claim analyzed.");
+      toast.success(
+        response.is_medical
+          ? "SomBERTb result ready."
+          : "Not a medical claim.",
+      );
       scrollToResult();
+      setIsAnalyzing(false);
+
+      if (
+        response.is_medical &&
+        response.enrichment_pending &&
+        response.prediction_id
+      ) {
+        setIsEnriching(true);
+        try {
+          const enriched = await enrichPrediction(token, response.prediction_id);
+          if (seq !== analysisSeq.current) return;
+          setResult((current) => {
+            if (!current) return current;
+            const nextLabel = current.label;
+            return {
+              ...current,
+              somaliReply: enriched.message || current.somaliReply,
+              sources: enriched.sources ?? current.sources,
+              similarTerms:
+                nextLabel === "Non-Reliable"
+                  ? (enriched.similar_terms ?? current.similarTerms)
+                  : [],
+            };
+          });
+        } catch {
+          if (seq === analysisSeq.current) {
+            toast.error("SomBERTb result is ready. Explanation sources timed out.");
+          }
+        } finally {
+          if (seq === analysisSeq.current) {
+            setIsEnriching(false);
+          }
+        }
+      }
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -244,7 +295,6 @@ export function PredictionWorkspace() {
         setInputError(message);
       }
       toast.error(message);
-    } finally {
       setIsAnalyzing(false);
     }
   }
@@ -260,9 +310,13 @@ export function PredictionWorkspace() {
   }
 
   function handleClear() {
+    analysisSeq.current += 1;
     setDraft("");
     setInputError(null);
     setResult(null);
+    setDatasetResult(null);
+    setDatasetEmptyMessage(null);
+    setIsEnriching(false);
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
@@ -312,18 +366,40 @@ export function PredictionWorkspace() {
     }
 
     if (isDataset) {
+      setResult(null);
+      setDatasetResult(null);
+      setDatasetEmptyMessage(null);
+      if (file.size === 0) {
+        const message =
+          "The uploaded file is empty. Add claim text and try again.";
+        setDatasetEmptyMessage(message);
+        toast.error(message);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
       setIsAnalyzing(true);
       try {
         const dataset = await predictDataset(token, file);
-        bumpHistory();
+        if (!dataset.processed_rows) {
+          const message =
+            "The uploaded file is empty. Add claim text and try again.";
+          setDatasetEmptyMessage(message);
+          toast.error(message);
+          return;
+        }
+        setDatasetResult(dataset);
         toast.success(
           `Dataset done — ${dataset.reliable_count} Reliable, ${dataset.misinformation_count} Non-Reliable.`,
         );
+        scrollToResult();
       } catch (error) {
         const message =
           error instanceof ApiError
             ? error.message
             : "Unable to process dataset.";
+        setDatasetEmptyMessage(
+          message.toLowerCase().includes("empty") ? message : null,
+        );
         toast.error(message);
       } finally {
         setIsAnalyzing(false);
@@ -392,7 +468,7 @@ export function PredictionWorkspace() {
       <div className="scrollbar-none flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-14 pb-10 sm:px-8 sm:pt-10 lg:px-12">
         <div className="flex w-full max-w-none flex-col gap-8">
           <header className="space-y-1">
-            <h1 className="text-xl font-medium tracking-tight text-ink">
+            <h1 className="text-xl font-semibold tracking-tight text-ink">
               Check a claim
             </h1>
             <p className="max-w-2xl text-sm text-ink-muted">
@@ -502,7 +578,7 @@ export function PredictionWorkspace() {
                     {charCount}/{MAX_CHARS}
                   </p>
                   <div className="flex items-center gap-4">
-                    {(draft || result) && (
+                    {(draft || result || datasetResult) && (
                       <button
                         type="button"
                         disabled={isAnalyzing}
@@ -571,6 +647,78 @@ export function PredictionWorkspace() {
             </p>
           ) : null}
 
+          {datasetEmptyMessage ? (
+            <p role="alert" className="text-sm text-red-600">
+              {datasetEmptyMessage}
+            </p>
+          ) : null}
+
+          {datasetResult ? (
+            <section
+              ref={resultRef}
+              aria-live="polite"
+              className="animate-[fade-up_0.25s_ease-out] space-y-4 border-t border-gray-200 pt-8"
+            >
+              <div>
+                <p className="text-xs text-ink-muted">Dataset result</p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight text-ink">
+                  {datasetResult.processed_rows}/{datasetResult.total_rows}{" "}
+                  processed
+                </p>
+                <p className="mt-1 text-xs text-ink-muted">Model SomBERTb</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-sm">
+                <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                  {datasetResult.reliable_count} Reliable
+                </span>
+                <span className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-red-700">
+                  {datasetResult.misinformation_count} Non-Reliable
+                </span>
+                {datasetResult.error_count > 0 ? (
+                  <span className="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-ink-muted">
+                    {datasetResult.error_count} errors
+                  </span>
+                ) : null}
+              </div>
+              <ul className="space-y-3">
+                {datasetResult.results.slice(0, 8).map((row) => (
+                  <li
+                    key={`${row.row}-${row.text.slice(0, 24)}`}
+                    className="border-b border-gray-100 pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <p className="line-clamp-2 text-sm text-ink">
+                      {row.text || "—"}
+                    </p>
+                    <p
+                      className={cn(
+                        "mt-1 text-sm font-medium",
+                        row.prediction === "Reliable"
+                          ? "text-emerald-700"
+                          : row.prediction
+                            ? "text-red-600"
+                            : "text-ink-muted",
+                      )}
+                    >
+                      {row.prediction ?? row.error ?? "Skipped"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              {datasetResult.results.length > 8 ? (
+                <p className="text-xs text-ink-muted">
+                  Showing first 8 of {datasetResult.results.length} rows.
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={handleClear}
+                className="cursor-pointer text-sm text-brand transition-colors hover:text-brand-deep"
+              >
+                Check another
+              </button>
+            </section>
+          ) : null}
+
           {result ? (
             <section
               ref={resultRef}
@@ -582,7 +730,7 @@ export function PredictionWorkspace() {
                   <p className="text-xs text-ink-muted">Result</p>
                   <p
                     className={cn(
-                      "mt-1 text-2xl font-medium tracking-tight",
+                      "mt-1 text-2xl font-semibold tracking-tight",
                       result.label === "Reliable"
                         ? "text-emerald-700"
                         : result.label === "Non-Reliable"
@@ -624,6 +772,12 @@ export function PredictionWorkspace() {
                 <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-ink">
                   {result.somaliReply}
                 </p>
+                {isEnriching ? (
+                  <p className="flex items-center gap-2 pt-1 text-xs text-ink-muted">
+                    <span className="size-3 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
+                    Loading Cerebras / Groq explanation and sources…
+                  </p>
+                ) : null}
               </div>
 
               {result.label === "Non-Reliable" &&
