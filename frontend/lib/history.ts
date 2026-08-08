@@ -1,12 +1,10 @@
-import { apiFetch } from "@/lib/api";
+import { API_BASE, apiFetch } from "@/lib/api";
 import type {
   Conversation,
   Detection,
   UserDashboardStats,
   UserReportResponse,
 } from "@/types/api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 export async function getHistory(token: string): Promise<Detection[]> {
   const data = await apiFetch<Detection[] | { items?: Detection[] }>(
