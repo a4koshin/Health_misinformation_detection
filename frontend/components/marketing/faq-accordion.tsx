@@ -27,7 +27,7 @@ export function FaqAccordion({ items }: { items: FaqItem[] }) {
               className="flex w-full cursor-pointer items-center justify-between gap-4 px-6 py-5 text-left"
               aria-expanded={isOpen}
             >
-              <span className="text-[15px] font-medium text-[#0f172a]">
+              <span className="text-[15px] font-semibold text-[#0f172a]">
                 {item.question}
               </span>
               <MaterialIcon
