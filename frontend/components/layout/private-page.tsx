@@ -25,7 +25,7 @@ export function PrivatePage({
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1 pr-12 sm:pr-0">
-            <h1 className="text-xl font-normal tracking-tight text-[#0f172a] sm:text-2xl">
+            <h1 className="text-xl font-semibold tracking-tight text-[#0f172a] sm:text-2xl">
               {title}
             </h1>
             {description ? (
