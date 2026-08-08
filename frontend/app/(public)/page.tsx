@@ -143,7 +143,7 @@ export default function HomePage() {
       {/* Features */}
       <PageSection>
         <Reveal className="mx-auto mb-12 max-w-2xl text-center">
-          <h2 className="text-3xl font-normal tracking-tight text-[#0f172a] sm:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
             Everything you need to fight misinformation
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[#475569]">
@@ -163,7 +163,7 @@ export default function HomePage() {
       {/* How it works */}
       <PageSection>
         <Reveal className="mx-auto mb-12 max-w-2xl text-center">
-          <h2 className="text-3xl font-normal tracking-tight text-[#0f172a] sm:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
             How it works
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[#475569]">
@@ -180,7 +180,7 @@ export default function HomePage() {
                 <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00] text-white shadow-[0_10px_24px_-10px_rgba(255,92,0,0.7)]">
                   <MaterialIcon name={step.icon} size={24} />
                 </span>
-                <h3 className="mb-2 text-lg font-normal text-[#0f172a]">
+                <h3 className="mb-2 text-lg font-semibold text-[#0f172a]">
                   {step.title}
                 </h3>
                 <p className="text-sm leading-relaxed text-[#475569]">
@@ -198,7 +198,7 @@ export default function HomePage() {
           <GlassCard strong className="overflow-hidden p-8 sm:p-12">
             <div className="grid items-center gap-10 lg:grid-cols-2">
               <div>
-                <h2 className="text-3xl font-normal tracking-tight text-[#0f172a] sm:text-4xl">
+                <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
                   Why choose HealthAI
                 </h2>
                 <p className="mt-4 max-w-md text-base leading-relaxed text-[#475569]">
@@ -241,7 +241,7 @@ export default function HomePage() {
       {/* Testimonials */}
       <PageSection>
         <Reveal className="mx-auto mb-12 max-w-2xl text-center">
-          <h2 className="text-3xl font-normal tracking-tight text-[#0f172a] sm:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
             Trusted by curious minds
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[#475569]">
@@ -276,7 +276,7 @@ export default function HomePage() {
       <PageSection>
         <div className="grid gap-10 lg:grid-cols-[1fr_1.5fr]">
           <Reveal>
-            <h2 className="text-3xl font-normal tracking-tight text-[#0f172a] sm:text-4xl">
+            <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
               Frequently asked questions
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#475569]">
@@ -302,7 +302,7 @@ export default function HomePage() {
             <div className="absolute -top-20 -right-20 size-64 rounded-full bg-white/10 blur-3xl" />
             <div className="absolute -bottom-24 -left-16 size-72 rounded-full bg-white/10 blur-3xl" />
             <div className="relative">
-              <h2 className="mx-auto max-w-2xl text-3xl font-normal tracking-tight text-white sm:text-4xl">
+              <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                 Ready to stop misinformation in its tracks?
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/80">
