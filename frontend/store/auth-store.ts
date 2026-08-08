@@ -22,6 +22,34 @@ type AuthState = {
   initialize: () => Promise<void>;
 };
 
+function userFromAuthPayload(data: {
+  user?: User;
+  access_token?: string;
+  id?: string;
+  email?: string;
+  role?: User["role"];
+  full_name?: string | null;
+  avatar_url?: string | null;
+  language_preference?: User["language_preference"];
+  created_at?: string;
+}): User | null {
+  if (data.user?.id && data.user.email) {
+    return data.user;
+  }
+  if (data.id && data.email && data.role && data.created_at) {
+    return {
+      id: data.id,
+      email: data.email,
+      full_name: data.full_name ?? null,
+      role: data.role,
+      avatar_url: data.avatar_url,
+      language_preference: data.language_preference,
+      created_at: data.created_at,
+    };
+  }
+  return null;
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -33,9 +61,12 @@ export const useAuthStore = create<AuthState>()(
       login: async (email, password) => {
         set({ isLoading: true });
         try {
-          const { access_token } = await loginRequest(email, password);
-          const user = await getCurrentUser(access_token);
-          set({ user, token: access_token, isLoading: false });
+          const data = await loginRequest(email, password);
+          const user = userFromAuthPayload(data);
+          if (!data.access_token || !user) {
+            throw new ApiError(500, "Login response was missing user details.");
+          }
+          set({ user, token: data.access_token, isLoading: false });
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -45,13 +76,18 @@ export const useAuthStore = create<AuthState>()(
       register: async (payload) => {
         set({ isLoading: true });
         try {
-          await registerRequest(payload);
-          const { access_token } = await loginRequest(
-            payload.email,
-            payload.password,
-          );
-          const user = await getCurrentUser(access_token);
-          set({ user, token: access_token, isLoading: false });
+          const data = await registerRequest(payload);
+          const user = userFromAuthPayload(data);
+          if (data.access_token && user) {
+            set({ user, token: data.access_token, isLoading: false });
+            return;
+          }
+          const loginData = await loginRequest(payload.email, payload.password);
+          const loginUser = userFromAuthPayload(loginData);
+          if (!loginData.access_token || !loginUser) {
+            throw new ApiError(500, "Register response was missing user details.");
+          }
+          set({ user: loginUser, token: loginData.access_token, isLoading: false });
         } catch (error) {
           set({ isLoading: false });
           throw error;
