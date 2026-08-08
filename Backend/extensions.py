@@ -7,4 +7,9 @@ jwt = JWTManager()
 
 
 def init_cors(app):
-    CORS(app, origins=[app.config["FRONTEND_URL"]], supports_credentials=False)
+    CORS(
+        app,
+        origins=[app.config["FRONTEND_URL"]],
+        supports_credentials=False,
+        max_age=86400,
+    )
