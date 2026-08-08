@@ -10,6 +10,7 @@ def save_prediction(
     label_confidence: float | None = None,
     cleaned_text: str | None = None,
     source: str | None = None,
+    commit: bool = True,
 ) -> Prediction:
     # Neon NOT NULL: label, confidence, risk, source — non-medical exits omit Task A.
     # Topic/category is retired — DB columns are kept only for schema compatibility.
@@ -34,7 +35,8 @@ def save_prediction(
         risk=resolved_risk,
     )
     db.session.add(prediction)
-    db.session.commit()
+    if commit:
+        db.session.commit()
     return prediction
 
 
