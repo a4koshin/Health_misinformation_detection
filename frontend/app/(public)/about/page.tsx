@@ -91,7 +91,7 @@ export default function AboutPage() {
               <p className="text-sm font-semibold tracking-widest text-brand uppercase">
                 Why we exist
               </p>
-              <h2 className="mt-4 text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
                 Better health decisions begin with trusted information
               </h2>
               <p className="mt-5 text-base leading-7 text-ink-muted">
@@ -172,7 +172,7 @@ export default function AboutPage() {
           <p className="text-sm font-semibold tracking-widest text-brand uppercase">
             Our journey
           </p>
-          <h2 className="mt-4 text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
             From research idea to working platform
           </h2>
           <p className="mt-4 text-base leading-7 text-ink-muted">
@@ -194,7 +194,7 @@ export default function AboutPage() {
                 <span className="mx-auto mt-6 flex size-11 items-center justify-center rounded-xl bg-brand/10 text-brand">
                   <MaterialIcon name={milestone.icon} size={22} />
                 </span>
-                <h3 className="mt-4 text-lg font-normal text-ink">
+                <h3 className="mt-4 text-lg font-semibold text-ink">
                   {milestone.title}
                 </h3>
                 <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-ink-muted">
@@ -211,7 +211,7 @@ export default function AboutPage() {
           <p className="text-sm font-semibold tracking-widest text-brand uppercase">
             What guides us
           </p>
-          <h2 className="mt-4 text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
             Built around trust, clarity, and care
           </h2>
         </Reveal>
@@ -223,7 +223,7 @@ export default function AboutPage() {
                   <MaterialIcon name={value.icon} size={24} />
                 </span>
                 <div>
-                  <h3 className="text-lg font-normal text-ink">
+                  <h3 className="text-lg font-semibold text-ink">
                     {value.title}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-ink-muted">
@@ -239,7 +239,7 @@ export default function AboutPage() {
       <PageSection>
         <Reveal>
           <div className="rounded-3xl border border-orange-100 bg-orange-50 px-6 py-14 text-center sm:px-12">
-            <h2 className="mx-auto max-w-2xl text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+            <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
               Help stop misinformation before it spreads
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-ink-muted">
