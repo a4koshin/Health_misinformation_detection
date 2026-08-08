@@ -47,6 +47,22 @@ def create_app() -> Flask:
         except Exception:
             db.session.rollback()
 
+        from services.seed_service import seed_admin
+
+        try:
+            seed_admin()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Admin seed failed")
+
+        from services.seed_service import seed_admin
+
+        try:
+            seed_admin()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Admin seed failed")
+
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
         # Keep Flask/JWT HTTP errors (401, 404, …) intact.
