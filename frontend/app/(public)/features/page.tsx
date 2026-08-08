@@ -113,7 +113,7 @@ export default function FeaturesPage() {
           <p className="text-sm font-semibold tracking-widest text-brand uppercase">
             Core platform
           </p>
-          <h2 className="mt-4 text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
             Everything you need to verify a claim
           </h2>
           <p className="mt-4 text-base leading-7 text-ink-muted">
@@ -137,7 +137,7 @@ export default function FeaturesPage() {
               <p className="text-sm font-semibold tracking-widest text-brand uppercase">
                 Built for everyday use
               </p>
-              <h2 className="mt-4 text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
                 Checking a claim feels like sending a message
               </h2>
               <p className="mt-5 text-base leading-7 text-ink-muted">
@@ -189,7 +189,7 @@ export default function FeaturesPage() {
           <p className="text-sm font-semibold tracking-widest text-brand uppercase">
             For administrators
           </p>
-          <h2 className="mt-4 text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
             Complete control for your team
           </h2>
           <p className="mt-4 text-base leading-7 text-ink-muted">
@@ -204,7 +204,7 @@ export default function FeaturesPage() {
                 <span className="mb-5 flex size-12 items-center justify-center rounded-2xl bg-brand text-white">
                   <MaterialIcon name={feature.icon} size={24} />
                 </span>
-                <h3 className="mb-2 text-lg font-normal text-ink">
+                <h3 className="mb-2 text-lg font-semibold text-ink">
                   {feature.title}
                 </h3>
                 <p className="text-sm leading-6 text-ink-muted">
@@ -219,7 +219,7 @@ export default function FeaturesPage() {
       <PageSection>
         <Reveal>
           <div className="rounded-3xl border border-orange-100 bg-orange-50 px-6 py-14 text-center sm:px-12">
-            <h2 className="mx-auto max-w-2xl text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+            <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
               Ready to try it yourself?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-ink-muted">
