@@ -8,6 +8,7 @@ import {
   createConversation,
   editConversationMessage,
 } from "@/lib/history";
+import { enrichPrediction } from "@/lib/predict";
 import type { Conversation } from "@/types/api";
 
 export type { ChatMessage };
@@ -122,6 +123,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         historyRevision: get().historyRevision + 1,
         isSaving: false,
       });
+
+      if (conversation.enrichment_pending && conversation.id) {
+        try {
+          const enriched = await enrichPrediction(token, conversation.id);
+          const { activeConversation, messages: current } = get();
+          if (!activeConversation || activeConversation.id !== conversation.id) {
+            return;
+          }
+          set({
+            messages: current.map((message) =>
+              message.role === "assistant"
+                ? { ...message, content: enriched.message || message.content }
+                : message,
+            ),
+          });
+        } catch {
+          // SomBERTb reply already shown.
+        }
+      }
     } catch (error) {
       set({
         isSaving: false,
@@ -158,6 +178,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         historyRevision: get().historyRevision + 1,
         isSaving: false,
       });
+
+      if (conversation.enrichment_pending && conversation.id) {
+        try {
+          const enriched = await enrichPrediction(token, conversation.id);
+          const { activeConversation, messages: current } = get();
+          if (!activeConversation || activeConversation.id !== conversation.id) {
+            return;
+          }
+          set({
+            messages: current.map((message) =>
+              message.role === "assistant"
+                ? { ...message, content: enriched.message || message.content }
+                : message,
+            ),
+          });
+        } catch {
+          // SomBERTb reply already shown.
+        }
+      }
     } catch (error) {
       set({ isSaving: false });
       throw error;
