@@ -1,6 +1,9 @@
 import type { RegisterPayload, TokenResponse, User } from "@/types/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+/** Empty = same-origin /api via Next rewrite (avoids CORS preflights). */
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+const BACKEND_HINT = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const DEFAULT_TIMEOUT_MS = 90_000;
 
 export class ApiError extends Error {
   status: number;
@@ -45,12 +48,16 @@ async function request<T>(
     response = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
+      signal: options.signal ?? AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
     });
   } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new ApiError(0, "Request timed out. Please try again.");
+    }
     if (isNetworkError(error)) {
       throw new ApiError(
         0,
-        `Cannot reach the server. Start the backend on ${API_BASE}.`,
+        `Cannot reach the server. Start the backend on ${BACKEND_HINT}.`,
       );
     }
     throw error;
@@ -107,12 +114,16 @@ export async function loginRequest(
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body,
+      signal: AbortSignal.timeout(20_000),
     });
   } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") {
+      throw new ApiError(0, "Login timed out. Please try again.");
+    }
     if (isNetworkError(error)) {
       throw new ApiError(
         0,
-        `Cannot reach the server. Start the backend on ${API_BASE}.`,
+        `Cannot reach the server. Start the backend on ${BACKEND_HINT}.`,
       );
     }
     throw error;
@@ -127,8 +138,8 @@ export async function loginRequest(
 
 export async function registerRequest(
   payload: RegisterPayload,
-): Promise<User> {
-  return apiFetch<User>("/api/auth/register", {
+): Promise<TokenResponse & User> {
+  return apiFetch<TokenResponse & User>("/api/auth/register", {
     method: "POST",
     body: JSON.stringify(payload),
   });
