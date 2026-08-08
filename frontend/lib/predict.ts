@@ -22,6 +22,7 @@ export type TextPredictionResponse = {
   model?: string | null;
   pred_id?: number | null;
   class_probs?: number[] | null;
+  enrichment_pending?: boolean;
 };
 
 export type MediaPredictionResponse = {
@@ -38,6 +39,15 @@ export type MediaPredictionResponse = {
   model?: string | null;
   pred_id?: number | null;
   class_probs?: number[] | null;
+  enrichment_pending?: boolean;
+};
+
+export type EnrichmentResponse = {
+  prediction_id: number | string;
+  message: string;
+  sources?: PredictionSource[];
+  similar_terms?: string[];
+  enrichment_pending?: boolean;
 };
 
 export type TranscribeMediaResponse = {
@@ -57,6 +67,17 @@ export async function predictText(
       method: "POST",
       body: JSON.stringify({ text }),
     },
+    token,
+  );
+}
+
+export async function enrichPrediction(
+  token: string,
+  predictionId: number | string,
+): Promise<EnrichmentResponse> {
+  return apiFetch<EnrichmentResponse>(
+    `/api/predict/${predictionId}/enrich`,
+    { method: "POST" },
     token,
   );
 }
