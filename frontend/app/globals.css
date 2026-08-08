@@ -134,6 +134,15 @@
     @apply bg-white font-sans;
   }
 
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+  }
+
   [data-sonner-toaster] {
     font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
   }
