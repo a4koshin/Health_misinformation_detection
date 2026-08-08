@@ -136,3 +136,51 @@ def audit_logs():
     except PermissionError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 403
     return jsonify(data), 200
+
+
+@jwt_required()
+def predict_dataset():
+    """POST /api/admin/dataset/predict — batch Task A on CSV/Excel (any logged-in user)."""
+    from flask_jwt_extended import get_jwt_identity
+
+    from services import dataset_service
+
+    user = auth_service.get_user_by_id(get_jwt_identity())
+    if not user:
+        return jsonify({"error": True, "message": "User not found."}), 404
+
+    file = request.files.get("file")
+    if file is None or not (file.filename or "").strip():
+        return jsonify(
+            {"error": True, "message": "Choose a CSV or Excel file first."}
+        ), 400
+
+    raw = file.read()
+    if not raw or not raw.strip():
+        return jsonify(
+            {
+                "error": True,
+                "message": "The uploaded file is empty. Add claim text and try again.",
+            }
+        ), 400
+
+    try:
+        result = dataset_service.predict_dataset_file(raw, file.filename or "dataset.csv")
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 503
+
+    audit_service.log_action(
+        actor_id=user.id,
+        actor_email=user.email,
+        action="dataset.predict",
+        entity_type="dataset",
+        entity_id=None,
+        details=(
+            f"Predicted dataset {file.filename} "
+            f"({result['processed_rows']}/{result['total_rows']} rows)"
+        ),
+        ip_address=_client_ip(),
+    )
+    return jsonify(result), 200
