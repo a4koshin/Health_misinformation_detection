@@ -107,7 +107,7 @@ export function GlassHero() {
           <motion.h1
             variants={fadeUp}
             transition={{ duration: 0.7 }}
-            className="mt-6 text-4xl leading-[1.1] font-normal tracking-tight text-[#0f172a] sm:text-5xl lg:text-6xl"
+            className="mt-6 text-4xl leading-[1.1] font-semibold tracking-tight text-[#0f172a] sm:text-5xl lg:text-6xl"
           >
             Truth you can trust in{" "}
             <span className="text-gradient-brand animate-gradient-x">
