@@ -19,7 +19,7 @@ function ModelsContent() {
               <MaterialIcon name="model_training" size={22} />
             </span>
             <div>
-              <h2 className="text-base font-medium text-[#0f172a]">
+              <h2 className="text-base font-semibold text-[#0f172a]">
                 Gatekeeper
               </h2>
               <p className="mt-1 text-sm text-[#475569]">
@@ -37,7 +37,7 @@ function ModelsContent() {
               <MaterialIcon name="psychology" size={22} />
             </span>
             <div>
-              <h2 className="text-base font-medium text-[#0f172a]">SomBERTb</h2>
+              <h2 className="text-base font-semibold text-[#0f172a]">SomBERTb</h2>
               <p className="mt-1 text-sm text-[#475569]">
                 Task A reliability classifier. Categories use keyword matching
                 (no Task B).
