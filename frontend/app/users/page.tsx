@@ -271,7 +271,7 @@ function UsersContent() {
       <DataTableCard
         header={
           <div>
-            <h2 className="text-base font-medium text-[#0f172a]">Users</h2>
+            <h2 className="text-base font-semibold text-[#0f172a]">Users</h2>
             <p className="text-sm text-[#475569]">
               Manage accounts, roles, and access across HealthAI.
             </p>
