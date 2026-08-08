@@ -1,6 +1,7 @@
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
+from extensions import db
 from models.prediction import Prediction
 from services import audit_service, auth_service, db_service, predictor_service
 from services.claim_validation_service import validate_somali_claim_input
@@ -46,7 +47,7 @@ def _run_and_save(user, text: str, *, source: str = "Manual check"):
     if not ok:
         raise ValueError(error_message or "Invalid claim text.")
 
-    result = predictor_service.run_full_pipeline(text)
+    result = predictor_service.classify_claim(text)
     message = _assistant_message(result)
 
     prediction = db_service.save_prediction(
@@ -57,13 +58,11 @@ def _run_and_save(user, text: str, *, source: str = "Manual check"):
         label_confidence=result["label_confidence"],
         cleaned_text=result.get("cleaned_text"),
         source="non_medical" if not result["is_medical"] else source,
+        commit=False,
     )
 
-    # Persist assistant reply for later GET conversation.
     prediction.summary = message
-    from extensions import db
-
-    db.session.commit()
+    db.session.flush()
 
     label_text = result["label"] or (
         "Non-medical" if not result["is_medical"] else "Pending"
@@ -76,9 +75,11 @@ def _run_and_save(user, text: str, *, source: str = "Manual check"):
         entity_id=prediction.id,
         details=f"Predicted claim as {label_text}",
         ip_address=_client_ip(),
+        commit=False,
     )
+    db.session.commit()
 
-    return prediction, message
+    return prediction, message, bool(result.get("enrichment_pending"))
 
 
 @jwt_required()
@@ -95,7 +96,7 @@ def get_history():
 
 @jwt_required()
 def create_conversation():
-    """POST /api/history — run the 3-stage pipeline and return a chat conversation."""
+    """POST /api/history — classify with SomBERTb and return a chat conversation."""
     data = request.get_json(silent=True) or {}
     text = (data.get("input_text") or data.get("text") or data.get("content") or "").strip()
     if not text:
@@ -106,7 +107,7 @@ def create_conversation():
         return jsonify({"error": True, "message": "User not found."}), 404
 
     try:
-        prediction, message = _run_and_save(user, text)
+        prediction, message, pending = _run_and_save(user, text)
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
     except RuntimeError as exc:
@@ -114,7 +115,9 @@ def create_conversation():
     except FileNotFoundError as exc:
         return jsonify({"error": True, "message": str(exc)}), 503
 
-    return jsonify(_prediction_to_conversation(prediction, message)), 201
+    payload = _prediction_to_conversation(prediction, message)
+    payload["enrichment_pending"] = pending
+    return jsonify(payload), 201
 
 
 @jwt_required()
@@ -155,13 +158,12 @@ def append_message(prediction_id: int):
     if not user:
         return jsonify({"error": True, "message": "User not found."}), 404
 
-    # Ensure the parent chat belongs to this user (auth gate only).
     parent = Prediction.query.filter_by(id=prediction_id, user_id=user.id).first()
     if not parent:
         return jsonify({"error": True, "message": "Prediction not found."}), 404
 
     try:
-        prediction, message = _run_and_save(user, text)
+        prediction, message, pending = _run_and_save(user, text)
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
     except RuntimeError as exc:
@@ -169,7 +171,9 @@ def append_message(prediction_id: int):
     except FileNotFoundError as exc:
         return jsonify({"error": True, "message": str(exc)}), 503
 
-    return jsonify(_prediction_to_conversation(prediction, message)), 201
+    payload = _prediction_to_conversation(prediction, message)
+    payload["enrichment_pending"] = pending
+    return jsonify(payload), 201
 
 
 @jwt_required()
@@ -194,7 +198,7 @@ def edit_message(prediction_id: int, message_id: str):
         return jsonify({"error": True, "message": "Prediction not found."}), 404
 
     try:
-        result = predictor_service.run_full_pipeline(text)
+        result = predictor_service.classify_claim(text)
     except RuntimeError as exc:
         return jsonify({"error": True, "message": str(exc)}), 503
 
@@ -222,10 +226,6 @@ def edit_message(prediction_id: int, message_id: str):
     prediction.summary = message
     prediction.risk = resolved_risk
 
-    from extensions import db
-
-    db.session.commit()
-
     audit_service.log_action(
         actor_id=user.id,
         actor_email=user.email,
@@ -234,9 +234,13 @@ def edit_message(prediction_id: int, message_id: str):
         entity_id=prediction.id,
         details=f"Edited prediction #{prediction.id}",
         ip_address=_client_ip(),
+        commit=False,
     )
+    db.session.commit()
 
-    return jsonify(_prediction_to_conversation(prediction, message)), 200
+    payload = _prediction_to_conversation(prediction, message)
+    payload["enrichment_pending"] = bool(result.get("enrichment_pending"))
+    return jsonify(payload), 200
 
 
 @jwt_required()
