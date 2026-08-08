@@ -177,7 +177,11 @@ def _source_from_hit(hit: dict[str, str]) -> dict[str, str]:
     }
 
 
-def generate_unreliable_explanation(claim_text: str) -> dict[str, Any]:
+def generate_unreliable_explanation(
+    claim_text: str,
+    *,
+    hits: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
     """Non-Reliable: Cerebras + Facebook/YouTube/web search for similar words/links.
 
     1) Search Facebook, YouTube, and the open web for pages about THIS claim's topic
@@ -195,7 +199,8 @@ def generate_unreliable_explanation(claim_text: str) -> dict[str, Any]:
 
     claim_keywords = web_search_service.extract_claim_keywords(claim)
     topic = web_search_service.topic_query(claim)
-    hits = web_search_service.search_web(claim, max_results=12)
+    if hits is None:
+        hits = web_search_service.search_web(claim, max_results=6)
     allowed_urls = {hit["url"] for hit in hits if hit.get("url")}
     platform_counts = web_search_service.platform_counts(hits)
 
@@ -411,159 +416,40 @@ Rules:
 
 
 def generate_reliable_explanation(claim_text: str) -> dict[str, Any]:
-    """Reliable: Cerebras/Groq + Facebook/YouTube/web search (no Gemini).
-
-    1) Search the web for on-topic supporting pages
-    2) Ask Cerebras (failover Groq) for a Somali explanation + real links
-       only from those search hits
-    3) Fall back to curated MoH/WHO links if search/API fails
-    """
-    import json
-
+    """Reliable: skip live search; phrase Task A via Cerebras/Groq or static copy."""
     claim = (claim_text or "").strip()
     static_message = _static_reliable(claim)
+    sources = [{**item, "platform": "web"} for item in _curated_sources()]
 
-    from services import web_search_service
     from services.cerebras_client import chat_completion, has_llm_key
 
-    claim_keywords = web_search_service.extract_claim_keywords(claim)
-    topic = web_search_service.topic_query(claim)
-    hits = web_search_service.search_web(claim, max_results=12)
-    allowed_urls = {hit["url"] for hit in hits if hit.get("url")}
-    platform_counts = web_search_service.platform_counts(hits)
-
-    sources: list[dict[str, str]] = []
     message: Optional[str] = None
-
-    if has_llm_key() and hits:
-        hits_block = web_search_service.format_hits_for_prompt(hits)
-        keywords_text = ", ".join(claim_keywords) if claim_keywords else topic
-        prompt = f"""You help SomAI users after a claim was classified Reliable.
-
-User claim:
-{claim}
-
-Claim topic keywords (MUST stay on this topic):
-{keywords_text}
-
-Live search results from Facebook, YouTube, and the Web
-(REAL pages only — you may ONLY cite these URLs):
-{hits_block}
-
-Hit counts by platform: Facebook={platform_counts.get('facebook', 0)},
-YouTube={platform_counts.get('youtube', 0)}, Web={platform_counts.get('web', 0)}.
-
-Return ONLY valid JSON with this exact shape:
-{{
-  "message": "2-3 Somali sentences thanking the user and saying THIS claim looks Reliable / evidence-based (no URLs in the message, no FDA/CDC/Mayo/NHS names)",
-  "source_indexes": [1, 2, 3]
-}}
-
-Rules:
-- The trained classifier already decided Reliable. Do NOT reverse that.
-- message must be Somali only, plain text, and briefly reflect the claim topic.
-- source_indexes: 1-based indexes ONLY for results whose title/snippet clearly
-  match the claim keywords. Prefer WHO / moh.gov.so / emro.who.int when on-topic.
-  Prefer a mix of Facebook / YouTube / Web only when those hits are on-topic.
-- Never invent URLs. Never invent source indexes that are not in the list.
-"""
+    if has_llm_key():
+        prompt = (
+            "Write 2 short Somali sentences thanking the user and saying "
+            "this health claim looks Reliable. No URLs. No FDA/CDC/Mayo/NHS names.\n\n"
+            f"Claim:\n{claim}"
+        )
         try:
             raw = chat_completion(
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "You are a careful health assistant. "
-                            "Phrase a Reliable verdict and cite only real "
-                            "on-topic search URLs. Output JSON only."
+                            "You phrase a Reliable verdict in Somali. "
+                            "Do not reverse the classifier. Plain text only."
                         ),
                     },
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.1,
-                max_tokens=700,
+                max_tokens=220,
             )
-            start_i = raw.find("{")
-            end_i = raw.rfind("}")
-            payload: dict[str, Any] = {}
-            if start_i >= 0 and end_i > start_i:
-                payload = json.loads(raw[start_i : end_i + 1])
-
-            msg = (payload.get("message") or "").strip()
+            msg = (raw or "").strip()
             if msg and validate_generated_message(msg):
                 message = msg
-
-            for index in payload.get("source_indexes") or []:
-                try:
-                    i = int(index) - 1
-                except (TypeError, ValueError):
-                    continue
-                if i < 0 or i >= len(hits):
-                    continue
-                hit = hits[i]
-                url = hit.get("url") or ""
-                if url not in allowed_urls:
-                    continue
-                if claim_keywords and web_search_service.keyword_overlap(
-                    claim_keywords,
-                    hit.get("title") or "",
-                    hit.get("snippet") or "",
-                    hit.get("url") or "",
-                ) < 1:
-                    continue
-                if any(s["url"] == url for s in sources):
-                    continue
-                sources.append(_source_from_hit(hit))
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Cerebras/Groq Reliable enrichment failed: %s", exc)
-
-    if not sources and hits:
-        ranked = sorted(
-            hits,
-            key=lambda h: web_search_service.keyword_overlap(
-                claim_keywords,
-                h.get("title") or "",
-                h.get("snippet") or "",
-                h.get("url") or "",
-            ),
-            reverse=True,
-        )
-        used: set[str] = set()
-        for platform in ("web", "facebook", "youtube"):
-            for hit in ranked:
-                if hit.get("platform") != platform:
-                    continue
-                if claim_keywords and web_search_service.keyword_overlap(
-                    claim_keywords,
-                    hit.get("title") or "",
-                    hit.get("snippet") or "",
-                    hit.get("url") or "",
-                ) < 1:
-                    continue
-                url = hit.get("url") or ""
-                if not url or url in used:
-                    continue
-                sources.append(_source_from_hit(hit))
-                used.add(url)
-                break
-        for hit in ranked:
-            if len(sources) >= 5:
-                break
-            url = hit.get("url") or ""
-            if not url or url in used:
-                continue
-            if claim_keywords and web_search_service.keyword_overlap(
-                claim_keywords,
-                hit.get("title") or "",
-                hit.get("snippet") or "",
-                hit.get("url") or "",
-            ) < 1:
-                continue
-            sources.append(_source_from_hit(hit))
-            used.add(url)
-
-    if not sources:
-        sources = [{**item, "platform": "web"} for item in _curated_sources()]
+            logger.warning("Cerebras/Groq Reliable phrasing failed: %s", exc)
 
     if not message or not validate_generated_message(message):
         message = static_message
