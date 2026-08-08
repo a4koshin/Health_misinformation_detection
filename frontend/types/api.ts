@@ -14,6 +14,7 @@ export type User = {
 export type TokenResponse = {
   access_token: string;
   token_type: string;
+  user?: User;
 };
 
 export type RegisterPayload = {
@@ -46,6 +47,7 @@ export type Detection = {
 
 export type Conversation = Detection & {
   messages: StoredChatMessage[];
+  enrichment_pending?: boolean;
 };
 
 export type DashboardStats = {
