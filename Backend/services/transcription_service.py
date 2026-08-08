@@ -10,10 +10,12 @@ from __future__ import annotations
 import os
 import re
 import tempfile
+import threading
 from pathlib import Path
 
-# Cached ASR pipeline — loaded once, reused for every request.
+# Cached ASR pipeline — loaded once on first transcribe, reused after that.
 _asr_pipeline = None
+_asr_lock = threading.Lock()
 
 # Hugging Face id — Somali / East-African fine-tuned Whisper turbo.
 TRANSCRIPTION_MODEL_ID = "microsoft/paza-whisper-large-v3-turbo"
@@ -38,17 +40,21 @@ def load_transcription_model():
     if _asr_pipeline is not None:
         return _asr_pipeline
 
-    import torch
-    from transformers import pipeline
+    with _asr_lock:
+        if _asr_pipeline is not None:
+            return _asr_pipeline
 
-    device = 0 if torch.cuda.is_available() else -1
-    _asr_pipeline = pipeline(
-        "automatic-speech-recognition",
-        model=TRANSCRIPTION_MODEL_ID,
-        device=device,
-        chunk_length_s=30,
-    )
-    return _asr_pipeline
+        import torch
+        from transformers import pipeline
+
+        device = 0 if torch.cuda.is_available() else -1
+        _asr_pipeline = pipeline(
+            "automatic-speech-recognition",
+            model=TRANSCRIPTION_MODEL_ID,
+            device=device,
+            chunk_length_s=30,
+        )
+        return _asr_pipeline
 
 
 def extract_audio(video_path: str) -> str:
@@ -197,10 +203,3 @@ def transcribe_video(video_path: str) -> str:
                 pass
 
 
-# Load once at import time (same pattern as predictor_service model warm-up).
-# If the download/load fails here, the first request will retry via
-# load_transcription_model().
-try:
-    load_transcription_model()
-except Exception as exc:  # noqa: BLE001 — allow app boot without ASR weights
-    print(f"[transcription_service] Model not loaded yet: {exc}")
