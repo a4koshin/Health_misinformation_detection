@@ -37,3 +37,8 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_MINUTES", "60"))
     )
+    # Allow large CSV/Excel dataset uploads (up to 20k rows).
+    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(64 * 1024 * 1024)))
+    ADMIN_USER = (os.getenv("ADMIN_USER") or os.getenv("ADMIN_EMAIL") or "").strip()
+    ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or os.getenv("PASSWORD") or "").strip()
+    ADMIN_NAME = (os.getenv("ADMIN_NAME") or "Admin").strip() or "Admin"
