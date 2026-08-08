@@ -16,7 +16,7 @@ export function PageHeader({
   return (
     <Reveal className="mx-auto max-w-3xl text-center">
       <GlassBadge>{badge}</GlassBadge>
-      <h1 className="mt-5 text-4xl font-normal tracking-tight text-[#0f172a] sm:text-5xl">
+      <h1 className="mt-5 text-4xl font-semibold tracking-tight text-[#0f172a] sm:text-5xl">
         {title}
       </h1>
       {description ? (
