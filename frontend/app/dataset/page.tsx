@@ -71,6 +71,10 @@ function DatasetContent() {
       toast.error("Choose a CSV or Excel file first.");
       return;
     }
+    if (file.size === 0) {
+      toast.error("The uploaded file is empty. Add claim text and try again.");
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -196,7 +200,7 @@ function DatasetContent() {
           <DataTableCard
             header={
               <div>
-                <h2 className="text-base font-medium text-[#0f172a]">
+                <h2 className="text-base font-semibold text-[#0f172a]">
                   Dataset results
                 </h2>
                 <p className="text-sm text-[#475569]">
