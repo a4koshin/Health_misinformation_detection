@@ -7,7 +7,9 @@ Searches are keyed to claim keywords so results stay on-topic
 from __future__ import annotations
 
 import logging
+import os
 import re
+from concurrent.futures import ThreadPoolExecutor, wait
 from typing import Any
 from urllib.parse import urlparse
 
@@ -186,20 +188,9 @@ def build_search_queries(claim_text: str) -> list[str]:
 
     focus = topic or claim
     queries = [
-        # Tight topic searches
-        f"{focus} WHO",
-        f"{focus} fact check",
-        f"{focus} treatment",
-        f"{focus} site:who.int",
-        f"{focus} site:moh.gov.so",
-        f"{focus} site:emro.who.int",
-        # Social, still topic-bound
+        f"{focus} WHO health",
         f"{focus} site:facebook.com",
-        f"{focus} WHO OR Ministry of Health site:facebook.com",
         f"{focus} site:youtube.com",
-        f"{focus} WHO OR fact check site:youtube.com",
-        # Full claim as last resort
-        claim,
     ]
     seen: set[str] = set()
     unique: list[str] = []
@@ -269,73 +260,81 @@ def _is_relevant(hit: dict[str, str], claim_keywords: list[str]) -> bool:
     return False
 
 
-def search_web(claim_text: str, *, max_results: int = 12) -> list[dict[str, str]]:
-    """Search Facebook, YouTube, and the web; keep only claim-relevant hits."""
-    queries = build_search_queries(claim_text)
-    if not queries:
-        return []
+def _query_timeout_seconds() -> float:
+    try:
+        return max(2.0, float(os.getenv("DDGS_QUERY_TIMEOUT", "5")))
+    except ValueError:
+        return 5.0
 
+
+def _overall_timeout_seconds() -> float:
+    try:
+        return max(3.0, float(os.getenv("DDGS_OVERALL_TIMEOUT", "10")))
+    except ValueError:
+        return 10.0
+
+
+def _text_search(query: str, max_results: int = 4) -> list[dict[str, Any]]:
     DDGS = _get_ddgs()
     if DDGS is None:
         return []
+    timeout = _query_timeout_seconds()
+    try:
+        client = DDGS(timeout=timeout)
+    except TypeError:
+        client = DDGS()
+    try:
+        with client:
+            return list(client.text(query, max_results=max_results) or [])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Web search failed for query=%r: %s", query, exc)
+        return []
+
+
+def search_web(claim_text: str, *, max_results: int = 6) -> list[dict[str, str]]:
+    """Search Facebook, YouTube, and the web; keep only claim-relevant hits."""
+    queries = build_search_queries(claim_text)[:3]
+    if not queries:
+        return []
+
+    if _get_ddgs() is None:
+        return []
 
     claim_keywords = extract_claim_keywords(claim_text)
-    topic = topic_query(claim_text)
     hits: list[dict[str, str]] = []
     seen_urls: set[str] = set()
 
+    pool = ThreadPoolExecutor(max_workers=min(3, len(queries)))
     try:
-        with DDGS() as ddgs:
-            for query in queries:
-                try:
-                    rows = ddgs.text(query, max_results=5)
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Web search failed for query=%r: %s", query, exc)
+        futures = {
+            pool.submit(_text_search, query, 4): query for query in queries
+        }
+        done, not_done = wait(futures, timeout=_overall_timeout_seconds())
+        for fut in not_done:
+            fut.cancel()
+        for fut in done:
+            query = futures[fut]
+            try:
+                rows = fut.result(timeout=0.1)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Web search future failed for query=%r: %s", query, exc)
+                continue
+            for row in rows or []:
+                if not isinstance(row, dict):
                     continue
-                for row in rows or []:
-                    if not isinstance(row, dict):
-                        continue
-                    url = str(row.get("href") or row.get("link") or row.get("url") or "")
-                    _append_hit(
-                        hits,
-                        seen_urls,
-                        url=url,
-                        title=str(row.get("title") or ""),
-                        snippet=str(row.get("body") or row.get("snippet") or ""),
-                    )
-
-            if topic:
-                try:
-                    videos = ddgs.videos(
-                        f"{topic} WHO OR fact check OR treatment",
-                        max_results=6,
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("YouTube/video search failed: %s", exc)
-                    videos = []
-                for row in videos or []:
-                    if not isinstance(row, dict):
-                        continue
-                    url = str(
-                        row.get("content")
-                        or row.get("url")
-                        or row.get("href")
-                        or row.get("embed_url")
-                        or ""
-                    )
-                    _append_hit(
-                        hits,
-                        seen_urls,
-                        url=url,
-                        title=str(row.get("title") or ""),
-                        snippet=str(
-                            row.get("description") or row.get("publisher") or ""
-                        ),
-                        platform="youtube",
-                    )
+                url = str(row.get("href") or row.get("link") or row.get("url") or "")
+                _append_hit(
+                    hits,
+                    seen_urls,
+                    url=url,
+                    title=str(row.get("title") or ""),
+                    snippet=str(row.get("body") or row.get("snippet") or ""),
+                )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Web search session failed: %s", exc)
         return []
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
 
     # Drop off-topic hits (e.g. Ramadan tips for a chloroquine claim).
     relevant = [hit for hit in hits if _is_relevant(hit, claim_keywords)]
