@@ -40,7 +40,7 @@ def register():
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 400
 
-    audit_service.log_action(
+    audit_service.log_action_later(
         actor_id=user.id,
         actor_email=user.email,
         action="user.register",
@@ -52,8 +52,13 @@ def register():
 
     token = create_token(user.id)
     body = user.to_dict()
-    body.update({"access_token": token, "token_type": "bearer",
-                "user": user.to_dict()})
+    body.update(
+        {
+            "access_token": token,
+            "token_type": "bearer",
+            "user": user.to_dict(),
+        }
+    )
     return jsonify(body), 201
 
 
@@ -65,7 +70,7 @@ def login():
     try:
         user = auth_service.authenticate_user(email, password)
     except ValueError as exc:
-        audit_service.log_action(
+        audit_service.log_action_later(
             actor_id=None,
             actor_email=(email or "").strip().lower() or None,
             action="user.login_failed",
@@ -75,7 +80,8 @@ def login():
         )
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 401
 
-    audit_service.log_action(
+    token = create_token(user.id)
+    audit_service.log_action_later(
         actor_id=user.id,
         actor_email=user.email,
         action="user.login",
@@ -84,8 +90,6 @@ def login():
         details=f"Signed in as {user.email}",
         ip_address=_client_ip(),
     )
-
-    token = create_token(user.id)
     return jsonify(
         {
             "access_token": token,
@@ -96,23 +100,11 @@ def login():
 
 
 @jwt_required()
-def me():
-    user_id = get_jwt_identity()
-    user = auth_service.get_user_by_id(user_id)
-    if not user:
-        return jsonify(
-            {"error": True, "message": "User not found.", "detail": "User not found."}
-        ), 404
-    payload = _read_auth_payload()
-
-
-@jwt_required()
 def update_me():
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
     has_full_name = "full_name" in data or "name" in data
-    full_name = data.get(
-        "full_name") if "full_name" in data else data.get("name")
+    full_name = data.get("full_name") if "full_name" in data else data.get("name")
 
     try:
         user = auth_service.update_profile(
@@ -121,8 +113,7 @@ def update_me():
             full_name=full_name,
             update_full_name=has_full_name,
             current_password=data.get("current_password") or None,
-            new_password=data.get("new_password") or data.get(
-                "password") or None,
+            new_password=data.get("new_password") or data.get("password") or None,
         )
     except LookupError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 404
@@ -139,22 +130,6 @@ def update_me():
         ip_address=_client_ip(),
     )
     return jsonify(user.to_dict()), 200
-    email = payload["email"]
-    password = payload["password"]
-
-    try:
-        user = auth_service.authenticate_user(email, password)
-    except ValueError as exc:
-        return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 401
-
-    token = create_token(user.id)
-    return jsonify(
-        {
-            "access_token": token,
-            "token_type": "bearer",
-            "user": user.to_dict(),
-        }
-    ), 200
 
 
 @jwt_required()
