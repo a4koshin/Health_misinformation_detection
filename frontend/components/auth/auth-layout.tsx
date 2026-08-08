@@ -41,7 +41,7 @@ export function AuthLayout({
 
         <div className="glass-strong rounded-3xl p-6 sm:p-9">
           <header className="mb-6 space-y-2 sm:mb-8">
-            <h1 className="text-xl font-normal tracking-tight text-[#0f172a] sm:text-2xl">
+            <h1 className="text-xl font-semibold tracking-tight text-[#0f172a] sm:text-2xl">
               {title}
             </h1>
             <p className="text-sm leading-relaxed text-[#475569]">
