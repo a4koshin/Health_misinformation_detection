@@ -57,7 +57,7 @@ export default function ContactPage() {
               <p className="text-sm font-semibold tracking-widest text-brand uppercase">
                 Get in touch
               </p>
-              <h2 className="mt-4 text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
                 Talk to the team behind HealthAI
               </h2>
               <p className="mt-5 text-base leading-7 text-ink-muted">
@@ -108,7 +108,7 @@ export default function ContactPage() {
                 aria-hidden="true"
               />
               <GlassCard strong className="relative p-7 sm:p-10">
-                <h2 className="text-xl font-normal text-ink">
+                <h2 className="text-xl font-semibold text-ink">
                   Send a message
                 </h2>
                 <p className="mt-1 mb-7 text-sm text-ink-muted">
@@ -124,7 +124,7 @@ export default function ContactPage() {
       <PageSection>
         <Reveal>
           <div className="rounded-3xl border border-orange-100 bg-orange-50 px-6 py-14 text-center sm:px-12">
-            <h2 className="mx-auto max-w-2xl text-3xl font-normal tracking-tight text-ink sm:text-4xl">
+            <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
               Looking for quick answers?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-ink-muted">
