@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { API_BASE, apiFetch } from "@/lib/api";
 import type {
   AppLanguage,
   ChangePasswordRequest,
@@ -7,8 +7,6 @@ import type {
   UpdateProfileRequest,
   UserProfile,
 } from "@/types/api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 export function resolveAvatarUrl(avatarUrl: string | null | undefined): string | null {
   if (!avatarUrl) return null;
