@@ -45,7 +45,7 @@ function SectionCard({
   return (
     <GlassCard strong className={cn("overflow-hidden p-0", className)}>
       <div className="border-b border-gray-100 px-6 py-5">
-        <h2 className="text-base font-medium text-[#0f172a]">{title}</h2>
+        <h2 className="text-base font-semibold text-[#0f172a]">{title}</h2>
         <p className="mt-1 text-sm text-[#64748b]">{description}</p>
       </div>
       <div className="px-6 py-5">{children}</div>
