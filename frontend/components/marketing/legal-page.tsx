@@ -29,7 +29,7 @@ export function LegalPage({
           <GlassCard strong className="space-y-8 p-8 sm:p-10">
             {sections.map((section) => (
               <section key={section.heading}>
-                <h2 className="mb-3 text-lg font-normal text-[#0f172a]">
+                <h2 className="mb-3 text-lg font-semibold text-[#0f172a]">
                   {section.heading}
                 </h2>
                 <div className="space-y-3">
