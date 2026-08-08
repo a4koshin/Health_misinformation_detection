@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import re
+import threading
 from pathlib import Path
 from typing import Any
-
-import torch
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 ML_DIR = Path(__file__).resolve().parents[1] / "ml_models"
 TASK_A_DIR = ML_DIR / "best_model_task_a"
@@ -16,14 +14,18 @@ TASK_A_DIR = ML_DIR / "best_model_task_a"
 LABEL_TO_ID = {"Reliable": 0, "Non-Reliable": 1}
 ID_TO_LABEL = {0: "Reliable", 1: "Non-Reliable"}
 
-_device: torch.device | None = None
+_device: Any = None
 _task_a_model = None
 _task_a_tokenizer = None
 _models_loaded = False
+_load_lock = threading.Lock()
 
 
 def load_models() -> None:
     """Load SomBERTb Task A (reliability). Gatekeeper uses CEREBRAS_API_KEY / GROQ_API_KEY."""
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
     global _device
     global _task_a_model, _task_a_tokenizer
     global _models_loaded
@@ -49,10 +51,17 @@ def load_models() -> None:
 
 
 def _ensure_loaded() -> None:
-    if not _models_loaded:
-        raise RuntimeError(
-            "ML models are not loaded. Add files under ml_models/ and restart."
-        )
+    if _models_loaded and _task_a_model is not None:
+        return
+    with _load_lock:
+        if _models_loaded and _task_a_model is not None:
+            return
+        try:
+            load_models()
+        except Exception as exc:
+            raise RuntimeError(
+                "ML models are not loaded. Add files under ml_models/ and retry."
+            ) from exc
 
 
 def clean_text(text: str) -> str:
@@ -77,6 +86,8 @@ def _predict_with_transformer(
     text: str,
     id_to_label: dict[int, str],
 ) -> dict[str, Any]:
+    import torch
+
     inputs = tokenizer(
         text,
         return_tensors="pt",
@@ -131,17 +142,58 @@ def predict_reliability(text: str) -> dict[str, Any]:
     }
 
 
-def run_full_pipeline(text: str) -> dict[str, Any]:
-    """
-    Pipeline:
+def predict_reliability_batch(
+    texts: list[str],
+    *,
+    batch_size: int = 32,
+) -> list[dict[str, Any]]:
+    """Run Task A on many claims. Empty strings are skipped (caller handles them)."""
+    import torch
 
-      Input claim_text (direct text or transcription)
-      Stage 0 GPT gatekeeper -> Non-Medical: STOP
-      Stage 1 best_model_task_a -> Reliable / Non-Reliable  (ALWAYS for medical)
-      Explanation phrasing via Cerebras/Groq + web search (does NOT change label)
-    """
-    from services import explanation_service
+    _ensure_loaded()
+    if _task_a_model is None or _task_a_tokenizer is None:
+        raise RuntimeError(
+            "best_model_task_a is not loaded. Check Backend/ml_models/best_model_task_a."
+        )
 
+    outputs: list[dict[str, Any]] = []
+    size = max(1, int(batch_size))
+    for start in range(0, len(texts), size):
+        batch = texts[start : start + size]
+        cleaned = [clean_text(item) or item for item in batch]
+        encoded = _task_a_tokenizer(
+            cleaned,
+            return_tensors="pt",
+            truncation=True,
+            padding=True,
+            max_length=256,
+        )
+        encoded = {key: value.to(_device) for key, value in encoded.items()}
+        with torch.no_grad():
+            logits = _task_a_model(**encoded).logits
+            probs = torch.softmax(logits, dim=-1)
+            pred_ids = torch.argmax(probs, dim=-1)
+
+        for index in range(len(batch)):
+            pred_id = int(pred_ids[index].item())
+            confidence = float(probs[index][pred_id].item())
+            label = ID_TO_LABEL.get(pred_id)
+            if label not in {"Reliable", "Non-Reliable"}:
+                label = "Non-Reliable" if pred_id != 0 else "Reliable"
+            outputs.append(
+                {
+                    "label": label,
+                    "confidence": confidence,
+                    "pred_id": pred_id,
+                    "probs": [float(p) for p in probs[index].tolist()],
+                    "model": "best_model_task_a",
+                }
+            )
+    return outputs
+
+
+def classify_claim(text: str) -> dict[str, Any]:
+    """Gatekeeper + SomBERTb only. No search and no Cerebras/Groq phrasing."""
     cleaned = clean_text(text)
     claim_text = (text or "").strip()
 
@@ -150,27 +202,25 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
         "label": None,
         "label_confidence": None,
         "cleaned_text": cleaned,
-        "message": (
-            "Jumladaan ma aha mid caafimaad ku saabsan. "
-            "Fadlan geli xog caafimaad ku saabsan si loo baaro."
-        ),
+        "message": build_message(False, None),
         "sources": [],
         "similar_terms": [],
         "model": None,
         "pred_id": None,
         "class_probs": None,
+        "enrichment_pending": False,
     }
 
     if not cleaned:
         return empty
 
-    # Stage 0 — GPT gatekeeper: Medical vs Non-Medical
+    # Stage 0 — Cerebras/Groq MUST decide medical vs non-medical first.
     is_medical = check_gatekeeper(claim_text)
-
     if not is_medical:
+        print("[pipeline] gatekeeper NON_MEDICAL — skipping SomBERTb and search")
         return empty
 
-    # Stage 1 — ALWAYS SomBERTb best_model_task_a (never skip / never hardcode label)
+    # Stage 1 — SomBERTb Task A only after MEDICAL.
     reliability = predict_reliability(cleaned)
     label = reliability["label"]
     label_confidence = float(reliability["confidence"])
@@ -185,36 +235,67 @@ def run_full_pipeline(text: str) -> dict[str, Any]:
         f"text={cleaned[:80]!r}"
     )
 
-    # Explanation only phrases the verdict via Cerebras/Groq + web search.
-    if label == "Reliable":
-        explanation = explanation_service.generate_reliable_explanation(claim_text)
-    else:
-        explanation = explanation_service.generate_unreliable_explanation(claim_text)
-
-    message = (
-        explanation.get("message") if isinstance(explanation, dict) else explanation
-    )
-    sources = (
-        explanation.get("sources", []) if isinstance(explanation, dict) else []
-    )
-    similar_terms = (
-        explanation.get("similar_terms", [])
-        if isinstance(explanation, dict) and label == "Non-Reliable"
-        else []
-    )
-
     return {
         "is_medical": True,
         "label": label,
         "label_confidence": label_confidence,
         "cleaned_text": cleaned,
-        "message": message,
-        "sources": sources,
-        "similar_terms": similar_terms,
+        "message": build_message(True, label),
+        "sources": [],
+        "similar_terms": [],
         "model": "best_model_task_a",
         "pred_id": pred_id,
         "class_probs": class_probs,
+        "enrichment_pending": True,
     }
+
+
+def enrich_explanation(claim_text: str, label: str | None) -> dict[str, Any]:
+    """Cerebras/Groq phrasing + live search. Does not change the SomBERTb label."""
+    from services import explanation_service
+
+    claim = (claim_text or "").strip()
+    if label == "Reliable":
+        explanation = explanation_service.generate_reliable_explanation(claim)
+    elif label in {"Non-Reliable", "Misinformation"}:
+        explanation = explanation_service.generate_unreliable_explanation(claim)
+    else:
+        return {
+            "message": build_message(False, None),
+            "sources": [],
+            "similar_terms": [],
+            "enrichment_pending": False,
+        }
+
+    message = (
+        explanation.get("message") if isinstance(explanation, dict) else explanation
+    )
+    sources = explanation.get("sources", []) if isinstance(explanation, dict) else []
+    similar_terms = (
+        explanation.get("similar_terms", [])
+        if isinstance(explanation, dict) and label == "Non-Reliable"
+        else []
+    )
+    return {
+        "message": message,
+        "sources": sources or [],
+        "similar_terms": similar_terms or [],
+        "enrichment_pending": False,
+    }
+
+
+def run_full_pipeline(text: str) -> dict[str, Any]:
+    """Classify with SomBERTb, then optionally enrich (dataset / sync callers)."""
+    result = classify_claim(text)
+    if not result.get("enrichment_pending"):
+        return result
+
+    explanation = enrich_explanation((text or "").strip(), result["label"])
+    result["message"] = explanation.get("message") or result["message"]
+    result["sources"] = explanation.get("sources") or []
+    result["similar_terms"] = explanation.get("similar_terms") or []
+    result["enrichment_pending"] = False
+    return result
 
 
 def build_message(
@@ -240,9 +321,3 @@ def build_message(
         "Markii aan fiirinay taladaan caafimaad, waxay u "
         "muuqataa mid Reliable."
     )
-
-
-try:
-    load_models()
-except Exception as exc:  # noqa: BLE001 - allow app boot without weights
-    print(f"[predictor_service] Models not loaded yet: {exc}")
