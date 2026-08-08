@@ -2,6 +2,7 @@ from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from extensions import db
+from models.prediction import Prediction
 from services import audit_service, auth_service, db_service, predictor_service
 from services import media_service
 from services.claim_validation_service import validate_somali_claim_input
@@ -28,9 +29,10 @@ def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
         label_confidence=result["label_confidence"],
         cleaned_text=result.get("cleaned_text"),
         source=source,
+        commit=False,
     )
     prediction.summary = message
-    db.session.commit()
+    db.session.flush()
 
     label_text = result["label"] or (
         "Non-medical" if not result["is_medical"] else "Pending"
@@ -43,7 +45,9 @@ def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
         entity_id=prediction.id,
         details=f"Predicted {source} claim as {label_text}",
         ip_address=_client_ip(),
+        commit=False,
     )
+    db.session.commit()
 
     return prediction, message
 
@@ -62,7 +66,7 @@ def predict():
         return jsonify({"error": True, "message": "User not found."}), 404
 
     try:
-        result = predictor_service.run_full_pipeline(text)
+        result = predictor_service.classify_claim(text)
     except RuntimeError as exc:
         return jsonify({"error": True, "message": str(exc)}), 503
 
@@ -77,12 +81,13 @@ def predict():
             "label": result["label"],
             "label_confidence": result["label_confidence"],
             "message": message,
-            "sources": result.get("sources") or [],
-            "similar_terms": result.get("similar_terms") or [],
+            "sources": [],
+            "similar_terms": [],
             "transcript": text,
             "model": result.get("model"),
             "pred_id": result.get("pred_id"),
             "class_probs": result.get("class_probs"),
+            "enrichment_pending": bool(result.get("enrichment_pending")),
         }
     ), 200
 
@@ -113,7 +118,7 @@ def predict_media():
         ), 400
 
     try:
-        result = predictor_service.run_full_pipeline(transcript)
+        result = predictor_service.classify_claim(transcript)
     except RuntimeError as exc:
         return jsonify({"error": True, "message": str(exc)}), 503
 
@@ -132,10 +137,69 @@ def predict_media():
             "label": result["label"],
             "label_confidence": result["label_confidence"],
             "message": message,
-            "sources": result.get("sources") or [],
-            "similar_terms": result.get("similar_terms") or [],
+            "sources": [],
+            "similar_terms": [],
             "model": result.get("model"),
             "pred_id": result.get("pred_id"),
             "class_probs": result.get("class_probs"),
+            "enrichment_pending": bool(result.get("enrichment_pending")),
+        }
+    ), 200
+
+
+@jwt_required()
+def enrich(prediction_id: int):
+    """Second step: Cerebras/Groq explanation + search. SomBERTb label stays fixed."""
+    user = auth_service.get_user_by_id(get_jwt_identity())
+    if not user:
+        return jsonify({"error": True, "message": "User not found."}), 404
+
+    prediction = Prediction.query.filter_by(
+        id=prediction_id, user_id=user.id
+    ).first()
+    if not prediction:
+        return jsonify({"error": True, "message": "Prediction not found."}), 404
+
+    label = prediction.label
+    if prediction.source == "non_medical" or label in {None, "Non-medical", "Pending"}:
+        return jsonify(
+            {
+                "prediction_id": prediction.id,
+                "message": prediction.summary
+                or predictor_service.build_message(False, None),
+                "sources": [],
+                "similar_terms": [],
+                "enrichment_pending": False,
+            }
+        ), 200
+
+    try:
+        explanation = predictor_service.enrich_explanation(
+            prediction.claim_text, label
+        )
+    except Exception as exc:  # noqa: BLE001
+        return jsonify(
+            {
+                "prediction_id": prediction.id,
+                "message": prediction.summary
+                or predictor_service.build_message(True, label),
+                "sources": [],
+                "similar_terms": [],
+                "enrichment_pending": False,
+                "enrichment_error": str(exc),
+            }
+        ), 200
+
+    message = explanation.get("message") or prediction.summary
+    prediction.summary = message
+    db.session.commit()
+
+    return jsonify(
+        {
+            "prediction_id": prediction.id,
+            "message": message,
+            "sources": explanation.get("sources") or [],
+            "similar_terms": explanation.get("similar_terms") or [],
+            "enrichment_pending": False,
         }
     ), 200
