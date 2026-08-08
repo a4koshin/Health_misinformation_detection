@@ -80,6 +80,8 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
 
   useEffect(() => {
     let active = true;
+    let idleId = 0;
+    let timeoutId = 0;
 
     async function loadHistory() {
       if (!token) {
@@ -110,10 +112,32 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
       }
     }
 
-    void loadHistory();
+    const schedule =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? () => {
+            idleId = window.requestIdleCallback(() => void loadHistory(), {
+              timeout: 1200,
+            });
+          }
+        : () => {
+            timeoutId = window.setTimeout(() => void loadHistory(), 300);
+          };
+
+    if (!token) {
+      setHistory([]);
+      setIsLoadingHistory(false);
+    } else {
+      schedule();
+    }
 
     return () => {
       active = false;
+      if (idleId && typeof window !== "undefined" && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
     };
   }, [token, historyRevision]);
 
