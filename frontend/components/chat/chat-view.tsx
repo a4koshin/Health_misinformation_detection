@@ -193,6 +193,10 @@ export function ChatView() {
 
   async function handleDatasetUpload(file: File) {
     if (!token || isBusy) return;
+    if (file.size === 0) {
+      toast.error("The uploaded file is empty. Add claim text and try again.");
+      return;
+    }
 
     setPendingUpload({ name: file.name, size: file.size, kind: "dataset" });
     setDatasetPreview(null);
