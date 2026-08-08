@@ -37,3 +37,9 @@ admin_bp.add_url_rule(
     view_func=admin_controller.audit_logs,
     methods=["GET"],
 )
+admin_bp.add_url_rule(
+    "/dataset/predict",
+    view_func=admin_controller.predict_dataset,
+    methods=["POST"],
+    endpoint="predict_dataset",
+)
