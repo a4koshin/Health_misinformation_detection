@@ -287,7 +287,7 @@ function UserDashboardContent() {
           <div className="grid gap-4 lg:grid-cols-2">
             <GlassCard className="p-6">
               <div className="mb-4">
-                <h2 className="text-base font-medium text-[#0f172a]">
+                <h2 className="text-base font-semibold text-[#0f172a]">
                   Reliable vs Non-Reliable
                 </h2>
                 <p className="text-sm text-[#475569]">
@@ -341,7 +341,7 @@ function UserDashboardContent() {
 
             <GlassCard className="p-6">
               <div className="mb-4">
-                <h2 className="text-base font-medium text-[#0f172a]">
+                <h2 className="text-base font-semibold text-[#0f172a]">
                   Activity overview
                 </h2>
                 <p className="text-sm text-[#475569]">
@@ -391,7 +391,7 @@ function UserDashboardContent() {
           <DataTableCard
             header={
               <div>
-                <h2 className="text-base font-medium text-[#0f172a]">
+                <h2 className="text-base font-semibold text-[#0f172a]">
                   Your chats
                 </h2>
                 <p className="text-sm text-[#475569]">
