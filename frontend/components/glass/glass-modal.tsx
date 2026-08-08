@@ -33,7 +33,7 @@ export function GlassModal({
         >
           <div className="mb-5 flex items-start justify-between gap-4">
             <div className="space-y-1">
-              <DialogPrimitive.Title className="text-lg font-normal text-[#0f172a]">
+              <DialogPrimitive.Title className="text-lg font-semibold text-[#0f172a]">
                 {title}
               </DialogPrimitive.Title>
               {description ? (
