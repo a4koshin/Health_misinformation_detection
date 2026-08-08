@@ -1,7 +1,23 @@
 import type { NextConfig } from "next";
 
+const BACKEND_URL =
+  process.env.BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:5000";
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${BACKEND_URL.replace(/\/$/, "")}/api/:path*`,
+      },
+      {
+        source: "/static/:path*",
+        destination: `${BACKEND_URL.replace(/\/$/, "")}/static/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
