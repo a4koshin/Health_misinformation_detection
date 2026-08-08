@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any, Optional
 
 from flask import current_app, has_app_context
@@ -47,6 +48,13 @@ def has_llm_key() -> bool:
     return bool(get_cerebras_key() or get_groq_key())
 
 
+def _llm_timeout_seconds() -> float:
+    try:
+        return max(2.0, float(os.getenv("LLM_TIMEOUT_SECONDS", "8")))
+    except ValueError:
+        return 8.0
+
+
 def _openai_client(api_key: str, base_url: Optional[str] = None) -> Any:
     try:
         from openai import OpenAI
@@ -55,9 +63,10 @@ def _openai_client(api_key: str, base_url: Optional[str] = None) -> Any:
             "openai package is required. Install it with: pip install openai"
         ) from exc
 
+    timeout = _llm_timeout_seconds()
     if base_url:
-        return OpenAI(api_key=api_key, base_url=base_url)
-    return OpenAI(api_key=api_key)
+        return OpenAI(api_key=api_key, base_url=base_url, timeout=timeout)
+    return OpenAI(api_key=api_key, timeout=timeout)
 
 
 def _cerebras_provider() -> Optional[dict[str, Any]]:
@@ -160,7 +169,20 @@ def _call_provider(
     if effort and "gpt-oss" in str(provider["model"]):
         create_kwargs["reasoning_effort"] = effort
 
-    response = provider["client"].chat.completions.create(**create_kwargs)
+    timeout = _llm_timeout_seconds()
+    pool = ThreadPoolExecutor(max_workers=1)
+    try:
+        future = pool.submit(
+            provider["client"].chat.completions.create, **create_kwargs
+        )
+        try:
+            response = future.result(timeout=timeout)
+        except FuturesTimeout as exc:
+            raise TimeoutError(
+                f"{provider['name']} timed out after {timeout:.0f}s"
+            ) from exc
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     return _extract_text(response.choices[0].message)
 
 
