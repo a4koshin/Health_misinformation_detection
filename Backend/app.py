@@ -9,6 +9,7 @@ from routes.auth_routes import auth_bp
 from routes.history_routes import history_bp
 from routes.predict_routes import predict_bp
 from routes.report_routes import report_bp
+from routes.review_routes import review_bp
 from routes.settings_routes import settings_bp
 from routes.transcription_routes import transcription_bp
 
@@ -28,6 +29,7 @@ def create_app() -> Flask:
     app.register_blueprint(admin_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(transcription_bp)
+    app.register_blueprint(review_bp)
 
     # Import models so SQLAlchemy knows the tables.
     from models import AuditLog, Prediction, User  # noqa: F401
@@ -41,6 +43,38 @@ def create_app() -> Flask:
                     "ALTER TABLE users "
                     "ADD COLUMN IF NOT EXISTS language_preference "
                     "VARCHAR(10) NOT NULL DEFAULT 'so'"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS needs_review "
+                    "BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS review_status VARCHAR(20)"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS advisor_id INTEGER "
+                    "REFERENCES users(id)"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS advisor_note TEXT"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP"
                 )
             )
             db.session.commit()
