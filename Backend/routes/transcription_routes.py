@@ -10,3 +10,9 @@ transcription_bp.add_url_rule(
     methods=["POST"],
     endpoint="transcribe",
 )
+transcription_bp.add_url_rule(
+    "/transcribe/url",
+    view_func=transcription_controller.transcribe_url,
+    methods=["POST"],
+    endpoint="transcribe_url",
+)
