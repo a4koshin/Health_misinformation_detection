@@ -225,6 +225,20 @@ def edit_message(prediction_id: int, message_id: str):
     )
     prediction.summary = message
     prediction.risk = resolved_risk
+    if resolved_label in {"Non-Reliable", "Misinformation"}:
+        prediction.needs_review = True
+        if prediction.review_status != "pending":
+            prediction.review_status = "pending"
+            prediction.advisor_id = None
+            prediction.advisor_note = None
+            prediction.reviewed_at = None
+    else:
+        prediction.needs_review = False
+        if prediction.review_status == "pending":
+            prediction.review_status = None
+            prediction.advisor_id = None
+            prediction.advisor_note = None
+            prediction.reviewed_at = None
 
     audit_service.log_action(
         actor_id=user.id,
