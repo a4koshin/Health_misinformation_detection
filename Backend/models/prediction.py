@@ -22,6 +22,11 @@ class Prediction(db.Model):
     source = db.Column(db.String(50), nullable=False)
     summary = db.Column(db.Text, nullable=True)
     upload_batch_id = db.Column(db.Integer, nullable=True)
+    needs_review = db.Column(db.Boolean, nullable=False, default=False)
+    review_status = db.Column(db.String(20), nullable=True)
+    advisor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    advisor_note = db.Column(db.Text, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(
         db.DateTime,
         nullable=False,
@@ -46,8 +51,17 @@ class Prediction(db.Model):
             "label_confidence": confidence,
             "source": source_label,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "needs_review": bool(self.needs_review),
+            "review_status": self.review_status,
+            "advisor_note": self.advisor_note,
+            "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             # Frontend Detection compatibility
             "input_text": self.claim_text,
             "confidence": confidence,
             "somali_status": self.label or ("Non-medical" if not is_medical else "Pending"),
         }
+
+    def to_review_dict(self) -> dict:
+        payload = self.to_dict()
+        payload["advisor_id"] = str(self.advisor_id) if self.advisor_id else None
+        return payload
