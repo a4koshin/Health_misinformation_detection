@@ -1,4 +1,4 @@
-export type UserRole = "user" | "admin";
+export type UserRole = "user" | "admin" | "healthcare_advisor";
 export type AppLanguage = "so" | "en";
 
 export type User = {
@@ -43,6 +43,10 @@ export type Detection = {
   somali_status: string;
   created_at: string;
   message_count?: number;
+  needs_review?: boolean;
+  review_status?: "pending" | "confirmed" | "corrected" | null;
+  advisor_note?: string | null;
+  reviewed_at?: string | null;
 };
 
 export type Conversation = Detection & {
