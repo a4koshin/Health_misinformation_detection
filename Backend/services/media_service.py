@@ -12,9 +12,6 @@ ALLOWED_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
 MAX_AUDIO_BYTES = 25 * 1024 * 1024
 MAX_VIDEO_BYTES = 50 * 1024 * 1024
 
-_asr_pipeline = None
-
-
 def _extension(filename: str) -> str:
     return Path(filename).suffix.lower()
 
@@ -85,84 +82,10 @@ def _extract_audio_from_video(video_path: Path) -> Path:
     return audio_path
 
 
-def _get_asr_pipeline():
-    global _asr_pipeline
-    if _asr_pipeline is not None:
-        return _asr_pipeline
-
-    try:
-        from transformers import pipeline
-    except ImportError as exc:
-        raise RuntimeError(
-            "Speech recognition is unavailable. Install transformers to enable audio/video claims."
-        ) from exc
-
-    _asr_pipeline = pipeline(
-        "automatic-speech-recognition",
-        model="openai/whisper-tiny",
-        chunk_length_s=30,
-    )
-    return _asr_pipeline
-
-
-def _transcribe_with_openai(audio_path: Path) -> str | None:
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if not api_key:
-        return None
-
-    try:
-        from openai import OpenAI
-    except ImportError:
-        return None
-
-    client = OpenAI(api_key=api_key)
-    with audio_path.open("rb") as handle:
-        result = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=handle,
-            language="so",
-        )
-    text = (getattr(result, "text", None) or "").strip()
-    return text or None
-
-
-def _transcribe_with_local_whisper(audio_path: Path) -> str:
-    # Prefer the Somali-tuned Paza Whisper used by /api/transcribe.
-    try:
-        from services import transcription_service
-
-        return transcription_service.transcribe_audio(str(audio_path))
-    except RuntimeError:
-        # e.g. no speech detected — do not hide behind tiny Whisper.
-        raise
-    except Exception as exc:
-        # Model load / unexpected ASR failure → try tiny Whisper fallback.
-        print(f"[media_service] Paza Whisper unavailable, falling back: {exc}")
-
-    asr = _get_asr_pipeline()
-    try:
-        result = asr(
-            str(audio_path),
-            generate_kwargs={"language": "so", "task": "transcribe"},
-        )
-    except TypeError:
-        result = asr(str(audio_path))
-    if isinstance(result, dict):
-        text = (result.get("text") or "").strip()
-    else:
-        text = str(result or "").strip()
-    # Drop Whisper special tokens such as <|transcribe|> if they leak into text.
-    import re
-
-    text = re.sub(r"<\|[^|>]*\|>", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    if not text:
-        raise RuntimeError("No speech was detected in this file.")
-    return text
-
-
 def transcribe_media(file: FileStorage, *, kind: str) -> str:
-    """Return transcript text from an uploaded audio or video file."""
+    """Return pure Somali transcript from an uploaded audio or video file."""
+    from services import transcription_service
+
     filename, _size = validate_media_file(file, kind=kind)
     ext = _extension(filename)
 
@@ -176,11 +99,7 @@ def transcribe_media(file: FileStorage, *, kind: str) -> str:
             audio_path = _extract_audio_from_video(media_path)
             temp_paths.append(audio_path)
 
-        transcript = _transcribe_with_openai(audio_path)
-        if transcript is None:
-            transcript = _transcribe_with_local_whisper(audio_path)
-
-        return transcript.strip()
+        return transcription_service.transcribe_audio_file(str(audio_path)).strip()
     finally:
         for path in temp_paths:
             try:
