@@ -4,6 +4,11 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from extensions import db
 
+# Allowed role strings: "user", "admin", "healthcare_advisor".
+# Designating a healthcare_advisor is a manual DB update for now:
+#   UPDATE users SET role = 'healthcare_advisor' WHERE email = '...';
+# TODO: expose this as an admin-only endpoint, not self-service.
+
 
 class User(db.Model):
     """Matches Neon users table (column is full_name, not name)."""
@@ -30,6 +35,10 @@ class User(db.Model):
 
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def is_healthcare_advisor(self) -> bool:
+        return (self.role or "").strip().lower() == "healthcare_advisor"
 
     def to_dict(self) -> dict:
         return {
