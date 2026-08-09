@@ -45,8 +45,8 @@ function NavItem({
       onClick={onClick}
       className={
         active
-          ? "flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-full bg-brand/10 px-3.5 text-[13px] font-medium text-brand-deep transition-colors duration-200 sm:h-9"
-          : "flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-full px-3.5 text-[13px] text-ink transition-colors duration-200 hover:bg-orange-50 sm:h-9"
+          ? "flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-full bg-brand/10 px-3.5 text-[13px] font-semibold text-brand-deep transition-colors duration-200 sm:h-9"
+          : "flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-full px-3.5 text-[13px] font-semibold text-ink transition-colors duration-200 hover:bg-orange-50 sm:h-9"
       }
     >
       <MaterialIcon
@@ -206,7 +206,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
         </div>
 
         <div className="scrollbar-none min-h-0 flex-1 overflow-y-auto px-3 pt-2">
-          <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
+            <p className="px-2 pb-1 text-[10px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
             Workspace
           </p>
           <div className="space-y-0.5">
@@ -242,7 +242,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
 
           {isAdmin ? (
             <div className="pt-4">
-              <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
+              <p className="px-2 pb-1 text-[10px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
                 Manage
               </p>
               <div className="space-y-0.5">
@@ -269,7 +269,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
           ) : null}
 
           <div className="pt-4">
-            <p className="px-2 pb-1 text-[10px] font-medium tracking-[0.08em] text-ink-muted uppercase">
+            <p className="px-2 pb-1 text-[10px] font-semibold tracking-[0.08em] text-ink-muted uppercase">
               Account
             </p>
             <div className="space-y-0.5">
@@ -299,7 +299,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                     {initials}
                   </AvatarFallback>
                 </Avatar>
-                <span className="min-w-0 flex-1 truncate text-left text-[13px] text-ink">
+                <span className="min-w-0 flex-1 truncate text-left text-[13px] font-semibold text-ink">
                   {displayName}
                 </span>
                 <MaterialIcon
