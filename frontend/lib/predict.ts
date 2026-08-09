@@ -82,6 +82,23 @@ export async function enrichPrediction(
   );
 }
 
+/** Social Facebook / YouTube / other link → Somali text only. */
+export async function transcribeMediaUrl(
+  token: string,
+  url: string,
+  kind: "audio" | "video" = "video",
+): Promise<TranscribeMediaResponse> {
+  return apiFetch<TranscribeMediaResponse>(
+    "/api/transcribe/url",
+    {
+      method: "POST",
+      body: JSON.stringify({ url, kind }),
+      signal: AbortSignal.timeout(600_000),
+    },
+    token,
+  );
+}
+
 /** Upload audio or video → Somali text only (then call predictText with the result). */
 export async function transcribeMedia(
   token: string,
@@ -97,6 +114,7 @@ export async function transcribeMedia(
     {
       method: "POST",
       body: formData,
+      signal: AbortSignal.timeout(600_000),
     },
     token,
   );
