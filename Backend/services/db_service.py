@@ -23,6 +23,7 @@ def save_prediction(
     else:
         resolved_risk = "none"
     resolved_source = source or ("pipeline" if is_medical else "non_medical")
+    needs_review = resolved_label in {"Non-Reliable", "Misinformation"}
 
     prediction = Prediction(
         user_id=user_id,
@@ -33,6 +34,8 @@ def save_prediction(
         label_confidence=label_confidence,
         source=resolved_source,
         risk=resolved_risk,
+        needs_review=needs_review,
+        review_status="pending" if needs_review else None,
     )
     db.session.add(prediction)
     if commit:
