@@ -10,7 +10,7 @@ from flask import jsonify, request
 from flask_jwt_extended import jwt_required
 from werkzeug.datastructures import FileStorage
 
-from services import transcription_service
+from services import media_download_service, transcription_service
 
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm"}
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".ogg", ".webm", ".aac", ".flac"}
@@ -118,3 +118,48 @@ def transcribe():
                 Path(media_path).unlink(missing_ok=True)
             except OSError:
                 pass
+
+
+@jwt_required()
+def transcribe_url():
+    """POST /api/transcribe/url — social video/audio link → {"transcribed_text": "..."}."""
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    kind = (data.get("kind") or "video").strip().lower()
+    if kind not in {"audio", "video"}:
+        kind = "video"
+
+    media_path: str | None = None
+    temp_dir: str | None = None
+
+    try:
+        media_path, temp_dir = media_download_service.download_social_audio(url)
+        text = transcription_service.transcribe_audio_file(media_path)
+        return jsonify(
+            {
+                "transcribed_text": text,
+                "source_url": url,
+                "kind": kind,
+            }
+        ), 200
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
+    except FileNotFoundError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
+    except RuntimeError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 503
+    except Exception:
+        return (
+            jsonify(
+                {
+                    "error": True,
+                    "message": (
+                        "Unable to transcribe this link. "
+                        "It may be private, blocked, or have no speech."
+                    ),
+                }
+            ),
+            500,
+        )
+    finally:
+        media_download_service.cleanup_download_dir(temp_dir)
