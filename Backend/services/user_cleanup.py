@@ -8,6 +8,11 @@ from models.prediction import Prediction
 
 def purge_user_dependencies(user_id: int) -> None:
     """Delete/null every row that still references this user."""
+    # Keep reviewed claims; detach this advisor so the user row can be removed.
+    Prediction.query.filter_by(advisor_id=user_id).update(
+        {Prediction.advisor_id: None},
+        synchronize_session=False,
+    )
     Prediction.query.filter_by(user_id=user_id).delete(synchronize_session=False)
 
     # Tables without ORM models in this app, but with FKs to users.
