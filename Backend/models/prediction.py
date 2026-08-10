@@ -3,6 +3,12 @@ from datetime import datetime, timezone
 from extensions import db
 
 
+def _display_name(user) -> str | None:
+    if not user:
+        return None
+    return (user.full_name or "").strip() or user.email.split("@")[0]
+
+
 class Prediction(db.Model):
     """Maps onto the existing Neon `predictions` table."""
 
@@ -26,6 +32,7 @@ class Prediction(db.Model):
     review_status = db.Column(db.String(20), nullable=True)
     advisor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     advisor_note = db.Column(db.Text, nullable=True)
+    corrected_claim_text = db.Column(db.Text, nullable=True)
     reviewed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(
         db.DateTime,
@@ -40,7 +47,13 @@ class Prediction(db.Model):
             else self.confidence
         )
         is_medical = self.source != "non_medical"
-        source_label = "File upload" if self.upload_batch_id else "Manual check"
+        stored_source = (self.source or "").strip()
+        if stored_source == "UploadedFile" or self.upload_batch_id:
+            source_label = "UploadedFile"
+        elif stored_source in {"Manual check", "File upload"}:
+            source_label = stored_source
+        else:
+            source_label = "Manual check"
         return {
             # Flask/API fields
             "id": str(self.id),
@@ -54,6 +67,8 @@ class Prediction(db.Model):
             "needs_review": bool(self.needs_review),
             "review_status": self.review_status,
             "advisor_note": self.advisor_note,
+            "original_claim_text": self.claim_text,
+            "corrected_claim_text": self.corrected_claim_text,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
             # Frontend Detection compatibility
             "input_text": self.claim_text,
@@ -65,3 +80,25 @@ class Prediction(db.Model):
         payload = self.to_dict()
         payload["advisor_id"] = str(self.advisor_id) if self.advisor_id else None
         return payload
+
+    @staticmethod
+    def serialize_many(rows: list["Prediction"], *, review: bool = False) -> list[dict]:
+        from models.user import User
+
+        user_ids = {row.user_id for row in rows}
+        user_ids.update(row.advisor_id for row in rows if row.advisor_id)
+        users = (
+            {user.id: user for user in User.query.filter(User.id.in_(user_ids)).all()}
+            if user_ids
+            else {}
+        )
+        items = []
+        for row in rows:
+            payload = row.to_review_dict() if review else row.to_dict()
+            owner = users.get(row.user_id)
+            advisor = users.get(row.advisor_id) if row.advisor_id else None
+            payload["user_name"] = _display_name(owner)
+            payload["user_email"] = owner.email if owner else None
+            payload["advisor_name"] = _display_name(advisor)
+            items.append(payload)
+        return items
