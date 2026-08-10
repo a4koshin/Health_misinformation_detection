@@ -46,6 +46,11 @@ export type Detection = {
   needs_review?: boolean;
   review_status?: "pending" | "confirmed" | "corrected" | null;
   advisor_note?: string | null;
+  original_claim_text?: string | null;
+  corrected_claim_text?: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  advisor_name?: string | null;
   reviewed_at?: string | null;
 };
 
@@ -57,14 +62,29 @@ export type Conversation = Detection & {
 export type DashboardStats = {
   total_users: number;
   total_admins: number;
+  total_advisors?: number;
+  total_regular_users?: number;
   total_detections: number;
   total_predictions: number;
   reliable_count: number;
   misinformation_count: number;
   non_reliable_count: number;
   pending_count: number;
-  daily: { date: string; label: string; count: number }[];
+  review_pending_count?: number;
+  review_confirmed_count?: number;
+  review_corrected_count?: number;
+  daily: {
+    date: string;
+    label: string;
+    count: number;
+    reliable?: number;
+    non_reliable?: number;
+  }[];
   active_users: { name: string; count: number }[];
+  label_mix?: { name: string; reliable: number; non_reliable: number }[];
+  roles?: { name: string; count: number; key: string }[];
+  sources?: { name: string; count: number }[];
+  reviews?: { name: string; count: number; key: string }[];
   users_table: {
     id: string;
     full_name: string | null;
@@ -92,6 +112,7 @@ export type ReportRow = {
   user_email?: string;
   claim: string;
   label: string | null;
+  source?: string | null;
   created_at: string;
 };
 
@@ -133,6 +154,7 @@ export type DatasetPredictionResponse = {
   reliable_count: number;
   misinformation_count: number;
   error_count: number;
+  saved_rows?: number;
   results: DatasetPredictionRow[];
 };
 
@@ -153,6 +175,7 @@ export type UserProfile = {
   email: string;
   avatar_url: string | null;
   language_preference: AppLanguage;
+  role?: UserRole;
 };
 
 export type UpdateProfileRequest = {
