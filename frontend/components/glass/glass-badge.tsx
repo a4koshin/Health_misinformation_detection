@@ -7,6 +7,7 @@ const toneClassNames = {
   neutral: "border-gray-200 bg-gray-100 text-[#475569]",
   success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700",
   danger: "border-red-500/25 bg-red-500/10 text-red-700",
+  info: "border-sky-500/25 bg-sky-500/10 text-sky-800",
 } as const;
 
 export function GlassBadge({
