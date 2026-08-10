@@ -21,7 +21,6 @@ import {
 import {
   enrichPrediction,
   predictText,
-  transcribeMedia,
   transcribeMediaUrl,
   type PredictionSource,
   type TextPredictionResponse,
@@ -34,13 +33,9 @@ import { cn } from "@/lib/utils";
 const MAX_CHARS = 2000;
 const FILE_ACCEPT =
   ".txt,.csv,.xlsx,.xlsm,.xls,.xltx,.xltm,text/plain,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const AUDIO_ACCEPT = "audio/*,.mp3,.wav,.m4a,.ogg,.webm,.aac,.flac";
-const VIDEO_ACCEPT = "video/*,.mp4,.mov,.webm,.mkv,.avi";
 
 const INPUT_MODES = [
   { id: "text" as const, label: "Text" },
-  { id: "audio" as const, label: "Audio" },
-  { id: "video" as const, label: "Video" },
   { id: "link" as const, label: "Link" },
   { id: "file" as const, label: "Dataset" },
 ];
@@ -77,8 +72,15 @@ function platformFromUrl(url: string) {
 
 function displayModelName(model?: string | null) {
   if (!model) return null;
-  // Folder checkpoint is best_model_task_a; show product name in UI.
-  if (model === "best_model_task_a" || model.toLowerCase().includes("sombert")) {
+  // Folder checkpoint is sombertb_Model; show product name in UI.
+  if (
+    model === "sombertb_Model" ||
+    model === "somBERTb_Model" ||
+    model === "SomBERTb_Model" ||
+    model === "best_model_task_a" ||
+    model === "SomBERTb" ||
+    model.toLowerCase().includes("sombert")
+  ) {
     return "SomBERTb";
   }
   return model;
@@ -146,7 +148,10 @@ function sourceProfile(item: PredictionSource) {
   }
 
   try {
-    return new URL(item.url).hostname.replace(/^www\./, "") || platformLabel(platform);
+    return (
+      new URL(item.url).hostname.replace(/^www\./, "") ||
+      platformLabel(platform)
+    );
   } catch {
     return platformLabel(platform);
   }
@@ -213,12 +218,8 @@ export function PredictionWorkspace() {
   const [mediaBusyLabel, setMediaBusyLabel] = useState<string | null>(null);
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaUrlError, setMediaUrlError] = useState<string | null>(null);
-  const [inputMode, setInputMode] = useState<
-    "text" | "audio" | "video" | "link" | "file"
-  >("text");
+  const [inputMode, setInputMode] = useState<"text" | "link" | "file">("text");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const audioInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const analysisSeq = useRef(0);
@@ -255,9 +256,7 @@ export function PredictionWorkspace() {
       setResult(toAnalysisResult(response, claim));
       bumpHistory();
       toast.success(
-        response.is_medical
-          ? "SomBERTb result ready."
-          : "Not a medical claim.",
+        response.is_medical ? "SomBERTb result ready." : "Not a medical claim.",
       );
       scrollToResult();
     } catch (error) {
@@ -320,7 +319,10 @@ export function PredictionWorkspace() {
 
   function scrollToResult() {
     window.setTimeout(() => {
-      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      resultRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
     }, 80);
   }
 
@@ -407,6 +409,7 @@ export function PredictionWorkspace() {
           return;
         }
         setDatasetResult(dataset);
+        bumpHistory();
         toast.success(
           `Dataset done — ${dataset.reliable_count} Reliable, ${dataset.misinformation_count} Non-Reliable.`,
         );
@@ -459,7 +462,11 @@ export function PredictionWorkspace() {
 
     let transcript = "";
     try {
-      const { transcribed_text } = await transcribeMediaUrl(token, url, "video");
+      const { transcribed_text } = await transcribeMediaUrl(
+        token,
+        url,
+        "video",
+      );
       transcript = (transcribed_text || "").trim();
       if (!transcript) {
         toast.error("No speech could be transcribed from that link.");
@@ -496,46 +503,6 @@ export function PredictionWorkspace() {
     }
   }
 
-  async function handleMediaUpload(file: File, kind: "audio" | "video") {
-    if (!token || isAnalyzing || analyzeLock.current) return;
-
-    setIsAnalyzing(true);
-    setMediaBusyLabel(
-      kind === "video" ? "Transcribing video…" : "Transcribing audio…",
-    );
-    try {
-      const { transcribed_text } = await transcribeMedia(token, file, kind);
-      const claim = (transcribed_text || "").trim();
-      if (!claim) {
-        toast.error(`No speech could be transcribed from that ${kind} file.`);
-        return;
-      }
-      const clipped = claim.slice(0, MAX_CHARS);
-      setDraft(clipped);
-      setResult(null);
-      setInputMode("text");
-      toast.success(
-        "Somali transcript ready. Review the text, then tap Check claim.",
-      );
-      requestAnimationFrame(() => textareaRef.current?.focus());
-    } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : `Unable to transcribe ${kind} file.`;
-      toast.error(message);
-    } finally {
-      setIsAnalyzing(false);
-      setMediaBusyLabel(null);
-      if (kind === "audio" && audioInputRef.current) {
-        audioInputRef.current.value = "";
-      }
-      if (kind === "video" && videoInputRef.current) {
-        videoInputRef.current.value = "";
-      }
-    }
-  }
-
   const charCount = draft.length;
   const showConfidence =
     result?.confidence != null &&
@@ -564,26 +531,6 @@ export function PredictionWorkspace() {
             onChange={(event) => {
               const file = event.target.files?.[0];
               if (file) void handleFileUpload(file);
-            }}
-          />
-          <input
-            ref={audioInputRef}
-            type="file"
-            accept={AUDIO_ACCEPT}
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void handleMediaUpload(file, "audio");
-            }}
-          />
-          <input
-            ref={videoInputRef}
-            type="file"
-            accept={VIDEO_ACCEPT}
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void handleMediaUpload(file, "video");
             }}
           />
 
@@ -628,7 +575,9 @@ export function PredictionWorkspace() {
                   onChange={(event) => handleDraftChange(event.target.value)}
                   rows={5}
                   aria-invalid={Boolean(inputError)}
-                  aria-describedby={inputError ? "claim-input-error" : undefined}
+                  aria-describedby={
+                    inputError ? "claim-input-error" : undefined
+                  }
                   placeholder="Tusaale: Tallaalka COVID-19 wuu ammaan yahay…"
                   className={cn(
                     "min-h-28 w-full resize-y rounded-xl border bg-white px-3 py-2.5 text-[15px] leading-relaxed text-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-ink-muted/50 focus:ring-2 disabled:opacity-60",
@@ -669,37 +618,21 @@ export function PredictionWorkspace() {
                       type="button"
                       size="sm"
                       onClick={() => void handleAnalyze()}
-                      disabled={isAnalyzing || !draft.trim() || Boolean(inputError)}
+                      disabled={
+                        isAnalyzing || !draft.trim() || Boolean(inputError)
+                      }
                       className="bg-brand bg-none shadow-none hover:bg-[#e65300] hover:shadow-none"
                     >
                       {isAnalyzing && !mediaBusyLabel ? (
                         <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                       ) : null}
-                      {isAnalyzing && !mediaBusyLabel ? "Checking…" : "Check"}
+                      {isAnalyzing && !mediaBusyLabel
+                        ? "Predicting...."
+                        : "Predict"}
                     </GlassButton>
                   </div>
                 </div>
               </div>
-            ) : null}
-
-            {inputMode === "audio" ? (
-              <MediaActions
-                description="Upload audio. We transcribe Somali speech — then tap Check."
-                busyLabel={mediaBusyLabel}
-                disabled={isAnalyzing}
-                primaryLabel="Upload"
-                onPrimary={() => audioInputRef.current?.click()}
-              />
-            ) : null}
-
-            {inputMode === "video" ? (
-              <MediaActions
-                description="Upload video. We transcribe Somali speech — then tap Check."
-                busyLabel={mediaBusyLabel}
-                disabled={isAnalyzing}
-                primaryLabel="Upload"
-                onPrimary={() => videoInputRef.current?.click()}
-              />
             ) : null}
 
             {inputMode === "link" ? (
@@ -773,7 +706,7 @@ export function PredictionWorkspace() {
                 onClick={handleClearResult}
                 className="cursor-pointer text-sm text-brand transition-colors hover:text-brand-deep"
               >
-                Check another
+                Predict another
               </button>
             </section>
           ) : null}
@@ -799,6 +732,12 @@ export function PredictionWorkspace() {
                   >
                     {result.label}
                   </p>
+                  {result.label === "Non-Reliable" ? (
+                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">
+                      This claim was sent to a Healthcare Advisor for review.
+                      Open History to see when they confirm or correct it.
+                    </p>
+                  ) : null}
                 </div>
                 {showConfidence ? (
                   <p className="text-sm tabular-nums text-ink-muted">
@@ -821,8 +760,7 @@ export function PredictionWorkspace() {
 
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
                 <p className="text-ink-muted">
-                  Risk{" "}
-                  <span className="text-ink">{result.risk}</span>
+                  Risk <span className="text-ink">{result.risk}</span>
                 </p>
               </div>
 
@@ -926,7 +864,7 @@ export function PredictionWorkspace() {
                 onClick={handleClearResult}
                 className="cursor-pointer text-sm text-brand transition-colors hover:text-brand-deep"
               >
-                Check another
+                Predict another
               </button>
             </section>
           ) : null}
@@ -1033,7 +971,10 @@ function SocialLinkField({
 }) {
   return (
     <div className="space-y-3">
-      <label htmlFor="media-link-input" className="text-sm font-medium text-ink">
+      <label
+        htmlFor="media-link-input"
+        className="text-sm font-medium text-ink"
+      >
         Video link
       </label>
       <input
@@ -1067,8 +1008,8 @@ function SocialLinkField({
         </p>
       ) : (
         <p id="media-link-help" className="text-xs text-ink-muted">
-          Paste a Facebook, YouTube, TikTok, Instagram, or X link. We
-          transcribe Somali speech (up to 15 minutes), then SomBERTb predicts.
+          Paste a Facebook, YouTube, TikTok, Instagram, or X link. We transcribe
+          Somali speech (up to 15 minutes), then SomBERTb predicts.
         </p>
       )}
       <GlassButton
