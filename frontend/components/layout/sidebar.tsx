@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getHistory } from "@/lib/history";
+import { shortRoleLabel } from "@/lib/roles";
 import { resolveAvatarUrl } from "@/lib/settings";
 import { getDisplayName, getInitials } from "@/lib/user";
 import { useAuth } from "@/store/auth-store";
@@ -72,6 +73,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const isAdmin = user?.role === "admin";
+  const isAdvisor = user?.role === "healthcare_advisor";
 
   function go(path: string) {
     router.push(path);
@@ -210,16 +212,25 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
             Workspace
           </p>
           <div className="space-y-0.5">
-            <NavItem
-              icon="dashboard"
-              label="Dashboard"
-              active={
-                pathname === "/dashboard" || pathname === "/my-dashboard"
-              }
-              onClick={() =>
-                go(isAdmin ? "/dashboard" : "/my-dashboard")
-              }
-            />
+            {isAdvisor ? (
+              <NavItem
+                icon="fact_check"
+                label="Review"
+                active={pathname === "/review"}
+                onClick={() => go("/review")}
+              />
+            ) : (
+              <NavItem
+                icon="dashboard"
+                label="Dashboard"
+                active={
+                  pathname === "/dashboard" || pathname === "/my-dashboard"
+                }
+                onClick={() =>
+                  go(isAdmin ? "/dashboard" : "/my-dashboard")
+                }
+              />
+            )}
             <NavItem
               icon="psychology"
               label="Prediction"
@@ -232,12 +243,22 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
               active={pathname === "/history"}
               onClick={() => go("/history")}
             />
-            <NavItem
-              icon="download"
-              label="Report"
-              active={pathname === "/report"}
-              onClick={() => go("/report")}
-            />
+            {!isAdvisor ? (
+              <NavItem
+                icon="rate_review"
+                label="Corrections"
+                active={pathname === "/corrections"}
+                onClick={() => go("/corrections")}
+              />
+            ) : null}
+            {isAdvisor ? null : (
+              <NavItem
+                icon="download"
+                label="Report"
+                active={pathname === "/report"}
+                onClick={() => go("/report")}
+              />
+            )}
           </div>
 
           {isAdmin ? (
@@ -251,12 +272,6 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                   label="Users"
                   active={pathname === "/users"}
                   onClick={() => go("/users")}
-                />
-                <NavItem
-                  icon="model_training"
-                  label="Models"
-                  active={pathname === "/models" || pathname === "/dataset"}
-                  onClick={() => go("/models")}
                 />
                 <NavItem
                   icon="policy"
@@ -332,8 +347,14 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                       {user.email}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-brand/10 px-2.5 py-0.5 text-[11px] font-semibold text-brand-deep capitalize">
-                    {user.role}
+                  <span
+                    className={
+                      user.role === "healthcare_advisor"
+                        ? "shrink-0 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800"
+                        : "shrink-0 rounded-full bg-brand/10 px-2.5 py-0.5 text-[11px] font-semibold text-brand-deep"
+                    }
+                  >
+                    {shortRoleLabel(user.role)}
                   </span>
                 </div>
               </DropdownMenuLabel>
