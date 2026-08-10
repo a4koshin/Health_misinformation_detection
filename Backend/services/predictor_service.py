@@ -6,7 +6,25 @@ from pathlib import Path
 from typing import Any
 
 ML_DIR = Path(__file__).resolve().parents[1] / "ml_models"
-TASK_A_DIR = ML_DIR / "best_model_task_a"
+# Prefer the new SomBERTb export; fall back to older folder names if present.
+_MODEL_CANDIDATES = (
+    "sombertb_Model",
+    "somBERTb_Model",
+    "SomBERTb_Model",
+    "best_model_task_a",
+)
+
+
+def _resolve_model_dir() -> Path:
+    for name in _MODEL_CANDIDATES:
+        path = ML_DIR / name
+        if path.is_dir():
+            return path
+    return ML_DIR / _MODEL_CANDIDATES[0]
+
+
+TASK_A_DIR = _resolve_model_dir()
+MODEL_NAME = TASK_A_DIR.name
 
 # Task A checkpoint only stores LABEL_0 / LABEL_1. This is the app mapping:
 #   class 0 -> Reliable
@@ -22,17 +40,32 @@ _load_lock = threading.Lock()
 
 
 def load_models() -> None:
-    """Load SomBERTb Task A (reliability). Gatekeeper uses CEREBRAS_API_KEY / GROQ_API_KEY."""
+    """Load SomBERTb reliability classifier. Gatekeeper uses CEREBRAS_API_KEY / GROQ_API_KEY."""
     import torch
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
     global _device
     global _task_a_model, _task_a_tokenizer
     global _models_loaded
+    global TASK_A_DIR, MODEL_NAME
+
+    TASK_A_DIR = _resolve_model_dir()
+    MODEL_NAME = TASK_A_DIR.name
 
     if not TASK_A_DIR.exists():
         raise FileNotFoundError(
             f"Missing model folder: {TASK_A_DIR.name} in {ML_DIR}"
+        )
+
+    weight_files = (
+        TASK_A_DIR / "model.safetensors",
+        TASK_A_DIR / "pytorch_model.bin",
+        TASK_A_DIR / "model.bin",
+    )
+    if not any(path.exists() for path in weight_files):
+        raise FileNotFoundError(
+            f"Model folder {TASK_A_DIR.name} is missing weights "
+            f"(expected model.safetensors)."
         )
 
     _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -117,14 +150,14 @@ def _predict_with_transformer(
 
 
 def predict_reliability(text: str) -> dict[str, Any]:
-    """Run SomBERTb Task A from ml_models/best_model_task_a.
+    """Run SomBERTb from ml_models/sombertb_Model.
 
     Returns {label, confidence, pred_id, probs, model}.
     """
     _ensure_loaded()
     if _task_a_model is None or _task_a_tokenizer is None:
         raise RuntimeError(
-            "best_model_task_a is not loaded. Check Backend/ml_models/best_model_task_a."
+            f"{MODEL_NAME} is not loaded. Check Backend/ml_models/{MODEL_NAME}."
         )
 
     result = _predict_with_transformer(
@@ -138,7 +171,7 @@ def predict_reliability(text: str) -> dict[str, Any]:
         "confidence": result["confidence"],
         "pred_id": result["pred_id"],
         "probs": result["probs"],
-        "model": "best_model_task_a",
+        "model": MODEL_NAME,
     }
 
 
@@ -147,13 +180,13 @@ def predict_reliability_batch(
     *,
     batch_size: int = 32,
 ) -> list[dict[str, Any]]:
-    """Run Task A on many claims. Empty strings are skipped (caller handles them)."""
+    """Run SomBERTb on many claims. Empty strings are skipped (caller handles them)."""
     import torch
 
     _ensure_loaded()
     if _task_a_model is None or _task_a_tokenizer is None:
         raise RuntimeError(
-            "best_model_task_a is not loaded. Check Backend/ml_models/best_model_task_a."
+            f"{MODEL_NAME} is not loaded. Check Backend/ml_models/{MODEL_NAME}."
         )
 
     outputs: list[dict[str, Any]] = []
@@ -186,7 +219,7 @@ def predict_reliability_batch(
                     "confidence": confidence,
                     "pred_id": pred_id,
                     "probs": [float(p) for p in probs[index].tolist()],
-                    "model": "best_model_task_a",
+                    "model": MODEL_NAME,
                 }
             )
     return outputs
@@ -220,7 +253,7 @@ def classify_claim(text: str) -> dict[str, Any]:
         print("[pipeline] gatekeeper NON_MEDICAL — skipping SomBERTb and search")
         return empty
 
-    # Stage 1 — SomBERTb Task A only after MEDICAL.
+    # Stage 1 — SomBERTb only after MEDICAL.
     reliability = predict_reliability(cleaned)
     label = reliability["label"]
     label_confidence = float(reliability["confidence"])
@@ -230,7 +263,7 @@ def classify_claim(text: str) -> dict[str, Any]:
         label = "Non-Reliable"
 
     print(
-        f"[best_model_task_a] pred_id={pred_id} label={label} "
+        f"[{MODEL_NAME}] pred_id={pred_id} label={label} "
         f"conf={label_confidence:.4f} probs={class_probs} "
         f"text={cleaned[:80]!r}"
     )
@@ -243,7 +276,7 @@ def classify_claim(text: str) -> dict[str, Any]:
         "message": build_message(True, label),
         "sources": [],
         "similar_terms": [],
-        "model": "best_model_task_a",
+        "model": MODEL_NAME,
         "pred_id": pred_id,
         "class_probs": class_probs,
         "enrichment_pending": True,
