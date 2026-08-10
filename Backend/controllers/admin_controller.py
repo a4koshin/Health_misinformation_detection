@@ -166,6 +166,8 @@ def predict_dataset():
 
     try:
         result = dataset_service.predict_dataset_file(raw, file.filename or "dataset.csv")
+        saved = dataset_service.persist_dataset_predictions(user.id, result["results"])
+        result["saved_rows"] = saved
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
     except RuntimeError as exc:
