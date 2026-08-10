@@ -23,7 +23,6 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/chat";
 import { downloadUserReport, getUserReport } from "@/lib/history";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
@@ -35,6 +34,17 @@ const toneStyles = {
   success: "bg-emerald-500/10 text-emerald-700",
   danger: "bg-red-500/10 text-red-700",
 } as const;
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
 
 function labelTone(label: string | null) {
   if (label === "Reliable") return "success" as const;
@@ -135,14 +145,6 @@ function ReportContent() {
   const totalClaims = report?.total_claims ?? report?.total_rows ?? 0;
   const reliableCount = report?.reliable_count ?? 0;
   const nonReliableCount = report?.non_reliable_count ?? 0;
-  const reliablePercent =
-    report?.reliable_percent ??
-    (totalClaims ? Math.round((reliableCount / totalClaims) * 1000) / 10 : 0);
-  const nonReliablePercent =
-    report?.non_reliable_percent ??
-    (totalClaims
-      ? Math.round((nonReliableCount / totalClaims) * 1000) / 10
-      : 0);
 
   return (
     <PrivatePage
@@ -192,13 +194,13 @@ function ReportContent() {
             />
             <StatCard
               label="Reliable"
-              value={`${reliableCount} (${reliablePercent}%)`}
+              value={reliableCount}
               icon="verified_user"
               tone="success"
             />
             <StatCard
               label="Non-Reliable"
-              value={`${nonReliableCount} (${nonReliablePercent}%)`}
+              value={nonReliableCount}
               icon="report"
               tone="danger"
             />
@@ -238,13 +240,14 @@ function ReportContent() {
                 <GlassTableHeaderCell>User</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Claim</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Label</GlassTableHeaderCell>
-                <GlassTableHeaderCell>Date</GlassTableHeaderCell>
+                <GlassTableHeaderCell>Source</GlassTableHeaderCell>
+                <GlassTableHeaderCell>Date and Time</GlassTableHeaderCell>
               </GlassTableRow>
             </GlassTableHead>
             <GlassTableBody>
               {rows.length === 0 ? (
                 <GlassTableRow>
-                  <GlassTableCell colSpan={4}>
+                  <GlassTableCell colSpan={5}>
                     <div className="flex flex-col items-center gap-3 py-12 text-center">
                       <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                         <MaterialIcon name="description" size={24} />
@@ -286,9 +289,10 @@ function ReportContent() {
                       </GlassBadge>
                     </GlassTableCell>
                     <GlassTableCell className="whitespace-nowrap text-[#475569]">
-                      {row.created_at
-                        ? formatRelativeTime(row.created_at)
-                        : "—"}
+                      {row.source || "Manual check"}
+                    </GlassTableCell>
+                    <GlassTableCell className="whitespace-nowrap text-[#475569]">
+                      {row.created_at ? formatDateTime(row.created_at) : "—"}
                     </GlassTableCell>
                   </GlassTableRow>
                 ))
