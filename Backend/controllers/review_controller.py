@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
+from models.prediction import Prediction
 from services import auth_service, review_service
 
 
@@ -47,6 +48,7 @@ def submit():
     prediction_id = data.get("prediction_id")
     decision = data.get("decision")
     note = data.get("note")
+    corrected_claim = data.get("corrected_claim") or data.get("corrected_claim_text")
 
     if prediction_id is None:
         return jsonify({"error": True, "message": "prediction_id is required."}), 400
@@ -57,10 +59,11 @@ def submit():
             advisor_id=user.id,
             decision=decision,
             note=note,
+            corrected_claim=corrected_claim,
         )
     except LookupError as exc:
         return jsonify({"error": True, "message": str(exc)}), 404
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
 
-    return jsonify(prediction.to_review_dict()), 200
+    return jsonify(Prediction.serialize_many([prediction], review=True)[0]), 200
