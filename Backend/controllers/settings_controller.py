@@ -196,3 +196,40 @@ def delete_account():
         ip_address=_client_ip(),
     )
     return jsonify({"message": "Your account has been deleted."}), 200
+
+
+@jwt_required()
+def wipe_database():
+    data = request.get_json(silent=True) or {}
+    password = data.get("password") or ""
+    try:
+        summary = settings_service.wipe_all_data(_current_user_id(), password)
+    except LookupError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 403
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
+
+    user = settings_service.get_user(_current_user_id())
+    if user:
+        audit_service.log_action(
+            actor_id=user.id,
+            actor_email=user.email,
+            action="settings.database_wipe",
+            entity_type="database",
+            details=(
+                f"Wiped database data "
+                f"(predictions={summary['predictions_deleted']}, "
+                f"users={summary['users_deleted']}, "
+                f"audit_logs={summary['audit_logs_deleted']})"
+            ),
+            ip_address=_client_ip(),
+        )
+
+    return jsonify(
+        {
+            "message": "All database data has been deleted. Your admin account was kept.",
+            **summary,
+        }
+    ), 200
