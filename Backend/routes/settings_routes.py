@@ -40,3 +40,8 @@ settings_bp.add_url_rule(
     view_func=settings_controller.delete_account,
     methods=["DELETE"],
 )
+settings_bp.add_url_rule(
+    "/database",
+    view_func=settings_controller.wipe_database,
+    methods=["DELETE"],
+)
