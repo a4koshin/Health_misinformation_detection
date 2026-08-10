@@ -23,6 +23,8 @@ export function ForgotPasswordForm() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [resetUrl, setResetUrl] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,9 +38,17 @@ export function ForgotPasswordForm() {
 
     setIsSubmitting(true);
     try {
-      await forgotPasswordRequest(email.trim());
+      const result = await forgotPasswordRequest(email.trim());
+      setResetUrl(result.reset_url || null);
+      setEmailSent(Boolean(result.email_sent));
       setIsSubmitted(true);
-      toast.success("Check your email for reset instructions.");
+      toast.success(
+        result.email_sent
+          ? "Check your email for reset instructions."
+          : result.reset_url
+            ? "Reset link is ready."
+            : "If that account exists, follow the next step.",
+      );
     } catch (err) {
       const message =
         err instanceof ApiError
@@ -54,19 +64,29 @@ export function ForgotPasswordForm() {
   if (isSubmitted) {
     return (
       <AuthLayout
-        title="Check your email"
-        description="If an account exists for that address, we sent password reset instructions to your inbox."
+        title={emailSent ? "Check your email" : "Reset your password"}
+        description={
+          emailSent
+            ? "If an account exists for that address, we sent a reset link to your inbox. You can also use the button below."
+            : "Inbox email is not configured yet. If this account exists, use the reset link below."
+        }
         backHref="/login"
         footer={
           <AuthFooterLink text="Remember your password?" linkText="Sign in" href="/login" />
         }
       >
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Did not receive anything? Try again with the same email or contact
-            support.
-          </p>
-          <Button asChild className="h-11 w-full">
+          {resetUrl ? (
+            <Button asChild className="h-11 w-full">
+              <Link href={resetUrl}>Reset password</Link>
+            </Button>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No reset link was created. Use a registered email, or ask an
+              admin to update your password.
+            </p>
+          )}
+          <Button asChild variant="outline" className="h-11 w-full">
             <Link href="/login">Back to sign in</Link>
           </Button>
         </div>
