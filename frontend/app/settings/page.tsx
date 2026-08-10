@@ -16,6 +16,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
+import { displayRoleLabel, roleBadgeTone } from "@/lib/roles";
 import {
   changePassword,
   deleteAccount,
@@ -24,6 +25,7 @@ import {
   resolveAvatarUrl,
   updateProfile,
   uploadAvatar,
+  wipeDatabase,
 } from "@/lib/settings";
 import { getDisplayName, getInitials } from "@/lib/user";
 import { cn } from "@/lib/utils";
@@ -118,6 +120,12 @@ function SettingsContent() {
   const [accountConfirmOpen, setAccountConfirmOpen] = useState(false);
   const [accountPassword, setAccountPassword] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const [wipeConfirmOpen, setWipeConfirmOpen] = useState(false);
+  const [wipePassword, setWipePassword] = useState("");
+  const [isWipingDatabase, setIsWipingDatabase] = useState(false);
+
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     let active = true;
@@ -312,6 +320,36 @@ function SettingsContent() {
     }
   }
 
+  async function handleWipeDatabase() {
+    if (!token) return;
+    if (!wipePassword.trim()) {
+      toast.error("Enter your password to confirm.");
+      return;
+    }
+
+    setIsWipingDatabase(true);
+    try {
+      const result = await wipeDatabase(token, {
+        password: wipePassword,
+      });
+      setWipeConfirmOpen(false);
+      setWipePassword("");
+      startNewChat();
+      useChatStore.setState((state) => ({
+        historyRevision: state.historyRevision + 1,
+      }));
+      toast.success(result.message || "Database wiped.");
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : "Unable to wipe the database.";
+      toast.error(message);
+    } finally {
+      setIsWipingDatabase(false);
+    }
+  }
+
   const initials = user
     ? getInitials(user)
     : (name || email || "U").slice(0, 2).toUpperCase();
@@ -357,10 +395,8 @@ function SettingsContent() {
                     {displayName}
                   </p>
                   {user ? (
-                    <GlassBadge
-                      tone={user.role === "admin" ? "brand" : "neutral"}
-                    >
-                      {user.role}
+                    <GlassBadge tone={roleBadgeTone(user.role)}>
+                      {displayRoleLabel(user.role)}
                     </GlassBadge>
                   ) : null}
                 </div>
@@ -545,10 +581,8 @@ function SettingsContent() {
               <div className="divide-y divide-gray-100">
                 <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
                   <p className="text-sm text-[#64748b]">Role</p>
-                  <GlassBadge
-                    tone={user.role === "admin" ? "brand" : "neutral"}
-                  >
-                    {user.role}
+                  <GlassBadge tone={roleBadgeTone(user.role)}>
+                    {displayRoleLabel(user.role)}
                   </GlassBadge>
                 </div>
                 <div className="flex items-center justify-between gap-4 py-3">
@@ -581,6 +615,19 @@ function SettingsContent() {
             destructive
             onClick={() => setHistoryConfirmOpen(true)}
           />
+
+          {isAdmin ? (
+            <ActionRow
+              title="Delete all database data"
+              description="Permanently erase every prediction, audit log, and non-admin account. Your admin account stays."
+              buttonLabel="Wipe database"
+              destructive
+              onClick={() => {
+                setWipePassword("");
+                setWipeConfirmOpen(true);
+              }}
+            />
+          ) : null}
 
           <ActionRow
             title="Delete my account"
@@ -664,6 +711,71 @@ function SettingsContent() {
                 className="h-10 min-w-[8.5rem] cursor-pointer rounded-lg bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {isDeletingAccount ? "Deleting…" : "Yes, I'm sure"}
+              </button>
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+
+      <DialogPrimitive.Root
+        open={wipeConfirmOpen}
+        onOpenChange={(open) => {
+          if (isWipingDatabase) return;
+          setWipeConfirmOpen(open);
+          if (!open) setWipePassword("");
+        }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[#0f172a]/40 backdrop-blur-[2px]" />
+          <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-xl">
+            <DialogPrimitive.Close
+              disabled={isWipingDatabase}
+              className="absolute top-3 right-3 flex size-8 cursor-pointer items-center justify-center rounded-lg text-[#94a3b8] hover:bg-gray-100"
+              aria-label="Close dialog"
+            >
+              <MaterialIcon name="close" size={20} />
+            </DialogPrimitive.Close>
+
+            <div className="flex flex-col items-center pt-4 text-center">
+              <span className="mb-5 flex size-14 items-center justify-center rounded-full bg-red-50 text-red-600">
+                <MaterialIcon name="database" size={30} />
+              </span>
+              <DialogPrimitive.Title className="text-lg font-semibold text-[#111827]">
+                Wipe all database data?
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Description className="mt-2 text-sm text-[#6b7280]">
+                This deletes every prediction, audit log, and non-admin account.
+                Your admin account stays. Re-enter your password to confirm.
+              </DialogPrimitive.Description>
+            </div>
+
+            <div className="mt-5 space-y-2 text-left">
+              <GlassLabel htmlFor="wipe-database-password">Password</GlassLabel>
+              <PasswordInput
+                id="wipe-database-password"
+                value={wipePassword}
+                onChange={(event) => setWipePassword(event.target.value)}
+                required
+                className="h-11 rounded-xl border-gray-200 bg-white"
+              />
+            </div>
+
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                disabled={isWipingDatabase}
+                onClick={() => setWipeConfirmOpen(false)}
+                className="h-10 min-w-[8.5rem] cursor-pointer rounded-lg border border-gray-200 bg-white px-5 text-sm font-medium text-[#374151] hover:bg-gray-50 disabled:opacity-50"
+              >
+                No, cancel
+              </button>
+              <button
+                type="button"
+                disabled={isWipingDatabase || !wipePassword.trim()}
+                onClick={() => void handleWipeDatabase()}
+                className="h-10 min-w-[8.5rem] cursor-pointer rounded-lg bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isWipingDatabase ? "Wiping…" : "Yes, wipe everything"}
               </button>
             </div>
           </DialogPrimitive.Content>
