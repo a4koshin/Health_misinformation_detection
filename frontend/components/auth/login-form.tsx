@@ -16,6 +16,7 @@ import { FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
+import { getPrivateHomePath } from "@/lib/auth-routing";
 import { useAuth, useAuthStore } from "@/store/auth-store";
 
 const inputClassName =
@@ -45,8 +46,7 @@ export function LoginForm() {
     try {
       await login(email.trim(), password);
       toast.success("Welcome back!");
-      const role = useAuthStore.getState().user?.role;
-      router.replace(role === "admin" ? "/dashboard" : "/prediction");
+      router.replace(getPrivateHomePath(useAuthStore.getState().user));
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : "Unable to sign in.";
