@@ -5,9 +5,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from extensions import db
 
 # Allowed role strings: "user", "admin", "healthcare_advisor".
-# Designating a healthcare_advisor is a manual DB update for now:
-#   UPDATE users SET role = 'healthcare_advisor' WHERE email = '...';
-# TODO: expose this as an admin-only endpoint, not self-service.
+# Assign roles via the admin Users page (POST/PATCH /api/admin/users).
+# Not self-service — registration always creates role="user".
 
 
 class User(db.Model):
@@ -58,6 +57,6 @@ class User(db.Model):
             "email": self.email,
             "avatar_url": self.avatar_url,
             "language_preference": self.language_preference or "so",
-            "role": "user",
+            "role": self.role or "user",
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
