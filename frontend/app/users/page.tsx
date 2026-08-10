@@ -40,6 +40,11 @@ import {
   updateUser,
 } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
+import {
+  ASSIGNABLE_ROLES,
+  displayRoleLabel,
+  roleBadgeTone,
+} from "@/lib/roles";
 import { useAuth } from "@/store/auth-store";
 import type { User, UserRole } from "@/types/api";
 
@@ -251,8 +256,11 @@ function UsersContent() {
                   }))
                 }
               >
-                <option value="user">user</option>
-                <option value="admin">admin</option>
+                {ASSIGNABLE_ROLES.map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
               </GlassSelect>
             </div>
           </div>
@@ -336,11 +344,8 @@ function UsersContent() {
                 </GlassTableCell>
                 <GlassTableCell>{user.email}</GlassTableCell>
                 <GlassTableCell>
-                  <GlassBadge
-                    tone={user.role === "admin" ? "brand" : "neutral"}
-                    className="capitalize"
-                  >
-                    {user.role}
+                  <GlassBadge tone={roleBadgeTone(user.role)}>
+                    {displayRoleLabel(user.role)}
                   </GlassBadge>
                 </GlassTableCell>
                 <GlassTableCell className="text-right">
