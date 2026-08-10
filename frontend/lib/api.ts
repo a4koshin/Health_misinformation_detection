@@ -170,8 +170,12 @@ export async function updateCurrentUser(
 
 export async function forgotPasswordRequest(
   email: string,
-): Promise<{ message: string }> {
-  return apiFetch<{ message: string }>("/api/auth/forgot-password", {
+): Promise<{ message: string; reset_url?: string | null; email_sent?: boolean }> {
+  return apiFetch<{
+    message: string;
+    reset_url?: string | null;
+    email_sent?: boolean;
+  }>("/api/auth/forgot-password", {
     method: "POST",
     body: JSON.stringify({ email }),
   });
