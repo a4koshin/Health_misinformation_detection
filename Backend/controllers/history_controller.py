@@ -84,12 +84,17 @@ def _run_and_save(user, text: str, *, source: str = "Manual check"):
 
 @jwt_required()
 def get_history():
-    user_id = int(get_jwt_identity())
+    user = auth_service.get_user_by_id(get_jwt_identity())
+    if not user:
+        return jsonify({"error": True, "message": "User not found."}), 404
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 50, type=int)
 
     result = db_service.get_user_predictions(
-        user_id, page=page, per_page=per_page
+        user.id,
+        page=page,
+        per_page=per_page,
+        include_reviewed=user.is_healthcare_advisor,
     )
     return jsonify(result["items"]), 200
 
@@ -231,6 +236,7 @@ def edit_message(prediction_id: int, message_id: str):
             prediction.review_status = "pending"
             prediction.advisor_id = None
             prediction.advisor_note = None
+            prediction.corrected_claim_text = None
             prediction.reviewed_at = None
     else:
         prediction.needs_review = False
@@ -238,6 +244,7 @@ def edit_message(prediction_id: int, message_id: str):
             prediction.review_status = None
             prediction.advisor_id = None
             prediction.advisor_note = None
+            prediction.corrected_claim_text = None
             prediction.reviewed_at = None
 
     audit_service.log_action(
