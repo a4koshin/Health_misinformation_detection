@@ -102,3 +102,17 @@ export async function deleteAccount(
     token,
   );
 }
+
+export async function wipeDatabase(
+  token: string,
+  payload: DeleteAccountRequest,
+): Promise<SettingsMessageResponse> {
+  return apiFetch<SettingsMessageResponse>(
+    "/api/settings/database",
+    {
+      method: "DELETE",
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
+}
