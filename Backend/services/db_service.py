@@ -1,3 +1,5 @@
+from sqlalchemy import or_
+
 from models.prediction import Prediction
 from extensions import db
 
@@ -43,18 +45,31 @@ def save_prediction(
     return prediction
 
 
-def get_user_predictions(user_id: int, page: int = 1, per_page: int = 20) -> dict:
+def get_user_predictions(
+    user_id: int,
+    page: int = 1,
+    per_page: int = 20,
+    *,
+    include_reviewed: bool = False,
+) -> dict:
     page = max(page, 1)
     per_page = min(max(per_page, 1), 100)
 
-    pagination = (
-        Prediction.query.filter_by(user_id=user_id)
-        .order_by(Prediction.created_at.desc())
-        .paginate(page=page, per_page=per_page, error_out=False)
+    query = Prediction.query.filter_by(user_id=user_id)
+    if include_reviewed:
+        query = Prediction.query.filter(
+            or_(
+                Prediction.user_id == user_id,
+                Prediction.advisor_id == user_id,
+            )
+        )
+
+    pagination = query.order_by(Prediction.created_at.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
     )
 
     return {
-        "items": [item.to_dict() for item in pagination.items],
+        "items": Prediction.serialize_many(pagination.items),
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total,
@@ -149,6 +164,11 @@ def _build_report_payload(rows: list[Prediction], scope_user_id: int | None) -> 
                 "user_email": user.email if user else "",
                 "claim": row.claim_text,
                 "label": label,
+                "source": (
+                    "UploadedFile"
+                    if (row.source or "") == "UploadedFile" or row.upload_batch_id
+                    else "Manual check"
+                ),
                 "created_at": row.created_at.isoformat() if row.created_at else None,
             }
         )
@@ -176,7 +196,7 @@ def build_report_csv(report: dict) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
-        ["user_name", "user_email", "claim", "label", "created_at"]
+        ["user_name", "user_email", "claim", "label", "source", "created_at"]
     )
     for row in report.get("rows", []):
         writer.writerow(
@@ -185,6 +205,7 @@ def build_report_csv(report: dict) -> str:
                 row.get("user_email", ""),
                 row.get("claim", ""),
                 row.get("label", ""),
+                row.get("source") or "Manual check",
                 row.get("created_at") or "",
             ]
         )
