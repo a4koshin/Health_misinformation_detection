@@ -1,7 +1,7 @@
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from services import audit_service, auth_service
+from services import audit_service, auth_service, password_reset_service
 from utils.jwt_utils import create_token
 
 
@@ -130,6 +130,46 @@ def update_me():
         ip_address=_client_ip(),
     )
     return jsonify(user.to_dict()), 200
+
+
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email") or request.form.get("email")
+    try:
+        result = password_reset_service.request_password_reset(email)
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
+
+    audit_service.log_action_later(
+        actor_id=None,
+        actor_email=(email or "").strip().lower() or None,
+        action="user.forgot_password",
+        entity_type="user",
+        details="Requested a password reset link",
+        ip_address=_client_ip(),
+    )
+    return jsonify(result), 200
+
+
+def reset_password():
+    data = request.get_json(silent=True) or {}
+    token = data.get("token") or request.form.get("token")
+    password = data.get("password") or request.form.get("password")
+    try:
+        user = password_reset_service.reset_password(token, password)
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
+
+    audit_service.log_action_later(
+        actor_id=user.id,
+        actor_email=user.email,
+        action="user.reset_password",
+        entity_type="user",
+        entity_id=user.id,
+        details="Reset password with email link",
+        ip_address=_client_ip(),
+    )
+    return jsonify({"message": "Password reset successfully."}), 200
 
 
 @jwt_required()
