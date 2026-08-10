@@ -26,6 +26,7 @@ import { MaterialIcon } from "@/components/ui/material-icon";
 import { predictDataset } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
+import { useChatStore } from "@/store/chat-store";
 import type { DatasetPredictionResponse } from "@/types/api";
 
 const ACCEPTED_EXTENSIONS =
@@ -80,6 +81,9 @@ function DatasetContent() {
     try {
       const data = await predictDataset(token, file);
       setResult(data);
+      useChatStore.setState((state) => ({
+        historyRevision: state.historyRevision + 1,
+      }));
       toast.success(
         `Done — ${data.reliable_count} Reliable, ${data.misinformation_count} Misinformation.`,
       );
