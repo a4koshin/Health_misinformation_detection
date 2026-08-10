@@ -196,6 +196,7 @@ def predict_dataset_file(raw: bytes, filename: str) -> dict[str, Any]:
                 "row": index,
                 "text": text,
                 "prediction": label,
+                "confidence": prediction.get("confidence"),
                 "error": None,
             }
         )
@@ -208,3 +209,34 @@ def predict_dataset_file(raw: bytes, filename: str) -> dict[str, Any]:
         "error_count": error_count,
         "results": results,
     }
+
+
+def persist_dataset_predictions(user_id: int, results: list[dict[str, Any]]) -> int:
+    """Save each successful dataset row to history/report as UploadedFile."""
+    from extensions import db
+    from services import db_service
+
+    saved = 0
+    for row in results:
+        text = (row.get("text") or "").strip()
+        label = row.get("prediction")
+        if not text or not label or row.get("error"):
+            continue
+        confidence = row.get("confidence")
+        try:
+            confidence = float(confidence) if confidence is not None else None
+        except (TypeError, ValueError):
+            confidence = None
+        db_service.save_prediction(
+            user_id=user_id,
+            claim_text=text,
+            is_medical=True,
+            label=label,
+            label_confidence=confidence,
+            source="UploadedFile",
+            commit=False,
+        )
+        saved += 1
+    if saved:
+        db.session.commit()
+    return saved
