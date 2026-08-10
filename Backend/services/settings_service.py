@@ -4,6 +4,7 @@ from pathlib import Path
 
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
+from sqlalchemy import func
 
 from extensions import db
 from models.prediction import Prediction
@@ -143,3 +144,66 @@ def delete_account(user_id) -> None:
     purge_user_dependencies(user.id)
     db.session.delete(user)
     db.session.commit()
+
+
+def wipe_all_data(admin_id, password: str) -> dict:
+    """Admin-only: delete all app data. Keeps the calling admin account."""
+    from sqlalchemy import text
+
+    from models.audit_log import AuditLog
+    from models.password_reset import PasswordReset
+
+    admin = get_user(admin_id)
+    if not admin:
+        raise LookupError("User not found.")
+    if (admin.role or "").strip().lower() != "admin":
+        raise PermissionError("Admin access required.")
+    if not password:
+        raise ValueError("Password is required to wipe the database.")
+    if not admin.check_password(password):
+        raise ValueError("Password is incorrect.")
+
+    predictions_deleted = int(
+        Prediction.query.delete(synchronize_session=False) or 0
+    )
+    password_resets_deleted = int(
+        PasswordReset.query.delete(synchronize_session=False) or 0
+    )
+    audit_logs_deleted = int(
+        AuditLog.query.delete(synchronize_session=False) or 0
+    )
+
+    upload_batches_deleted = 0
+    try:
+        with db.session.begin_nested():
+            result = db.session.execute(text("DELETE FROM upload_batches"))
+            upload_batches_deleted = int(result.rowcount or 0)
+    except Exception:
+        upload_batches_deleted = 0
+
+    other_users = User.query.filter(
+        User.id != admin.id,
+        func.lower(User.role) != "admin",
+    ).all()
+    users_deleted = 0
+    for user in other_users:
+        if user.avatar_url and user.avatar_url.startswith("/static/uploads/avatars/"):
+            avatar_path = (
+                Path(__file__).resolve().parent.parent / user.avatar_url.lstrip("/")
+            )
+            if avatar_path.exists() and avatar_path.is_file():
+                try:
+                    avatar_path.unlink()
+                except OSError:
+                    pass
+        db.session.delete(user)
+        users_deleted += 1
+
+    db.session.commit()
+    return {
+        "predictions_deleted": predictions_deleted,
+        "users_deleted": users_deleted,
+        "audit_logs_deleted": audit_logs_deleted,
+        "password_resets_deleted": password_resets_deleted,
+        "upload_batches_deleted": upload_batches_deleted,
+    }
