@@ -7,6 +7,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   Pie,
   PieChart,
@@ -52,6 +53,42 @@ const COLORS = {
   text: "#0f172a",
   muted: "#475569",
 } as const;
+
+const RADIAN = Math.PI / 180;
+
+function donutPercentLabel({
+  cx,
+  cy,
+  midAngle,
+  innerRadius,
+  outerRadius,
+  percent,
+}: {
+  cx: number;
+  cy: number;
+  midAngle: number;
+  innerRadius: number;
+  outerRadius: number;
+  percent: number;
+}) {
+  if (percent < 0.04) return null;
+  const radius = innerRadius + (outerRadius - innerRadius) / 2;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#ffffff"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={12}
+      fontWeight={600}
+    >
+      {`${Math.round(percent * 100)}%`}
+    </text>
+  );
+}
 
 const statCards = [
   {
@@ -207,7 +244,7 @@ function UserDashboardContent() {
 
   const pieData = useMemo(() => {
     if (!stats) return [];
-    return [
+    const items = [
       {
         name: "Reliable",
         value: stats.reliable_count,
@@ -219,6 +256,11 @@ function UserDashboardContent() {
         color: COLORS.nonReliable,
       },
     ].filter((item) => item.value > 0);
+    const total = items.reduce((sum, item) => sum + item.value, 0);
+    return items.map((item) => ({
+      ...item,
+      percentLabel: total ? `${Math.round((item.value / total) * 100)}%` : "0%",
+    }));
   }, [stats]);
 
   const barData = useMemo(() => {
@@ -319,20 +361,30 @@ function UserDashboardContent() {
                         innerRadius={58}
                         outerRadius={88}
                         paddingAngle={3}
+                        label={donutPercentLabel}
+                        labelLine={false}
                       >
                         {pieData.map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value) => [`${value}`, "Count"]}
+                        formatter={(_value, name, item) => [
+                          item?.payload?.percentLabel ??
+                            `${Math.round(Number(item?.percent ?? 0) * 100)}%`,
+                          name,
+                        ]}
                         contentStyle={{
                           borderRadius: 12,
                           border: "1px solid #e2e8f0",
                           boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
                         }}
                       />
-                      <Legend />
+                      <Legend
+                        formatter={(value, entry) =>
+                          `${value} (${entry.payload?.percentLabel ?? ""})`
+                        }
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -351,7 +403,7 @@ function UserDashboardContent() {
 
               <div className="h-56 w-full sm:h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData} barSize={28}>
+                  <BarChart data={barData} barSize={28} margin={{ top: 18 }}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       stroke={COLORS.grid}
@@ -371,6 +423,7 @@ function UserDashboardContent() {
                     />
                     <Tooltip
                       cursor={{ fill: "rgba(255,92,0,0.06)" }}
+                      formatter={(value) => [Number(value), "Count"]}
                       contentStyle={{
                         borderRadius: 12,
                         border: "1px solid #e2e8f0",
@@ -381,6 +434,12 @@ function UserDashboardContent() {
                       {barData.map((entry) => (
                         <Cell key={entry.name} fill={entry.fill} />
                       ))}
+                      <LabelList
+                        dataKey="count"
+                        position="top"
+                        fill="#0f172a"
+                        fontSize={12}
+                      />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -419,7 +478,6 @@ function UserDashboardContent() {
               <GlassTableRow>
                 <GlassTableHeaderCell>Chat</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Label</GlassTableHeaderCell>
-                <GlassTableHeaderCell>Messages</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Updated</GlassTableHeaderCell>
                 <GlassTableHeaderCell className="text-right">
                   Action
@@ -429,7 +487,7 @@ function UserDashboardContent() {
             <GlassTableBody>
               {chats.length === 0 ? (
                 <GlassTableRow>
-                  <GlassTableCell colSpan={5}>
+                  <GlassTableCell colSpan={4}>
                     <div className="flex flex-col items-center gap-3 py-10 text-center">
                       <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                         <MaterialIcon name="forum" size={24} />
@@ -455,9 +513,6 @@ function UserDashboardContent() {
                       <GlassBadge tone={labelTone(chat.label)}>
                         {displayLabel(chat.label)}
                       </GlassBadge>
-                    </GlassTableCell>
-                    <GlassTableCell>
-                      {chat.message_count ?? "—"}
                     </GlassTableCell>
                     <GlassTableCell className="text-[#475569]">
                       {formatRelativeTime(chat.created_at)}
