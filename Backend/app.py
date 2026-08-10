@@ -32,7 +32,7 @@ def create_app() -> Flask:
     app.register_blueprint(review_bp)
 
     # Import models so SQLAlchemy knows the tables.
-    from models import AuditLog, Prediction, User  # noqa: F401
+    from models import AuditLog, PasswordReset, Prediction, User  # noqa: F401
 
     with app.app_context():
         db.create_all()
@@ -75,6 +75,23 @@ def create_app() -> Flask:
                 text(
                     "ALTER TABLE predictions "
                     "ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS corrected_claim_text TEXT"
+                )
+            )
+            db.session.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS password_resets ("
+                    "id SERIAL PRIMARY KEY, "
+                    "user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "token VARCHAR(255) NOT NULL UNIQUE, "
+                    "expires_at TIMESTAMP NOT NULL, "
+                    "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
+                    ")"
                 )
             )
             db.session.commit()
