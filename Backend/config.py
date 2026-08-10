@@ -42,3 +42,13 @@ class Config:
     ADMIN_USER = (os.getenv("ADMIN_USER") or os.getenv("ADMIN_EMAIL") or "").strip()
     ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or os.getenv("PASSWORD") or "").strip()
     ADMIN_NAME = (os.getenv("ADMIN_NAME") or "Admin").strip() or "Admin"
+    MAIL_SERVER = (os.getenv("MAIL_SERVER") or "").strip()
+    MAIL_PORT = int(os.getenv("MAIL_PORT") or "587")
+    MAIL_USE_TLS = (os.getenv("MAIL_USE_TLS") or "true").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    MAIL_USERNAME = (os.getenv("MAIL_USERNAME") or "").strip()
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD") or ""
+    MAIL_FROM = (os.getenv("MAIL_FROM") or "").strip()
