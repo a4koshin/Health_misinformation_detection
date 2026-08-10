@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { getPrivateHomePath } from "@/lib/auth-routing";
 import { useAuth } from "@/store/auth-store";
 import type { UserRole } from "@/types/api";
 
@@ -23,7 +24,7 @@ export function ProtectedRoute({
     if (!user) {
       redirectTarget = "/login";
     } else if (!isAllowed) {
-      redirectTarget = user.role === "admin" ? "/dashboard" : "/prediction";
+      redirectTarget = getPrivateHomePath(user);
     }
   }
 
