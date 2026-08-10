@@ -19,7 +19,7 @@ def get_pending_reviews(page: int = 1, per_page: int = 20) -> dict:
     )
 
     return {
-        "items": [item.to_review_dict() for item in pagination.items],
+        "items": Prediction.serialize_many(pagination.items, review=True),
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total,
@@ -32,6 +32,7 @@ def submit_review(
     advisor_id: int,
     decision: str,
     note: str | None = None,
+    corrected_claim: str | None = None,
 ) -> Prediction:
     try:
         pred_id = int(prediction_id)
@@ -53,10 +54,21 @@ def submit_review(
     prediction.advisor_id = advisor_id
     prediction.advisor_note = (note or "").strip() or None
     prediction.reviewed_at = datetime.now(timezone.utc)
+    prediction.needs_review = False
 
     if choice == "corrected":
+        rewritten = (corrected_claim or note or "").strip()
+        if not rewritten:
+            raise ValueError("A corrected sentence is required.")
+        if rewritten == (prediction.claim_text or "").strip():
+            raise ValueError("Corrected sentence must differ from the original claim.")
         prediction.label = "Reliable"
         prediction.risk = "low"
+        prediction.corrected_claim_text = rewritten
+        if not prediction.advisor_note:
+            prediction.advisor_note = rewritten
+    else:
+        prediction.corrected_claim_text = None
 
     db.session.commit()
     return prediction
