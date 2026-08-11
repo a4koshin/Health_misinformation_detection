@@ -34,7 +34,9 @@ def list_pending():
 
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
-    payload = review_service.get_pending_reviews(page=page, per_page=per_page)
+    payload = review_service.get_pending_reviews(
+        advisor=user, page=page, per_page=per_page
+    )
     return jsonify(payload), 200
 
 
