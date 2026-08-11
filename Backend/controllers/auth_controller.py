@@ -69,6 +69,10 @@ def login():
 
     try:
         user = auth_service.authenticate_user(email, password)
+    except PermissionError as exc:
+        return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 403
+    except PermissionError as exc:
+        return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 403
     except ValueError as exc:
         audit_service.log_action_later(
             actor_id=None,
