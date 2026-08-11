@@ -183,7 +183,7 @@ function CorrectionsContent() {
             <GlassTableHeaderCell>Previous claim</GlassTableHeaderCell>
             <GlassTableHeaderCell>Corrected sentence</GlassTableHeaderCell>
             <GlassTableHeaderCell>Corrected by</GlassTableHeaderCell>
-            <GlassTableHeaderCell>Date</GlassTableHeaderCell>
+            <GlassTableHeaderCell>Date and Time</GlassTableHeaderCell>
           </GlassTableRow>
         </GlassTableHead>
         <GlassTableBody>
