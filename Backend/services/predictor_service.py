@@ -6,19 +6,31 @@ from pathlib import Path
 from typing import Any
 
 ML_DIR = Path(__file__).resolve().parents[1] / "ml_models"
-# Prefer the new SomBERTb export; fall back to older folder names if present.
+# Prefer sombertb_task_a; fall back to older folder names if present.
 _MODEL_CANDIDATES = (
+    "sombertb_task_a",
     "sombertb_Model",
     "somBERTb_Model",
     "SomBERTb_Model",
     "best_model_task_a",
 )
+_WEIGHT_NAMES = ("model.safetensors", "pytorch_model.bin", "model.bin")
+
+
+def _has_weights(path: Path) -> bool:
+    return any((path / name).exists() for name in _WEIGHT_NAMES)
 
 
 def _resolve_model_dir() -> Path:
     for name in _MODEL_CANDIDATES:
         path = ML_DIR / name
-        if path.is_dir():
+        if path.is_dir() and _has_weights(path):
+
+
+def _resolve_model_dir() -> Path:
+    for name in _MODEL_CANDIDATES:
+        path = ML_DIR / name
+        if path.is_dir() and _has_weights(path):
             return path
     return ML_DIR / _MODEL_CANDIDATES[0]
 
@@ -51,12 +63,7 @@ def load_models() -> None:
 
     TASK_A_DIR = _resolve_model_dir()
     MODEL_NAME = TASK_A_DIR.name
-
-    if not TASK_A_DIR.exists():
-        raise FileNotFoundError(
-            f"Missing model folder: {TASK_A_DIR.name} in {ML_DIR}"
-        )
-
+    if not _has_weights(TASK_A_DIR):
     weight_files = (
         TASK_A_DIR / "model.safetensors",
         TASK_A_DIR / "pytorch_model.bin",
@@ -144,7 +151,7 @@ def _predict_with_transformer(
     return {
         "label": label,
         "confidence": confidence,
-        "pred_id": pred_id,
+    """Run SomBERTb from ml_models/sombertb_task_a.
         "probs": [float(p) for p in probs.tolist()],
     }
 
