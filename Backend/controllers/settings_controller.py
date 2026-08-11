@@ -163,39 +163,35 @@ def delete_history():
 
 
 @jwt_required()
-def delete_account():
+def request_account_deletion():
     data = request.get_json(silent=True) or {}
     password = data.get("password") or ""
-    user = settings_service.get_user(_current_user_id())
-    if not user:
-        return jsonify({"error": True, "message": "User not found."}), 404
-
-    if not password:
-        return jsonify(
-            {"error": True, "message": "Password is required to delete your account."}
-        ), 400
-
-    if not user.check_password(password):
-        return jsonify({"error": True, "message": "Password is incorrect."}), 400
-
-    email = user.email
-    user_id = user.id
-
     try:
-        settings_service.delete_account(user_id)
+        user = settings_service.request_account_deletion(
+            _current_user_id(), password
+        )
     except LookupError as exc:
         return jsonify({"error": True, "message": str(exc)}), 404
+    except PermissionError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 403
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc)}), 400
 
     audit_service.log_action(
-        actor_id=None,
-        actor_email=email,
-        action="settings.account_delete",
+        actor_id=user.id,
+        actor_email=user.email,
+        action="settings.account_deletion_request",
         entity_type="user",
-        entity_id=user_id,
-        details=f"Deleted account {email}",
+        entity_id=user.id,
+        details=f"Requested account deletion for {user.email}",
         ip_address=_client_ip(),
     )
-    return jsonify({"message": "Your account has been deleted."}), 200
+    return jsonify(
+        {
+            "message": "Deletion request sent. An admin will review and deactivate the account.",
+            **user.to_settings_profile(),
+        }
+    ), 200
 
 
 @jwt_required()
