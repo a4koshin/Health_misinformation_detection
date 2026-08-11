@@ -33,6 +33,12 @@ admin_bp.add_url_rule(
     endpoint="delete_user",
 )
 admin_bp.add_url_rule(
+    "/users/<int:user_id>/approve-deletion",
+    view_func=admin_controller.approve_account_deletion,
+    methods=["POST"],
+    endpoint="approve_account_deletion",
+)
+admin_bp.add_url_rule(
     "/audit-logs",
     view_func=admin_controller.audit_logs,
     methods=["GET"],
