@@ -36,7 +36,7 @@ const FILE_ACCEPT =
 
 const INPUT_MODES = [
   { id: "text" as const, label: "Text" },
-  { id: "link" as const, label: "Link" },
+  { id: "link" as const, label: "Link", disabled: true },
   { id: "file" as const, label: "Dataset" },
 ];
 
@@ -72,8 +72,9 @@ function platformFromUrl(url: string) {
 
 function displayModelName(model?: string | null) {
   if (!model) return null;
-  // Folder checkpoint is sombertb_Model; show product name in UI.
+  // Folder checkpoint is sombertb_task_a; show product name in UI.
   if (
+    model === "sombertb_task_a" ||
     model === "sombertb_Model" ||
     model === "somBERTb_Model" ||
     model === "SomBERTb_Model" ||
@@ -511,7 +512,7 @@ export function PredictionWorkspace() {
 
   return (
     <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="scrollbar-none flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-14 pb-10 sm:px-8 sm:pt-10 lg:px-12">
+      <div className="scrollbar-none flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-5 pb-10 sm:px-8 sm:pt-6 lg:px-12">
         <div className="flex w-full max-w-none flex-col gap-8">
           <header className="space-y-1">
             <h1 className="text-xl font-semibold tracking-tight text-ink">
@@ -546,10 +547,16 @@ export function PredictionWorkspace() {
                   type="button"
                   role="tab"
                   aria-selected={inputMode === mode.id}
-                  disabled={isAnalyzing}
-                  onClick={() => setInputMode(mode.id)}
+                  aria-disabled={mode.disabled}
+                  disabled={isAnalyzing || mode.disabled}
+                  title={mode.disabled ? "Link checks are disabled." : undefined}
+                  onClick={() => {
+                    if (mode.disabled) return;
+                    setInputMode(mode.id);
+                  }}
                   className={cn(
                     "relative -mb-px cursor-pointer pb-2.5 text-sm transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50",
+                    mode.disabled && "opacity-40 hover:text-ink-muted",
                     inputMode === mode.id
                       ? "font-medium text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-brand"
                       : "text-ink-muted hover:text-ink",
@@ -735,7 +742,7 @@ export function PredictionWorkspace() {
                   {result.label === "Non-Reliable" ? (
                     <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">
                       This claim was sent to a Healthcare Advisor for review.
-                      Open History to see when they confirm or correct it.
+                      Open History to see when they correct it.
                     </p>
                   ) : null}
                 </div>
