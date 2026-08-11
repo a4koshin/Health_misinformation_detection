@@ -36,9 +36,9 @@ settings_bp.add_url_rule(
     methods=["DELETE"],
 )
 settings_bp.add_url_rule(
-    "/account",
-    view_func=settings_controller.delete_account,
-    methods=["DELETE"],
+    "/account/deletion-request",
+    view_func=settings_controller.request_account_deletion,
+    methods=["POST"],
 )
 settings_bp.add_url_rule(
     "/database",
