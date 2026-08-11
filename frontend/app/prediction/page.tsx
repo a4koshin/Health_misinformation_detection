@@ -6,7 +6,7 @@ import { PredictionWorkspace } from "@/components/prediction/prediction-workspac
 
 export default function PredictionPage() {
   return (
-    <ProtectedRoute>
+    <ProtectedRoute roles={["user", "admin"]}>
       <AppShell>
         <PredictionWorkspace />
       </AppShell>
