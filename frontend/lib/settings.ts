@@ -89,14 +89,14 @@ export async function deleteHistory(
   );
 }
 
-export async function deleteAccount(
+export async function requestAccountDeletion(
   token: string,
   payload: DeleteAccountRequest,
-): Promise<SettingsMessageResponse> {
-  return apiFetch<SettingsMessageResponse>(
-    "/api/settings/account",
+): Promise<SettingsMessageResponse & UserProfile> {
+  return apiFetch<SettingsMessageResponse & UserProfile>(
+    "/api/settings/account/deletion-request",
     {
-      method: "DELETE",
+      method: "POST",
       body: JSON.stringify(payload),
     },
     token,
