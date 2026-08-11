@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { cn } from "@/lib/utils";
@@ -67,16 +68,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-white shadow-none sm:rounded-3xl sm:border sm:border-gray-200 sm:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.1)]">
-        {!sidebarOpen ? (
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="absolute top-3 left-3 z-20 flex size-10 cursor-pointer items-center justify-center rounded-full bg-white/90 text-ink-muted shadow-sm ring-1 ring-gray-200/80 transition-colors hover:bg-orange-50 hover:text-brand"
-            aria-label="Open sidebar"
-          >
-            <MaterialIcon name="menu" size={22} />
-          </button>
-        ) : null}
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-3 sm:px-5">
+          {!sidebarOpen ? (
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="flex size-10 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
+              aria-label="Open sidebar"
+            >
+              <MaterialIcon name="menu" size={22} />
+            </button>
+          ) : (
+            <span className="size-10" aria-hidden="true" />
+          )}
+          <NotificationBell />
+        </header>
         {children}
       </div>
     </div>
