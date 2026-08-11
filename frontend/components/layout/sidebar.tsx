@@ -144,6 +144,10 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
   }, [token, historyRevision]);
 
   function handleNewChat() {
+    if (isAdvisor) {
+      go("/review");
+      return;
+    }
     startNewChat();
     setSearchOpen(false);
     go("/prediction");
@@ -181,20 +185,22 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
             type="button"
             onClick={handleNewChat}
             className="min-w-0 cursor-pointer"
-            aria-label="SomAI — new chat"
+            aria-label={isAdvisor ? "SomAI — review" : "SomAI — new chat"}
           >
             <LogoMark className="h-11 sm:h-12" />
           </button>
           <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="flex size-9 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
-              aria-label="Search chats"
-              title="Search chats"
-            >
-              <MaterialIcon name="search" size={20} />
-            </button>
+            {isAdvisor ? null : (
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="flex size-9 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
+                aria-label="Search chats"
+                title="Search chats"
+              >
+                <MaterialIcon name="search" size={20} />
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -231,12 +237,14 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                 }
               />
             )}
-            <NavItem
-              icon="psychology"
-              label="Prediction"
-              active={pathname === "/prediction"}
-              onClick={() => go("/prediction")}
-            />
+            {isAdvisor ? null : (
+              <NavItem
+                icon="psychology"
+                label="Prediction"
+                active={pathname === "/prediction"}
+                onClick={() => go("/prediction")}
+              />
+            )}
             <NavItem
               icon="history"
               label="History"
@@ -251,14 +259,14 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                 onClick={() => go("/corrections")}
               />
             ) : null}
-            {isAdvisor ? null : (
+            {isAdmin ? (
               <NavItem
                 icon="download"
                 label="Report"
                 active={pathname === "/report"}
                 onClick={() => go("/report")}
               />
-            )}
+            ) : null}
           </div>
 
           {isAdmin ? (
@@ -276,7 +284,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                 <NavItem
                   icon="policy"
                   label="Audit log"
-                  active={pathname === "/audit-log"}
+                  active={pathname === "/audit-log" || pathname === "/activity"}
                   onClick={() => go("/audit-log")}
                 />
               </div>
@@ -358,15 +366,6 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                   </span>
                 </div>
               </DropdownMenuLabel>
-              <div className="py-1">
-                <DropdownMenuItem
-                  className="cursor-pointer rounded-lg px-3 py-2"
-                  onClick={() => go("/settings")}
-                >
-                  <MaterialIcon name="manage_accounts" size={18} />
-                  Account
-                </DropdownMenuItem>
-              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 variant="destructive"
