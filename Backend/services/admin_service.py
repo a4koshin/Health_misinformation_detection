@@ -8,8 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models.prediction import Prediction
 from models.user import User
-from services import auth_service
 from services.user_cleanup import purge_user_dependencies
+from services.user_validation import validate_email, validate_full_name
+from services import auth_service
 
 
 def require_admin() -> User:
@@ -226,8 +227,9 @@ def create_user(
     full_name: str | None = None,
     role: str | None = "user",
 ) -> User:
-    email = (email or "").strip().lower()
-    if not email or not password:
+    email = validate_email(email)
+    next_name = validate_full_name(full_name, required=True)
+    if not password:
         raise ValueError("Email and password are required.")
     if len(password) < 6:
         raise ValueError("Password must be at least 6 characters.")
@@ -235,10 +237,14 @@ def create_user(
     if User.query.filter_by(email=email).first():
         raise ValueError("Email is already registered.")
 
+    resolved_role = _normalize_role(role)
     user = User(
         email=email,
-        full_name=(full_name or "").strip() or None,
-        role=_normalize_role(role),
+        full_name=next_name or None,
+        role=resolved_role,
+        advisor_since=(
+            datetime.now(timezone.utc) if resolved_role == "healthcare_advisor" else None
+        ),
     )
     user.set_password(password)
     db.session.add(user)
@@ -261,16 +267,14 @@ def update_user(
         raise LookupError("User not found.")
 
     if email is not None:
-        next_email = email.strip().lower()
-        if not next_email:
-            raise ValueError("Email is required.")
+        next_email = validate_email(email)
         clash = User.query.filter(User.email == next_email, User.id != user.id).first()
         if clash:
             raise ValueError("Email is already registered.")
         user.email = next_email
 
     if update_full_name:
-        user.full_name = (full_name or "").strip() or None
+        user.full_name = validate_full_name(full_name, required=True)
 
     if password:
         if len(password) < 6:
@@ -279,13 +283,14 @@ def update_user(
 
     if role is not None:
         next_role = _normalize_role(role)
+        previous_role = (user.role or "").lower()
         if (
             user.id == actor_id
-            and (user.role or "").lower() == "admin"
+            and previous_role == "admin"
             and next_role != "admin"
         ):
             raise ValueError("You cannot remove your own admin role.")
-        if (user.role or "").lower() == "admin" and next_role != "admin":
+        if previous_role == "admin" and next_role != "admin":
             admin_count = (
                 db.session.query(func.count(User.id))
                 .filter(func.lower(User.role) == "admin")
@@ -295,33 +300,49 @@ def update_user(
             if admin_count <= 1:
                 raise ValueError("Cannot demote the last admin.")
         user.role = next_role
+        if next_role == "healthcare_advisor" and previous_role != "healthcare_advisor":
+            user.advisor_since = datetime.now(timezone.utc)
+        elif next_role != "healthcare_advisor":
+            user.advisor_since = None
 
     db.session.commit()
     return user
 
 
-def delete_user(*, user_id: int, actor_id: int) -> None:
+def approve_account_deletion(*, user_id: int, actor_id: int) -> User:
+    user = auth_service.get_user_by_id(user_id)
+    if not user:
+        raise LookupError("User not found.")
+    if user.id == actor_id:
+        raise ValueError("You cannot deactivate your own account.")
+    if (user.role or "").lower() == "admin":
+        raise ValueError("Admin accounts cannot be deactivated this way.")
+    if not user.deletion_requested_at:
+        raise ValueError("This account has not requested deletion.")
+    if not user.is_active:
+        raise ValueError("This account is already deactivated.")
+
+    user.is_active = False
+    db.session.commit()
+    return user
+
+
+def delete_user(*, user_id: int, actor_id: int) -> dict:
     user = auth_service.get_user_by_id(user_id)
     if not user:
         raise LookupError("User not found.")
     if user.id == actor_id:
         raise ValueError("You cannot delete your own account.")
     if (user.role or "").lower() == "admin":
-        admin_count = (
-            db.session.query(func.count(User.id))
-            .filter(func.lower(User.role) == "admin")
-            .scalar()
-            or 0
-        )
-        if admin_count <= 1:
-            raise ValueError("Cannot delete the last admin.")
+        raise ValueError("Admin accounts cannot be deleted.")
 
+    email = user.email
+    role = user.role
     purge_user_dependencies(user.id)
     db.session.delete(user)
     try:
         db.session.commit()
     except IntegrityError as exc:
         db.session.rollback()
-        raise ValueError(
-            "This account is still referenced by other records and cannot be deleted."
-        ) from exc
+        raise ValueError("Unable to delete this user because related records remain.") from exc
+    return {"id": str(user_id), "email": email, "role": role}
