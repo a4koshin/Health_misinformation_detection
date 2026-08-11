@@ -1,6 +1,8 @@
-from sqlalchemy import or_
+from sqlalchemy import func, or_
+from sqlalchemy.orm import aliased
 
 from models.prediction import Prediction
+from models.user import User
 from extensions import db
 
 
@@ -116,22 +118,54 @@ def get_user_report_stats(user_id: int) -> dict:
     return _build_report_payload(rows, scope_user_id=user_id)
 
 
-def get_platform_report(user_id: int | None = None, *, is_admin: bool = False) -> dict:
+def get_platform_report(
+    user_id: int | None = None,
+    *,
+    is_admin: bool = False,
+    role: str | None = None,
+    doctor_id: str | int | None = None,
+) -> dict:
     """Admin sees all users; regular users see only their own predictions."""
     query = Prediction.query
     if not is_admin:
         query = query.filter_by(user_id=user_id)
+
+    resolved_role = (role or "").strip().lower()
+    if resolved_role == "healthcare_advisor":
+        advisor_user = aliased(User)
+        query = query.join(
+            advisor_user, Prediction.advisor_id == advisor_user.id
+        ).filter(func.lower(advisor_user.role) == "healthcare_advisor")
+    elif resolved_role in {"user", "admin"}:
+        query = query.join(User, User.id == Prediction.user_id).filter(
+            func.lower(User.role) == resolved_role
+        )
+
+    try:
+        advisor_pk = int(doctor_id) if doctor_id not in (None, "", "all") else None
+    except (TypeError, ValueError):
+        advisor_pk = None
+    if advisor_pk is not None:
+        query = query.filter(Prediction.advisor_id == advisor_pk)
 
     rows = [
         row
         for row in query.order_by(Prediction.created_at.desc()).all()
         if (row.source or "") != "non_medical" and row.label
     ]
-    return _build_report_payload(rows, scope_user_id=None if is_admin else user_id)
+    return _build_report_payload(
+        rows,
+        scope_user_id=None if is_admin else user_id,
+        role=resolved_role,
+    )
 
 
-def _build_report_payload(rows: list[Prediction], scope_user_id: int | None) -> dict:
-    from models.user import User
+def _build_report_payload(
+    rows: list[Prediction],
+    scope_user_id: int | None,
+    *,
+    role: str | None = None,
+) -> dict:
 
     total_claims = len(rows)
     reliable_rows = [row for row in rows if row.label == "Reliable"]
@@ -142,28 +176,76 @@ def _build_report_payload(rows: list[Prediction], scope_user_id: int | None) -> 
     non_reliable_count = len(non_reliable_rows)
 
     user_ids = {row.user_id for row in rows}
+    advisor_ids = {row.advisor_id for row in rows if row.advisor_id}
     users_with_predictions = len(user_ids)
 
+    related_ids = user_ids | advisor_ids
     users_by_id = {
         user.id: user
-        for user in User.query.filter(User.id.in_(user_ids)).all()
-    } if user_ids else {}
+        for user in User.query.filter(User.id.in_(related_ids)).all()
+    } if related_ids else {}
+
+    doctors = (
+        User.query.filter(
+            func.lower(User.role) == "healthcare_advisor",
+            User.is_active.is_(True),
+        )
+        .order_by(User.full_name.asc(), User.email.asc())
+        .all()
+    )
+    doctor_corrections: dict[int, int] = {}
+    for row in rows:
+        if (row.review_status or "") == "corrected" and row.advisor_id:
+            doctor_corrections[row.advisor_id] = doctor_corrections.get(row.advisor_id, 0) + 1
 
     report_rows = []
     for row in rows:
         user = users_by_id.get(row.user_id)
+        advisor = users_by_id.get(row.advisor_id) if row.advisor_id else None
         label = row.label
         if label == "Misinformation":
             label = "Non-Reliable"
+        advisor_name = (
+            (
+                (advisor.full_name or "").strip()
+                or advisor.email.split("@")[0]
+            )
+            if advisor
+            else None
+        )
+        advisor_email = advisor.email if advisor else None
+        submitter_name = (user.full_name if user and user.full_name else None) or (
+            user.email.split("@")[0] if user else "Unknown"
+        )
+        submitter_role = (user.role if user else "user") or "user"
+        advisor_view = (role or "").strip().lower() == "healthcare_advisor"
         report_rows.append(
             {
                 "id": str(row.id),
-                "user_id": str(row.user_id),
-                "user_name": (user.full_name if user and user.full_name else None)
-                or (user.email.split("@")[0] if user else "Unknown"),
-                "user_email": user.email if user else "",
+                "user_id": (
+                    str(row.advisor_id)
+                    if advisor_view and row.advisor_id
+                    else str(row.user_id)
+                ),
+                "user_name": (
+                    advisor_name or "Healthcare Advisor"
+                    if advisor_view
+                    else submitter_name
+                ),
+                "user_email": (
+                    advisor_email or ""
+                    if advisor_view
+                    else (user.email if user else "")
+                ),
+                "user_role": (
+                    "healthcare_advisor" if advisor_view else submitter_role
+                ),
                 "claim": row.claim_text,
                 "label": label,
+                "review_status": row.review_status,
+                "advisor_id": str(row.advisor_id) if row.advisor_id else None,
+                "advisor_name": advisor_name,
+                "advisor_email": advisor_email,
                 "source": (
                     "UploadedFile"
                     if (row.source or "") == "UploadedFile" or row.upload_batch_id
@@ -185,6 +267,62 @@ def _build_report_payload(rows: list[Prediction], scope_user_id: int | None) -> 
         "non_reliable_percent": round((non_reliable_count / total_claims) * 100, 1)
         if total_claims
         else 0.0,
+        "doctors_who_can_review": len(doctors),
+        "doctors": [
+            {
+                "id": str(doctor.id),
+                "name": (doctor.full_name or "").strip() or doctor.email.split("@")[0],
+                "email": doctor.email,
+                "corrections": doctor_corrections.get(doctor.id, 0),
+            }
+            for doctor in doctors
+        ],
+                "advisor_name": (
+                    (advisor.full_name or "").strip()
+                    or (advisor.email.split("@")[0] if advisor else None)
+                ),
+                "source": (
+                    "UploadedFile"
+                    if (row.source or "") == "UploadedFile" or row.upload_batch_id
+                    else "Manual check"
+                ),
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+            }
+        [
+            "user_name",
+            "user_email",
+            "user_role",
+            "claim",
+            "label",
+            "source",
+            "reviewed_by",
+            "created_at",
+        ]
+    )
+    for row in report.get("rows", []):
+        writer.writerow(
+            [
+                row.get("user_name", ""),
+                row.get("user_email", ""),
+                row.get("user_role", ""),
+                row.get("claim", ""),
+                row.get("label", ""),
+                row.get("source") or "Manual check",
+                row.get("advisor_name") or "",
+        else 0.0,
+        "non_reliable_percent": round((non_reliable_count / total_claims) * 100, 1)
+        if total_claims
+        else 0.0,
+        "doctors_who_can_review": len(doctors),
+        "doctors": [
+            {
+                "id": str(doctor.id),
+                "name": (doctor.full_name or "").strip() or doctor.email.split("@")[0],
+                "email": doctor.email,
+                "corrections": doctor_corrections.get(doctor.id, 0),
+            }
+            for doctor in doctors
+        ],
         "rows": report_rows,
     }
 
