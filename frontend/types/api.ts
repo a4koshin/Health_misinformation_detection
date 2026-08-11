@@ -8,6 +8,8 @@ export type User = {
   role: UserRole;
   avatar_url?: string | null;
   language_preference?: AppLanguage;
+  is_active?: boolean;
+  deletion_requested_at?: string | null;
   created_at: string;
 };
 
@@ -50,6 +52,7 @@ export type Detection = {
   corrected_claim_text?: string | null;
   user_name?: string | null;
   user_email?: string | null;
+  advisor_id?: string | null;
   advisor_name?: string | null;
   reviewed_at?: string | null;
 };
@@ -110,10 +113,22 @@ export type ReportRow = {
   user_id?: string;
   user_name?: string;
   user_email?: string;
+  user_role?: UserRole | string | null;
   claim: string;
   label: string | null;
+  review_status?: "pending" | "confirmed" | "corrected" | null;
+  advisor_id?: string | null;
+  advisor_name?: string | null;
+  advisor_email?: string | null;
   source?: string | null;
   created_at: string;
+};
+
+export type ReportDoctor = {
+  id: string;
+  name: string;
+  email: string;
+  corrections: number;
 };
 
 export type UserReportResponse = {
@@ -124,6 +139,8 @@ export type UserReportResponse = {
   non_reliable_count: number;
   reliable_percent?: number;
   non_reliable_percent?: number;
+  doctors_who_can_review?: number;
+  doctors?: ReportDoctor[];
   rows: ReportRow[];
 };
 
@@ -158,6 +175,34 @@ export type DatasetPredictionResponse = {
   results: DatasetPredictionRow[];
 };
 
+export type NotificationType = "review_queued" | "claim_corrected";
+
+export type AppNotification = {
+  id: string;
+  recipient_id: string;
+  audience: "user" | "advisor" | "admin";
+  type: NotificationType;
+  title: string;
+  body: string;
+  prediction_id: string | null;
+  actor_id: string | null;
+  actor_role: string | null;
+  actor_name: string | null;
+  other_user_id: string | null;
+  other_user_name: string | null;
+  claim_excerpt: string | null;
+  corrected_excerpt: string | null;
+  href: string | null;
+  read_at: string | null;
+  created_at: string | null;
+  unread: boolean;
+};
+
+export type NotificationListResponse = {
+  items: AppNotification[];
+  unread_count: number;
+};
+
 export type AuditLog = {
   id: string;
   actor_id: string | null;
@@ -176,6 +221,9 @@ export type UserProfile = {
   avatar_url: string | null;
   language_preference: AppLanguage;
   role?: UserRole;
+  is_active?: boolean;
+  deletion_requested_at?: string | null;
+  created_at?: string | null;
 };
 
 export type UpdateProfileRequest = {
