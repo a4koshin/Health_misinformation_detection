@@ -3,7 +3,13 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from extensions import db
 from models.prediction import Prediction
-from services import audit_service, auth_service, db_service, predictor_service
+from services import (
+    audit_service,
+    auth_service,
+    db_service,
+    notification_service,
+    predictor_service,
+)
 from services import media_service
 from services.claim_validation_service import validate_somali_claim_input
 
@@ -48,6 +54,8 @@ def _save_prediction_for_user(user, text: str, result: dict, *, source: str):
         commit=False,
     )
     db.session.commit()
+    if prediction.needs_review:
+        notification_service.notify_non_reliable_claim(prediction)
 
     return prediction, message
 
@@ -64,6 +72,20 @@ def predict():
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
         return jsonify({"error": True, "message": "User not found."}), 404
+    if user.is_healthcare_advisor:
+        return jsonify(
+            {
+                "error": True,
+                "message": "Healthcare advisors cannot run predictions.",
+            }
+        ), 403
+    if user.is_healthcare_advisor:
+        return jsonify(
+            {
+                "error": True,
+                "message": "Healthcare advisors cannot run predictions.",
+            }
+        ), 403
 
     try:
         result = predictor_service.classify_claim(text)
@@ -97,6 +119,13 @@ def predict_media():
     kind = (request.form.get("kind") or "").strip().lower()
     if kind not in {"audio", "video"}:
         return jsonify(
+    if user.is_healthcare_advisor:
+        return jsonify(
+            {
+                "error": True,
+                "message": "Healthcare advisors cannot run predictions.",
+            }
+        ), 403
             {"error": True, "message": "Upload kind must be 'audio' or 'video'."}
         ), 400
 
