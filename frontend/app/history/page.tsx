@@ -263,7 +263,9 @@ function HistoryContent() {
             <GlassTableHeaderCell>Label</GlassTableHeaderCell>
             <GlassTableHeaderCell>Source</GlassTableHeaderCell>
             <GlassTableHeaderCell>Date</GlassTableHeaderCell>
-            <GlassTableHeaderCell>Review</GlassTableHeaderCell>
+            <GlassTableHeaderCell>
+              {isAdvisor ? "Reviewed" : "Review"}
+            </GlassTableHeaderCell>
             {isAdvisor ? null : (
               <GlassTableHeaderCell className="text-right">
                 Action
@@ -339,8 +341,21 @@ function HistoryContent() {
                     <GlassTableCell className="whitespace-nowrap text-[#475569]">
                       {formatDate(item.created_at)}
                     </GlassTableCell>
-                    <GlassTableCell className="max-w-[180px]">
-                      {reviewLabel(item) ? (
+                    <GlassTableCell className="max-w-[220px]">
+                      {isAdvisor ? (
+                        item.review_status === "corrected" ||
+                        item.review_status === "confirmed" ? (
+                          <GlassBadge tone="info">
+                            {item.advisor_name
+                              ? `Reviewed by ${item.advisor_name}`
+                              : "Reviewed"}
+                          </GlassBadge>
+                        ) : item.review_status === "pending" || item.needs_review ? (
+                          <span className="text-sm text-[#94a3b8]">Waiting</span>
+                        ) : (
+                          <span className="text-[#94a3b8]">—</span>
+                        )
+                      ) : reviewLabel(item) ? (
                         <div className="space-y-1">
                           <GlassBadge tone={reviewTone(item.review_status)}>
                             {reviewLabel(item)}
