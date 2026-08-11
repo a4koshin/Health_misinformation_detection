@@ -49,6 +49,20 @@ class Config:
         "true",
         "yes",
     }
-    MAIL_USERNAME = (os.getenv("MAIL_USERNAME") or "").strip()
-    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD") or ""
-    MAIL_FROM = (os.getenv("MAIL_FROM") or "").strip()
+    MAIL_USERNAME = (
+        os.getenv("MAIL_USERNAME") or os.getenv("EMAIL_USER") or ""
+    ).strip()
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD") or os.getenv("EMAIL_PASS") or ""
+    MAIL_FROM = (
+        os.getenv("MAIL_FROM")
+        or os.getenv("MAIL_USERNAME")
+        or os.getenv("EMAIL_USER")
+        or ""
+    ).strip()
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD") or os.getenv("EMAIL_PASS") or ""
+    MAIL_FROM = (
+        os.getenv("MAIL_FROM")
+        or os.getenv("MAIL_USERNAME")
+        or os.getenv("EMAIL_USER")
+        or ""
+    ).strip()
