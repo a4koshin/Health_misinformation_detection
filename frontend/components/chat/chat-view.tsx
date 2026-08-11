@@ -286,7 +286,7 @@ export function ChatView() {
   }, [showWelcome, firstName, greetingNonce]);
 
   return (
-    <main className="prediction-workspace relative flex flex-1 flex-col overflow-hidden pt-12 lg:pt-0">
+    <main className="prediction-workspace relative flex flex-1 flex-col overflow-hidden">
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,92,0,0.08),_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(255,138,77,0.06),_transparent_45%)]"
         aria-hidden="true"
