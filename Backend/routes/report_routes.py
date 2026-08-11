@@ -14,8 +14,3 @@ report_bp.add_url_rule(
     view_func=report_controller.download_report,
     methods=["GET"],
 )
-report_bp.add_url_rule(
-    "/report/download",
-    view_func=report_controller.download_report,
-    methods=["GET"],
-)
