@@ -28,6 +28,7 @@ import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
 import { getReviewQueue, submitReview, type ReviewDecision } from "@/lib/review";
+import { getDisplayName } from "@/lib/user";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
 import type { Detection } from "@/types/api";
@@ -42,6 +43,16 @@ function displayLabel(label: string | null) {
   return label;
 }
 
+function isReviewed(item: Detection) {
+  return item.review_status === "corrected" || item.review_status === "confirmed";
+}
+
+function reviewedByLabel(item: Detection) {
+  if (!isReviewed(item)) return "Waiting";
+  const name = (item.advisor_name || "").trim();
+  return name ? `Reviewed by ${name}` : "Reviewed";
+}
+
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
@@ -54,23 +65,30 @@ function formatDate(value: string) {
 }
 
 function ReviewContent() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [items, setItems] = useState<Detection[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [activeItem, setActiveItem] = useState<Detection | null>(null);
-  const [decision, setDecision] = useState<ReviewDecision>("confirmed");
+  const [decision, setDecision] = useState<ReviewDecision>("corrected");
   const [correctedClaim, setCorrectedClaim] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const pagination = useTablePagination(items, 10);
 
-  async function loadQueue() {
+  async function loadQueue(silent = false) {
     if (!token) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     try {
       const data = await getReviewQueue(token);
-      setItems(Array.isArray(data.items) ? data.items : []);
+      const nextItems = Array.isArray(data.items) ? data.items : [];
+      setItems(nextItems);
+      setPendingCount(
+        data.pending_count ??
+          nextItems.filter((item) => item.review_status === "pending").length,
+      );
     } catch (error) {
+      if (silent) return;
       const message =
         error instanceof ApiError
           ? error.message
@@ -78,15 +96,20 @@ function ReviewContent() {
       toast.error(message);
       setItems([]);
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   }
 
   useEffect(() => {
     void loadQueue();
+    const timer = window.setInterval(() => {
+      void loadQueue(true);
+    }, 15000);
+    return () => window.clearInterval(timer);
   }, [token]);
 
   function openReview(item: Detection, nextDecision: ReviewDecision) {
+    if (isReviewed(item)) return;
     setActiveItem(item);
     setDecision(nextDecision);
     setCorrectedClaim("");
@@ -126,9 +149,22 @@ function ReviewContent() {
           ? "Corrected sentence sent to the original user's History."
           : "Non-Reliable verdict confirmed.",
       );
+      const reviewerName = user ? getDisplayName(user) : "you";
       setItems((current) =>
-        current.filter((item) => item.id !== activeItem.id),
+        current.map((item) =>
+          item.id === activeItem.id
+            ? {
+                ...item,
+                review_status: decision,
+                needs_review: false,
+                advisor_name: reviewerName,
+                corrected_claim_text:
+                  decision === "corrected" ? trimmedCorrection : item.corrected_claim_text,
+              }
+            : item,
+        ),
       );
+      setPendingCount((count) => Math.max(0, count - 1));
       setActiveItem(null);
       setCorrectedClaim("");
       setFormError(null);
@@ -146,7 +182,7 @@ function ReviewContent() {
   return (
     <PrivatePage
       title="Review queue"
-      description="Oldest Non-Reliable claims first. Confirm the AI or correct the label to Reliable — the original user will see your decision in History."
+      description="Every doctor sees Non-Reliable claims. After one doctor corrects a sentence, other doctors cannot correct it."
     >
       <DataTableCard
         header={
@@ -155,9 +191,9 @@ function ReviewContent() {
               Pending reviews
             </h2>
             <p className="text-sm text-[#475569]">
-              {items.length === 1
+              {pendingCount === 1
                 ? "1 claim waiting for review."
-                : `${items.length} claims waiting for review.`}
+                : `${pendingCount} claims waiting for review.`}
             </p>
           </div>
         }
@@ -183,6 +219,7 @@ function ReviewContent() {
             <GlassTableHeaderCell>Claim</GlassTableHeaderCell>
             <GlassTableHeaderCell>AI label</GlassTableHeaderCell>
             <GlassTableHeaderCell>Date</GlassTableHeaderCell>
+            <GlassTableHeaderCell>Reviewed</GlassTableHeaderCell>
             <GlassTableHeaderCell className="text-right">
               Actions
             </GlassTableHeaderCell>
@@ -192,14 +229,14 @@ function ReviewContent() {
           {isLoading ? (
             Array.from({ length: 4 }).map((_, index) => (
               <GlassTableRow key={index}>
-                <GlassTableCell colSpan={5}>
+                <GlassTableCell colSpan={6}>
                   <div className="h-8 animate-pulse rounded-lg bg-gray-50" />
                 </GlassTableCell>
               </GlassTableRow>
             ))
           ) : pagination.pageItems.length === 0 ? (
             <GlassTableRow>
-              <GlassTableCell colSpan={5}>
+              <GlassTableCell colSpan={6}>
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
                   <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                     <MaterialIcon name="verified" size={24} />
@@ -214,8 +251,13 @@ function ReviewContent() {
               </GlassTableCell>
             </GlassTableRow>
           ) : (
-            pagination.pageItems.map((item) => (
-              <GlassTableRow key={item.id}>
+            pagination.pageItems.map((item) => {
+              const reviewed = isReviewed(item);
+              return (
+              <GlassTableRow
+                key={item.id}
+                className={reviewed ? "opacity-60" : undefined}
+              >
                 <GlassTableCell className="whitespace-nowrap">
                   <p className="font-medium text-[#0f172a]">
                     {item.user_name || "User"}
@@ -230,34 +272,33 @@ function ReviewContent() {
                   </p>
                 </GlassTableCell>
                 <GlassTableCell>
-                  <GlassBadge tone="danger">
+                  <GlassBadge tone={reviewed ? "success" : "danger"}>
                     {displayLabel(item.label)}
                   </GlassBadge>
                 </GlassTableCell>
                 <GlassTableCell className="whitespace-nowrap text-[#475569]">
                   {formatDate(item.created_at)}
                 </GlassTableCell>
+                <GlassTableCell>
+                  {reviewed ? (
+                    <GlassBadge tone="info">{reviewedByLabel(item)}</GlassBadge>
+                  ) : (
+                    <span className="text-sm text-[#94a3b8]">Waiting</span>
+                  )}
+                </GlassTableCell>
                 <GlassTableCell className="text-right">
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <GlassButton
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openReview(item, "confirmed")}
-                    >
-                      Confirm
-                    </GlassButton>
-                    <GlassButton
-                      type="button"
-                      size="sm"
-                      onClick={() => openReview(item, "corrected")}
-                    >
-                      Correct
-                    </GlassButton>
-                  </div>
+                  <GlassButton
+                    type="button"
+                    size="sm"
+                    disabled={reviewed}
+                    onClick={() => openReview(item, "corrected")}
+                  >
+                    {reviewed ? "Reviewed" : "Correct"}
+                  </GlassButton>
                 </GlassTableCell>
               </GlassTableRow>
-            ))
+              );
+            })
           )}
         </GlassTableBody>
       </DataTableCard>
@@ -267,16 +308,8 @@ function ReviewContent() {
         onOpenChange={(open) => {
           if (!open) closeReview();
         }}
-        title={
-          decision === "corrected"
-            ? "Correct to Reliable"
-            : "Confirm Non-Reliable"
-        }
-        description={
-          decision === "corrected"
-            ? "Rewrite the claim. History will show the original sentence, your correction, and the user."
-            : "Confirm the AI was right. The original user will see this in History."
-        }
+        title="Correct to Reliable"
+        description="Rewrite the claim. History will show the original sentence, your correction, and the user."
       >
         {activeItem ? (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -293,42 +326,36 @@ function ReviewContent() {
                 {claimText(activeItem)}
               </p>
             </div>
-            {decision === "corrected" ? (
-              <div className="space-y-2">
-                <GlassLabel htmlFor="corrected-claim">
-                  Corrected sentence
-                </GlassLabel>
-                <GlassTextarea
-                  id="corrected-claim"
-                  value={correctedClaim}
-                  aria-invalid={Boolean(formError)}
-                  aria-describedby={
-                    formError ? "corrected-claim-error" : undefined
-                  }
-                  placeholder="Write the reliable version of this claim…"
-                  onChange={(event) => {
-                    setCorrectedClaim(event.target.value);
-                    if (formError) setFormError(null);
-                  }}
-                />
-                {formError ? (
-                  <p
-                    id="corrected-claim-error"
-                    role="alert"
-                    className="text-sm text-red-600"
-                  >
-                    {formError}
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
+            <div className="space-y-2">
+              <GlassLabel htmlFor="corrected-claim">
+                Corrected sentence
+              </GlassLabel>
+              <GlassTextarea
+                id="corrected-claim"
+                value={correctedClaim}
+                aria-invalid={Boolean(formError)}
+                aria-describedby={
+                  formError ? "corrected-claim-error" : undefined
+                }
+                placeholder="Write the reliable version of this claim…"
+                onChange={(event) => {
+                  setCorrectedClaim(event.target.value);
+                  if (formError) setFormError(null);
+                }}
+              />
+              {formError ? (
+                <p
+                  id="corrected-claim-error"
+                  role="alert"
+                  className="text-sm text-red-600"
+                >
+                  {formError}
+                </p>
+              ) : null}
+            </div>
             <div className="flex gap-3 pt-1">
               <GlassButton type="submit" disabled={isSaving}>
-                {isSaving
-                  ? "Saving…"
-                  : decision === "corrected"
-                    ? "Submit correction"
-                    : "Confirm verdict"}
+                {isSaving ? "Saving…" : "Submit correction"}
               </GlassButton>
               <GlassButton
                 type="button"
