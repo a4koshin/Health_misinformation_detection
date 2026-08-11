@@ -30,7 +30,7 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
 import type { AuditLog } from "@/types/api";
 
-type ActionFilter = "all" | "auth" | "prediction" | "report";
+type ActionFilter = "all" | "auth" | "prediction" | "review" | "report";
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -55,6 +55,8 @@ function actionLabel(action: string) {
     "user.profile_update": "Updated profile",
     "prediction.create": "Prediction",
     "prediction.delete": "Deleted prediction",
+    "review.queued": "Sent to advisor",
+    "review.corrected": "Claim corrected",
     "report.download": "Downloaded report",
   };
   return map[action] ?? action;
@@ -70,12 +72,16 @@ function actionTone(action: string) {
   if (action.includes("prediction")) {
     return "success" as const;
   }
+  if (action.startsWith("review.")) {
+    return "info" as const;
+  }
   return "neutral" as const;
 }
 
 function actionGroup(action: string): Exclude<ActionFilter, "all"> {
   if (action.startsWith("user.")) return "auth";
   if (action.startsWith("prediction.")) return "prediction";
+  if (action.startsWith("review.")) return "review";
   if (action.startsWith("report.")) return "report";
   return "auth";
 }
@@ -154,13 +160,13 @@ function AuditLogContent() {
   return (
     <PrivatePage
       title="Audit log"
-      description="Every user action across HealthAI — sign-ins, predictions, deletes, and report downloads."
+      description="Sign-ins, predictions, advisor reviews, and report downloads in one place."
     >
       <DataTableCard
         header={
           <div>
             <h2 className="text-base font-semibold text-[#0f172a]">
-              Activity
+              Recorded actions
             </h2>
             <p className="text-sm text-[#475569]">
               Search and filter every recorded action on the platform.
@@ -200,6 +206,7 @@ function AuditLogContent() {
                 <option value="all">All actions</option>
                 <option value="auth">Auth</option>
                 <option value="prediction">Predictions</option>
+                <option value="review">Advisor reviews</option>
                 <option value="report">Reports</option>
               </GlassSelect>
             </div>
