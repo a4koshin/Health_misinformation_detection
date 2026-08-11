@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { toast } from "sonner";
 
@@ -19,15 +18,16 @@ import { ApiError } from "@/lib/api";
 import { displayRoleLabel, roleBadgeTone } from "@/lib/roles";
 import {
   changePassword,
-  deleteAccount,
   deleteHistory,
   getProfile,
+  requestAccountDeletion,
   resolveAvatarUrl,
   updateProfile,
   uploadAvatar,
   wipeDatabase,
 } from "@/lib/settings";
 import { getDisplayName, getInitials } from "@/lib/user";
+import { validateEmailAddress, validateFullName } from "@/lib/user-validation";
 import { cn } from "@/lib/utils";
 import { useAuth, useAuthStore } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
@@ -93,8 +93,7 @@ function ActionRow({
 }
 
 function SettingsContent() {
-  const router = useRouter();
-  const { token, user, logout } = useAuth();
+  const { token, user } = useAuth();
   const startNewChat = useChatStore((state) => state.startNewChat);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -194,6 +193,13 @@ function SettingsContent() {
     event.preventDefault();
     if (!token) return;
 
+    const nameError = validateFullName(name);
+    const emailError = validateEmailAddress(email);
+    if (nameError || emailError) {
+      toast.error(nameError || emailError);
+      return;
+    }
+
     setIsSavingProfile(true);
     try {
       let nextAvatar = profile?.avatar_url ?? null;
@@ -214,6 +220,8 @@ function SettingsContent() {
         email: updated.email ?? email.trim(),
         avatar_url: nextAvatar ?? updated.avatar_url ?? null,
         language_preference: profile?.language_preference ?? "so",
+        deletion_requested_at: profile?.deletion_requested_at,
+        is_active: profile?.is_active,
       };
       setProfile(nextProfile);
 
@@ -302,18 +310,29 @@ function SettingsContent() {
 
     setIsDeletingAccount(true);
     try {
-      const result = await deleteAccount(token, {
+      const result = await requestAccountDeletion(token, {
         password: accountPassword,
       });
       setAccountConfirmOpen(false);
-      toast.success(result.message || "Account deleted.");
-      logout();
-      router.replace("/login");
+      setAccountPassword("");
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              deletion_requested_at:
+                result.deletion_requested_at ?? new Date().toISOString(),
+            }
+          : current,
+      );
+      toast.success(
+        result.message ||
+          "Deletion request sent. An admin will review it.",
+      );
     } catch (error) {
       const message =
         error instanceof ApiError
           ? error.message
-          : "Unable to delete account.";
+          : "Unable to request account deletion.";
       toast.error(message);
     } finally {
       setIsDeletingAccount(false);
@@ -629,16 +648,30 @@ function SettingsContent() {
             />
           ) : null}
 
-          <ActionRow
-            title="Delete my account"
-            description="Permanently delete your account and all related data."
-            buttonLabel="Delete account"
-            destructive
-            onClick={() => {
-              setAccountPassword("");
-              setAccountConfirmOpen(true);
-            }}
-          />
+          {!isAdmin ? (
+            profile?.deletion_requested_at ? (
+              <GlassCard strong className="px-6 py-5">
+                <p className="text-sm font-medium text-[#0f172a]">
+                  Deletion requested
+                </p>
+                <p className="mt-1 text-sm text-[#64748b]">
+                  An admin will review this request and deactivate the account.
+                  You can keep using the app until then.
+                </p>
+              </GlassCard>
+            ) : (
+              <ActionRow
+                title="Request account deletion"
+                description="Ask an admin to deactivate your account. Your data stays until they approve."
+                buttonLabel="Request deletion"
+                destructive
+                onClick={() => {
+                  setAccountPassword("");
+                  setAccountConfirmOpen(true);
+                }}
+              />
+            )
+          ) : null}
         </div>
       )}
       <DeleteAlertModal
@@ -677,10 +710,11 @@ function SettingsContent() {
                 <MaterialIcon name="person_off" size={30} />
               </span>
               <DialogPrimitive.Title className="text-lg font-semibold text-[#111827]">
-                Delete your account?
+                Request account deletion?
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-2 text-sm text-[#6b7280]">
-                Re-enter your password to confirm. This cannot be undone.
+                Re-enter your password. An admin must approve this before the
+                account is deactivated.
               </DialogPrimitive.Description>
             </div>
 
@@ -710,7 +744,7 @@ function SettingsContent() {
                 onClick={() => void handleDeleteAccount()}
                 className="h-10 min-w-[8.5rem] cursor-pointer rounded-lg bg-red-600 px-5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {isDeletingAccount ? "Deleting…" : "Yes, I'm sure"}
+                {isDeletingAccount ? "Sending…" : "Yes, request it"}
               </button>
             </div>
           </DialogPrimitive.Content>
