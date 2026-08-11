@@ -4,19 +4,46 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from sqlalchemy import case
+
 from extensions import db
 from models.prediction import Prediction
+from models.user import User
 
 
-def get_pending_reviews(page: int = 1, per_page: int = 20) -> dict:
+def _naive_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
+def advisor_queue_start(advisor: User) -> datetime | None:
+    """Advisors only see Non-Reliable claims created after they joined as advisor."""
+    return _naive_utc(advisor.advisor_since or advisor.created_at)
+
+
+def get_pending_reviews(
+    advisor: User,
+    page: int = 1,
+    per_page: int = 20,
+) -> dict:
     page = max(int(page or 1), 1)
     per_page = min(max(int(per_page or 20), 1), 100)
 
-    pagination = (
-        Prediction.query.filter_by(review_status="pending")
-        .order_by(Prediction.created_at.asc())
-        .paginate(page=page, per_page=per_page, error_out=False)
+    query = Prediction.query.filter(
+        Prediction.review_status.in_(("pending", "corrected", "confirmed"))
     )
+    since = advisor_queue_start(advisor)
+    if since is not None:
+        query = query.filter(Prediction.created_at >= since)
+
+    pending_count = query.filter(Prediction.review_status == "pending").count()
+    pagination = query.order_by(
+        case((Prediction.review_status == "pending", 0), else_=1),
+        Prediction.created_at.asc(),
+    ).paginate(page=page, per_page=per_page, error_out=False)
 
     return {
         "items": Prediction.serialize_many(pagination.items, review=True),
@@ -24,6 +51,7 @@ def get_pending_reviews(page: int = 1, per_page: int = 20) -> dict:
         "per_page": pagination.per_page,
         "total": pagination.total,
         "pages": pagination.pages,
+        "pending_count": int(pending_count or 0),
     }
 
 
@@ -39,12 +67,37 @@ def submit_review(
     except (TypeError, ValueError) as exc:
         raise LookupError("Prediction not found.") from exc
 
-    prediction = db.session.get(Prediction, pred_id)
+    prediction = (
+        db.session.query(Prediction)
+        .filter_by(id=pred_id)
+        .with_for_update()
+        .first()
+    )
     if not prediction:
         raise LookupError("Prediction not found.")
 
     if not prediction.needs_review or prediction.review_status != "pending":
-        raise ValueError("This claim is not awaiting review.")
+        reviewer = (
+            db.session.get(User, prediction.advisor_id)
+            if prediction.advisor_id
+            else None
+        )
+        reviewer_name = (
+            ((reviewer.full_name or "").strip() or reviewer.email.split("@")[0])
+            if reviewer
+            else "another doctor"
+        )
+        raise ValueError(
+            f"This claim was already reviewed by {reviewer_name}."
+        )
+
+    advisor = db.session.get(User, advisor_id)
+    since = advisor_queue_start(advisor) if advisor else None
+    claim_created = _naive_utc(prediction.created_at)
+    if since is not None and claim_created is not None and claim_created < since:
+        raise ValueError(
+            "This claim was submitted before you joined as a Healthcare Advisor."
+        )
 
     choice = (decision or "").strip().lower()
     if choice not in {"confirmed", "corrected"}:
@@ -71,4 +124,8 @@ def submit_review(
         prediction.corrected_claim_text = None
 
     db.session.commit()
+    if choice == "corrected" and advisor:
+        from services import notification_service
+
+        notification_service.notify_claim_corrected(prediction, advisor)
     return prediction
