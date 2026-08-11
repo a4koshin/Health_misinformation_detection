@@ -45,6 +45,7 @@ import {
   displayRoleLabel,
   roleBadgeTone,
 } from "@/lib/roles";
+import { validateEmailAddress, validateFullName } from "@/lib/user-validation";
 import { useAuth } from "@/store/auth-store";
 import type { User, UserRole } from "@/types/api";
 
@@ -72,6 +73,11 @@ function UsersContent() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [showForm, setShowForm] = useState(false);
+  const [formErrors, setFormErrors] = useState<{
+    full_name?: string;
+    email?: string;
+    password?: string;
+  }>({});
   const pagination = useTablePagination(users, 10);
 
   async function loadUsers() {
@@ -96,6 +102,7 @@ function UsersContent() {
   function openCreateForm() {
     setEditingUser(null);
     setForm(emptyForm);
+    setFormErrors({});
     setShowForm(true);
   }
 
@@ -107,6 +114,7 @@ function UsersContent() {
       password: "",
       role: user.role,
     });
+    setFormErrors({});
     setShowForm(true);
   }
 
@@ -114,30 +122,48 @@ function UsersContent() {
     setShowForm(false);
     setEditingUser(null);
     setForm(emptyForm);
+    setFormErrors({});
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!token) return;
 
+    const nameError = validateFullName(form.full_name);
+    const emailError = validateEmailAddress(form.email);
+    const passwordError =
+      !editingUser && !form.password
+        ? "Password is required."
+        : !editingUser && form.password.length < 6
+          ? "Password must be at least 6 characters."
+          : form.password && form.password.length < 6
+            ? "Password must be at least 6 characters."
+            : undefined;
+    const nextErrors = {
+      ...(nameError ? { full_name: nameError } : {}),
+      ...(emailError ? { email: emailError } : {}),
+      ...(passwordError ? { password: passwordError } : {}),
+    };
+    setFormErrors(nextErrors);
+    if (nameError || emailError || passwordError) {
+      toast.error(nameError || emailError || passwordError);
+      return;
+    }
+
     setIsSaving(true);
     try {
       if (editingUser) {
         await updateUser(token, editingUser.id, {
           email: form.email.trim(),
-          full_name: form.full_name.trim() || null,
+          full_name: form.full_name.trim(),
           role: form.role,
           ...(form.password ? { password: form.password } : {}),
         });
         toast.success("User updated.");
       } else {
-        if (!form.password) {
-          toast.error("Password is required.");
-          return;
-        }
         await createUser(token, {
           email: form.email.trim(),
-          full_name: form.full_name.trim() || null,
+          full_name: form.full_name.trim(),
           password: form.password,
           role: form.role,
         });
@@ -154,10 +180,15 @@ function UsersContent() {
     }
   }
 
-  async function handleDelete() {
+  async function handleDeleteUser() {
     if (!token || !pendingDelete) return;
     if (pendingDelete.id === currentUser?.id) {
       toast.error("You cannot delete your own account.");
+      setPendingDelete(null);
+      return;
+    }
+    if (pendingDelete.role === "admin") {
+      toast.error("Admin accounts cannot be deleted.");
       setPendingDelete(null);
       return;
     }
@@ -180,7 +211,7 @@ function UsersContent() {
   return (
     <PrivatePage
       title="Users"
-      description="Create, update, and remove user accounts."
+      description="Create, view, update, and delete accounts. Admin accounts cannot be deleted."
       actions={
         <GlassButton type="button" size="sm" onClick={openCreateForm}>
           <MaterialIcon name="person_add" size={18} />
@@ -207,13 +238,18 @@ function UsersContent() {
               <GlassInput
                 id="user-name"
                 value={form.full_name}
-                onChange={(event) =>
+                aria-invalid={Boolean(formErrors.full_name)}
+                onChange={(event) => {
                   setForm((current) => ({
                     ...current,
                     full_name: event.target.value,
-                  }))
-                }
+                  }));
+                  setFormErrors((current) => ({ ...current, full_name: undefined }));
+                }}
               />
+              {formErrors.full_name ? (
+                <p className="text-sm text-red-600">{formErrors.full_name}</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <GlassLabel htmlFor="user-email">Email</GlassLabel>
@@ -221,11 +257,16 @@ function UsersContent() {
                 id="user-email"
                 type="email"
                 value={form.email}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, email: event.target.value }))
-                }
+                aria-invalid={Boolean(formErrors.email)}
+                onChange={(event) => {
+                  setForm((current) => ({ ...current, email: event.target.value }));
+                  setFormErrors((current) => ({ ...current, email: undefined }));
+                }}
                 required
               />
+              {formErrors.email ? (
+                <p className="text-sm text-red-600">{formErrors.email}</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <GlassLabel htmlFor="user-password">
@@ -234,15 +275,20 @@ function UsersContent() {
               <PasswordInput
                 id="user-password"
                 value={form.password}
-                onChange={(event) =>
+                aria-invalid={Boolean(formErrors.password)}
+                onChange={(event) => {
                   setForm((current) => ({
                     ...current,
                     password: event.target.value,
-                  }))
-                }
+                  }));
+                  setFormErrors((current) => ({ ...current, password: undefined }));
+                }}
                 className="h-11 rounded-2xl border-gray-200 bg-gray-50 backdrop-blur-xl"
                 required={!editingUser}
               />
+              {formErrors.password ? (
+                <p className="text-sm text-red-600">{formErrors.password}</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <GlassLabel htmlFor="user-role">Role</GlassLabel>
@@ -306,6 +352,7 @@ function UsersContent() {
             <GlassTableHeaderCell>Name</GlassTableHeaderCell>
             <GlassTableHeaderCell>Email</GlassTableHeaderCell>
             <GlassTableHeaderCell>Role</GlassTableHeaderCell>
+            <GlassTableHeaderCell>Status</GlassTableHeaderCell>
             <GlassTableHeaderCell className="text-right">
               Actions
             </GlassTableHeaderCell>
@@ -315,14 +362,14 @@ function UsersContent() {
           {isLoading ? (
             Array.from({ length: 4 }).map((_, index) => (
               <GlassTableRow key={index}>
-                <GlassTableCell colSpan={4}>
+                <GlassTableCell colSpan={5}>
                   <div className="h-8 animate-pulse rounded-lg bg-gray-50" />
                 </GlassTableCell>
               </GlassTableRow>
             ))
           ) : users.length === 0 ? (
             <GlassTableRow>
-              <GlassTableCell colSpan={4}>
+              <GlassTableCell colSpan={5}>
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
                   <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                     <MaterialIcon name="group" size={24} />
@@ -337,7 +384,10 @@ function UsersContent() {
               </GlassTableCell>
             </GlassTableRow>
           ) : (
-            pagination.pageItems.map((user) => (
+            pagination.pageItems.map((user) => {
+              const isActive = user.is_active !== false;
+              const requested = Boolean(user.deletion_requested_at);
+              return (
               <GlassTableRow key={user.id}>
                 <GlassTableCell className="font-medium">
                   {user.full_name || "—"}
@@ -348,17 +398,34 @@ function UsersContent() {
                     {displayRoleLabel(user.role)}
                   </GlassBadge>
                 </GlassTableCell>
+                <GlassTableCell>
+                  {!isActive ? (
+                    <GlassBadge tone="danger">Deactivated</GlassBadge>
+                  ) : requested ? (
+                    <GlassBadge tone="brand">Deletion requested</GlassBadge>
+                  ) : (
+                    <GlassBadge tone="success">Active</GlassBadge>
+                  )}
+                </GlassTableCell>
                 <GlassTableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     <TableEditButton onClick={() => openEditForm(user)} />
                     <TableDeleteButton
                       onClick={() => setPendingDelete(user)}
-                      disabled={user.id === currentUser?.id}
+                      disabled={
+                        user.role === "admin" || user.id === currentUser?.id
+                      }
+                      label={
+                        user.role === "admin"
+                          ? "Admin accounts cannot be deleted"
+                          : `Delete ${user.email}`
+                      }
                     />
                   </div>
                 </GlassTableCell>
               </GlassTableRow>
-            ))
+              );
+            })
           )}
         </GlassTableBody>
       </DataTableCard>
@@ -368,9 +435,11 @@ function UsersContent() {
         onOpenChange={(open) => {
           if (!open && !isDeleting) setPendingDelete(null);
         }}
-        itemLabel={pendingDelete?.email}
+        title="Delete this user?"
+        description={`This permanently deletes ${pendingDelete?.email ?? "this account"} and their predictions. Admin accounts cannot be deleted.`}
+        confirmLabel="Yes, delete"
         isLoading={isDeleting}
-        onConfirm={handleDelete}
+        onConfirm={handleDeleteUser}
       />
     </PrivatePage>
   );
