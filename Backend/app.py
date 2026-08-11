@@ -1,4 +1,5 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from sqlalchemy import text
 from werkzeug.exceptions import HTTPException
 
@@ -9,6 +10,7 @@ from routes.auth_routes import auth_bp
 from routes.history_routes import history_bp
 from routes.predict_routes import predict_bp
 from routes.report_routes import report_bp
+from routes.notification_routes import notification_bp
 from routes.review_routes import review_bp
 from routes.settings_routes import settings_bp
 from routes.transcription_routes import transcription_bp
@@ -30,9 +32,10 @@ def create_app() -> Flask:
     app.register_blueprint(settings_bp)
     app.register_blueprint(transcription_bp)
     app.register_blueprint(review_bp)
+    app.register_blueprint(notification_bp)
 
     # Import models so SQLAlchemy knows the tables.
-    from models import AuditLog, PasswordReset, Prediction, User  # noqa: F401
+    from models import AuditLog, Notification, PasswordReset, Prediction, User  # noqa: F401
 
     with app.app_context():
         db.create_all()
@@ -85,9 +88,65 @@ def create_app() -> Flask:
             )
             db.session.execute(
                 text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN IF NOT EXISTS advisor_since TIMESTAMP"
+                )
+            )
+            db.session.execute(
+                text(
+                    "UPDATE users "
+                    "SET advisor_since = created_at "
+                    "WHERE LOWER(role) = 'healthcare_advisor' "
+                    "AND advisor_since IS NULL"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN IF NOT EXISTS is_active "
+                    "BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN IF NOT EXISTS deletion_requested_at TIMESTAMP"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN IF NOT EXISTS advisor_since TIMESTAMP"
+                )
+            )
+            db.session.execute(
+                text(
                     "CREATE TABLE IF NOT EXISTS password_resets ("
                     "id SERIAL PRIMARY KEY, "
                     "user_id INTEGER NOT NULL REFERENCES users(id), "
+            db.session.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS notifications ("
+                    "id SERIAL PRIMARY KEY, "
+                    "recipient_id INTEGER NOT NULL REFERENCES users(id), "
+                    "audience VARCHAR(32) NOT NULL, "
+                    "type VARCHAR(40) NOT NULL, "
+                    "title VARCHAR(180) NOT NULL, "
+                    "body TEXT NOT NULL, "
+                    "prediction_id INTEGER, "
+                    "actor_id INTEGER, "
+                    "actor_role VARCHAR(32), "
+                    "actor_name VARCHAR(120), "
+                    "other_user_id INTEGER, "
+                    "other_user_name VARCHAR(120), "
+                    "claim_excerpt TEXT, "
+                    "corrected_excerpt TEXT, "
+                    "href VARCHAR(120), "
+                    "read_at TIMESTAMP, "
+                    "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
+                    ")"
+                )
+            )
                     "token VARCHAR(255) NOT NULL UNIQUE, "
                     "expires_at TIMESTAMP NOT NULL, "
                     "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
@@ -107,6 +166,29 @@ def create_app() -> Flask:
             app.logger.exception("Admin seed failed")
 
         from services.seed_service import seed_admin
+
+    @app.before_request
+    def reject_deactivated_users():
+        if request.method == "OPTIONS":
+            return None
+        try:
+            verify_jwt_in_request(optional=True)
+        except Exception:
+            return None
+        identity = get_jwt_identity()
+        if not identity:
+            return None
+        from services import auth_service
+
+        user = auth_service.get_user_by_id(identity)
+        if user is not None and not user.is_active:
+            return jsonify(
+                {
+                    "error": True,
+                    "message": "This account has been deactivated.",
+                }
+            ), 403
+        return None
 
         try:
             seed_admin()
