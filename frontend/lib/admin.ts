@@ -49,10 +49,24 @@ export async function updateUser(
   );
 }
 
-export async function deleteUser(token: string, userId: string): Promise<void> {
-  await apiFetch<void>(
+export async function deleteUser(
+  token: string,
+  userId: string,
+): Promise<{ message: string; id: string; email: string }> {
+  return apiFetch<{ message: string; id: string; email: string }>(
     `/api/admin/users/${userId}`,
     { method: "DELETE" },
+    token,
+  );
+}
+
+export async function approveAccountDeletion(
+  token: string,
+  userId: string,
+): Promise<User> {
+  return apiFetch<User>(
+    `/api/admin/users/${userId}/approve-deletion`,
+    { method: "POST" },
     token,
   );
 }
