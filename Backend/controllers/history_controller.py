@@ -3,7 +3,19 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 
 from extensions import db
 from models.prediction import Prediction
-from services import audit_service, auth_service, db_service, predictor_service
+from services import (
+    audit_service,
+    auth_service,
+    db_service,
+    notification_service,
+    predictor_service,
+)
+    audit_service,
+    auth_service,
+    db_service,
+    notification_service,
+    predictor_service,
+)
 from services.claim_validation_service import validate_somali_claim_input
 
 
@@ -72,6 +84,8 @@ def _run_and_save(user, text: str, *, source: str = "Manual check"):
         actor_email=user.email,
         action="prediction.create",
         entity_type="prediction",
+    if prediction.needs_review:
+        notification_service.notify_non_reliable_claim(prediction)
         entity_id=prediction.id,
         details=f"Predicted claim as {label_text}",
         ip_address=_client_ip(),
@@ -224,6 +238,7 @@ def edit_message(prediction_id: int, message_id: str):
     prediction.cleaned_text = result.get("cleaned_text")
     prediction.label = resolved_label
     prediction.confidence = resolved_confidence
+    was_pending = prediction.review_status == "pending"
     prediction.label_confidence = conf
     prediction.source = (
         "non_medical" if not result["is_medical"] else (prediction.source or "pipeline")
@@ -252,6 +267,8 @@ def edit_message(prediction_id: int, message_id: str):
         actor_email=user.email,
         action="prediction.update",
         entity_type="prediction",
+    if prediction.needs_review and prediction.review_status == "pending" and not was_pending:
+        notification_service.notify_non_reliable_claim(prediction)
         entity_id=prediction.id,
         details=f"Edited prediction #{prediction.id}",
         ip_address=_client_ip(),
