@@ -106,11 +106,8 @@ def delete_user(user_id: int):
     except PermissionError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 403
 
-    target = auth_service.get_user_by_id(user_id)
-    target_email = target.email if target else str(user_id)
-
     try:
-        admin_service.delete_user(user_id=user_id, actor_id=admin.id)
+        deleted = admin_service.delete_user(user_id=user_id, actor_id=admin.id)
     except LookupError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 404
     except ValueError as exc:
@@ -122,10 +119,43 @@ def delete_user(user_id: int):
         action="user.delete",
         entity_type="user",
         entity_id=user_id,
-        details=f"Deleted user {target_email}",
+        details=f"Deleted user {deleted['email']} ({deleted['role']})",
         ip_address=_client_ip(),
     )
-    return "", 204
+    return jsonify({"message": "User deleted.", **deleted}), 200
+
+
+@jwt_required()
+def approve_account_deletion(user_id: int):
+    try:
+        admin = admin_service.require_admin()
+    except PermissionError as exc:
+        return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 403
+
+    try:
+        user = admin_service.approve_account_deletion(
+            user_id=user_id, actor_id=admin.id
+        )
+    except LookupError as exc:
+        return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 400
+
+    audit_service.log_action(
+        actor_id=admin.id,
+        actor_email=admin.email,
+        action="user.deactivate",
+        entity_type="user",
+        entity_id=user.id,
+        details=f"Deactivated {user.email} after deletion request",
+        ip_address=_client_ip(),
+    )
+    return jsonify(
+        {
+            "message": "Account deactivated.",
+            **user.to_dict(),
+        }
+    ), 200
 
 
 @jwt_required()
