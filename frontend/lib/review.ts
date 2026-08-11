@@ -9,6 +9,7 @@ export type ReviewQueueResponse = {
   per_page: number;
   total: number;
   pages: number;
+  pending_count?: number;
 };
 
 export async function getReviewQueue(
