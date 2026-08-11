@@ -1,10 +1,12 @@
 from models.user import User
 from extensions import db
+from services.user_validation import validate_email, validate_full_name
 
 
 def register_user(email: str, password: str, name: str | None = None) -> User:
-    email = (email or "").strip().lower()
-    if not email or not password:
+    email = validate_email(email)
+    next_name = validate_full_name(name, required=True)
+    if not password:
         raise ValueError("Email and password are required.")
 
     existing = User.query.filter_by(email=email).first()
@@ -13,7 +15,7 @@ def register_user(email: str, password: str, name: str | None = None) -> User:
 
     user = User(
         email=email,
-        full_name=(name or "").strip() or None,
+        full_name=next_name or None,
         role="user",
     )
     user.set_password(password)
@@ -27,6 +29,10 @@ def authenticate_user(email: str, password: str) -> User:
     user = User.query.filter_by(email=email).first()
     if not user or not user.check_password(password):
         raise ValueError("Invalid email or password.")
+    if not user.is_active:
+        raise PermissionError("This account has been deactivated.")
+    if not user.is_active:
+        raise PermissionError("This account has been deactivated.")
     return user
 
 
@@ -49,17 +55,15 @@ def update_profile(
     user = get_user_by_id(user_id)
     if not user:
         raise LookupError("User not found.")
-
-    if email is not None:
-        next_email = email.strip().lower()
-        if not next_email:
-            raise ValueError("Email is required.")
+        next_email = validate_email(email)
         clash = User.query.filter(
             User.email == next_email, User.id != user.id).first()
         if clash:
             raise ValueError("Email is already registered.")
         user.email = next_email
 
+    if update_full_name:
+        user.full_name = validate_full_name(full_name, required=True)
     if update_full_name:
         user.full_name = (full_name or "").strip() or None
 
