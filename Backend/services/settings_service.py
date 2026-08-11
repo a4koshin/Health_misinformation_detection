@@ -9,7 +9,7 @@ from sqlalchemy import func
 from extensions import db
 from models.prediction import Prediction
 from models.user import User
-from services.user_cleanup import purge_user_dependencies
+from services.user_validation import validate_email, validate_full_name
 
 ALLOWED_AVATAR_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_AVATAR_BYTES = 2 * 1024 * 1024  # 2MB
@@ -28,16 +28,15 @@ def update_profile(user_id, name: str | None, email: str | None) -> User:
     if not user:
         raise LookupError("User not found.")
 
-    next_email = (email or "").strip().lower()
-    if not next_email:
-        raise ValueError("Email is required.")
+    next_email = validate_email(email)
+    next_name = validate_full_name(name, required=True)
 
     clash = User.query.filter(User.email == next_email, User.id != user.id).first()
     if clash:
         raise ValueError("Email is already taken by another user.")
 
     user.email = next_email
-    user.full_name = (name or "").strip() or None
+    user.full_name = next_name
     db.session.commit()
     return user
 
@@ -126,24 +125,26 @@ def delete_history(user_id) -> int:
     return int(deleted or 0)
 
 
-def delete_account(user_id) -> None:
+def request_account_deletion(user_id, password: str) -> User:
+    from datetime import datetime, timezone
+
     user = get_user(user_id)
     if not user:
         raise LookupError("User not found.")
+    if (user.role or "").strip().lower() == "admin":
+        raise PermissionError("Admins cannot request account deletion.")
+    if not user.is_active:
+        raise ValueError("This account is already deactivated.")
+    if not password:
+        raise ValueError("Password is required to request account deletion.")
+    if not user.check_password(password):
+        raise ValueError("Password is incorrect.")
+    if user.deletion_requested_at:
+        return user
 
-    if user.avatar_url and user.avatar_url.startswith("/static/uploads/avatars/"):
-        avatar_path = (
-            Path(__file__).resolve().parent.parent / user.avatar_url.lstrip("/")
-        )
-        if avatar_path.exists() and avatar_path.is_file():
-            try:
-                avatar_path.unlink()
-            except OSError:
-                pass
-
-    purge_user_dependencies(user.id)
-    db.session.delete(user)
+    user.deletion_requested_at = datetime.now(timezone.utc)
     db.session.commit()
+    return user
 
 
 def wipe_all_data(admin_id, password: str) -> dict:
