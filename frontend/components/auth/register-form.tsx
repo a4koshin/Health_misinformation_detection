@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
 import { getPrivateHomePath } from "@/lib/auth-routing";
+import { validateEmailAddress, validateFullName } from "@/lib/user-validation";
 import { useAuth, useAuthStore } from "@/store/auth-store";
 
 
@@ -36,7 +37,21 @@ export function RegisterForm() {
     event.preventDefault();
     setError("");
 
-    if (!fullName.trim() || !email.trim() || !password) {
+    const nameError = validateFullName(fullName);
+    if (nameError) {
+      setError(nameError);
+      toast.error(nameError);
+      return;
+    }
+
+    const emailError = validateEmailAddress(email);
+    if (emailError) {
+      setError(emailError);
+      toast.error(emailError);
+      return;
+    }
+
+    if (!password) {
       setError("Full name, email, and password are required.");
       toast.error("Full name, email, and password are required.");
       return;
