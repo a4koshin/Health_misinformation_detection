@@ -34,7 +34,7 @@ def request_password_reset(email: str) -> dict:
         raise ValueError("Email is required.")
 
     user = User.query.filter_by(email=address).first()
-    if not user:
+    if not user or not user.is_active:
         return {"message": GENERIC_MESSAGE, "reset_url": None}
 
     PasswordReset.query.filter_by(user_id=user.id).delete(synchronize_session=False)
@@ -71,8 +71,8 @@ def request_password_reset(email: str) -> dict:
             emailed = False
     else:
         current_app.logger.warning(
-            "MAIL_* is not set in Backend/.env — cannot send reset email. "
-            "Add MAIL_SERVER, MAIL_USERNAME, MAIL_PASSWORD, and MAIL_FROM."
+            "Mail is not configured in Backend/.env — cannot send reset email. "
+            "Set EMAIL_USER and EMAIL_PASS (or MAIL_USERNAME / MAIL_PASSWORD)."
         )
 
     if not emailed:
