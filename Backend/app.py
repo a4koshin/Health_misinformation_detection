@@ -124,6 +124,12 @@ def create_app() -> Flask:
                     "CREATE TABLE IF NOT EXISTS password_resets ("
                     "id SERIAL PRIMARY KEY, "
                     "user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "token VARCHAR(255) NOT NULL UNIQUE, "
+                    "expires_at TIMESTAMP NOT NULL, "
+                    "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
+                    ")"
+                )
+            )
             db.session.execute(
                 text(
                     "CREATE TABLE IF NOT EXISTS notifications ("
@@ -143,12 +149,6 @@ def create_app() -> Flask:
                     "corrected_excerpt TEXT, "
                     "href VARCHAR(120), "
                     "read_at TIMESTAMP, "
-                    "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
-                    ")"
-                )
-            )
-                    "token VARCHAR(255) NOT NULL UNIQUE, "
-                    "expires_at TIMESTAMP NOT NULL, "
                     "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
                     ")"
                 )
