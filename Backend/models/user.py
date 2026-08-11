@@ -23,6 +23,12 @@ class User(db.Model):
     avatar_url = db.Column("avatar_path", db.String(255), nullable=True)
     language_preference = db.Column(
         db.String(10), nullable=False, default="so")
+    # When this account became a healthcare advisor. Review queue starts here.
+    advisor_since = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    deletion_requested_at = db.Column(db.DateTime, nullable=True)
+    # When this account became a healthcare advisor. Review queue starts here.
+    advisor_since = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(
         db.DateTime,
         nullable=False,
@@ -46,6 +52,12 @@ class User(db.Model):
             "full_name": self.full_name,
             "name": self.full_name,
             "role": self.role or "user",
+            "is_active": bool(self.is_active),
+            "deletion_requested_at": (
+                self.deletion_requested_at.isoformat()
+                if self.deletion_requested_at
+                else None
+            ),
             "avatar_url": self.avatar_url,
             "language_preference": self.language_preference or "so",
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -56,6 +68,12 @@ class User(db.Model):
             "name": self.full_name,
             "email": self.email,
             "avatar_url": self.avatar_url,
+            "is_active": bool(self.is_active),
+            "deletion_requested_at": (
+                self.deletion_requested_at.isoformat()
+                if self.deletion_requested_at
+                else None
+            ),
             "language_preference": self.language_preference or "so",
             "role": self.role or "user",
             "created_at": self.created_at.isoformat() if self.created_at else None,
