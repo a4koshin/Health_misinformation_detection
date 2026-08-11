@@ -217,6 +217,7 @@ def persist_dataset_predictions(user_id: int, results: list[dict[str, Any]]) -> 
     from services import db_service
 
     saved = 0
+    queued: list = []
     for row in results:
         text = (row.get("text") or "").strip()
         label = row.get("prediction")
@@ -227,7 +228,7 @@ def persist_dataset_predictions(user_id: int, results: list[dict[str, Any]]) -> 
             confidence = float(confidence) if confidence is not None else None
         except (TypeError, ValueError):
             confidence = None
-        db_service.save_prediction(
+        prediction = db_service.save_prediction(
             user_id=user_id,
             claim_text=text,
             is_medical=True,
@@ -236,7 +237,13 @@ def persist_dataset_predictions(user_id: int, results: list[dict[str, Any]]) -> 
             source="UploadedFile",
             commit=False,
         )
+        if prediction.needs_review:
+            queued.append(prediction)
         saved += 1
     if saved:
         db.session.commit()
+    if queued:
+        from services import notification_service
+
+        notification_service.notify_non_reliable_batch(queued, user_id=user_id)
     return saved
