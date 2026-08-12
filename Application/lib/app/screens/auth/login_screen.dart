@@ -49,117 +49,100 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final loading = context.watch<AuthProvider>().isLoading;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(28, 36, 28, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AuthHeadline(
-                      lead: 'Welcome',
-                      accent: 'Back',
-                      subtitle: 'Check Somali health claims in seconds',
-                    ),
-                    const SizedBox(height: 40),
-                    TextField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.email],
-                      textInputAction: TextInputAction.next,
-                      decoration: authInputDecoration(hint: 'Email'),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _password,
-                      obscureText: _obscure,
-                      autofillHints: const [AutofillHints.password],
-                      onSubmitted: (_) => loading ? null : _submit(),
-                      decoration: authInputDecoration(
-                        hint: 'Password',
-                        suffix: IconButton(
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(36, 36),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: EdgeInsets.zero,
-                          ),
-                          icon: Icon(
-                            _obscure ? Iconsax.eye : Iconsax.eye_slash,
-                            color: AppColors.placeholder,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: loading
-                            ? null
-                            : () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const ForgotPasswordScreen(),
-                                  ),
-                                );
-                              },
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.inkMuted,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          'Forgot Your Password?',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    AuthPrimaryButton(
-                      label: 'Sign In',
-                      loading: loading,
-                      onPressed: _submit,
-                    ),
-                  ],
+    return AuthScaffold(
+      footer: AuthFooterPrompt(
+        prompt: "Don't have an account? ",
+        action: 'Sign Up',
+        onTap: loading
+            ? null
+            : () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                );
+              },
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AuthHeader(
+            title: 'Sign in',
+            subtitle: 'Welcome back to SomAI',
+          ),
+          const SizedBox(height: 32),
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            autofillHints: const [AutofillHints.email],
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              label: 'Email',
+              hint: 'you@example.com',
+              prefix: const Icon(
+                Iconsax.sms,
+                size: 18,
+                color: AppColors.placeholder,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _password,
+            obscureText: _obscure,
+            autofillHints: const [AutofillHints.password],
+            onSubmitted: (_) => loading ? null : _submit(),
+            decoration: authInputDecoration(
+              label: 'Password',
+              hint: 'Enter your password',
+              prefix: const Icon(
+                Iconsax.lock,
+                size: 18,
+                color: AppColors.placeholder,
+              ),
+              suffix: IconButton(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure ? Iconsax.eye : Iconsax.eye_slash,
+                  color: AppColors.placeholder,
+                  size: 18,
                 ),
               ),
             ),
-            AuthFooterPrompt(
-              prompt: "Don't have an account? ",
-              action: 'Sign Up',
-              onTap: loading
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: loading
                   ? null
                   : () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const RegisterScreen(),
+                          builder: (_) => const ForgotPasswordScreen(),
                         ),
                       );
                     },
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.brand,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              child: const Text(
+                'Forgot password?',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
+          ),
+          if (_error != null) ...[
+            AuthMessage(text: _error!),
+            const SizedBox(height: 14),
           ],
-        ),
+          AuthPrimaryButton(
+            label: 'Sign In',
+            loading: loading,
+            onPressed: _submit,
+          ),
+        ],
       ),
     );
   }
