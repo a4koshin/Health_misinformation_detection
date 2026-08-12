@@ -18,16 +18,83 @@ class ApiClient {
   Future<Map<String, dynamic>> get(
     String path, {
     bool auth = false,
+    Duration? timeout,
   }) {
-    return _send('GET', path, auth: auth);
+    return _send('GET', path, auth: auth, timeout: timeout);
   }
 
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
     bool auth = false,
+    Duration? timeout,
   }) {
-    return _send('POST', path, body: body, auth: auth);
+    return _send('POST', path, body: body, auth: auth, timeout: timeout);
+  }
+
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required String fieldName,
+    String? filePath,
+    List<int>? bytes,
+    String? filename,
+    bool auth = false,
+  }) async {
+    if ((filePath == null || filePath.isEmpty) && bytes == null) {
+      throw const ApiException('No file was selected.');
+    }
+
+    final uri = Uri.parse('${ApiConstants.baseUrl}$path');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers['Accept'] = 'application/json';
+
+    if (auth) {
+      final token = await _storage.read();
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+    }
+
+    if (bytes != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          fieldName,
+          bytes,
+          filename: filename ?? 'dataset.csv',
+        ),
+      );
+    } else {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          fieldName,
+          filePath!,
+          filename: filename,
+        ),
+      );
+    }
+
+    try {
+      final streamed = await _client.send(request).timeout(
+            const Duration(seconds: 120),
+          );
+      final response = await http.Response.fromStream(streamed);
+      return _decodeResponse(response);
+    } on SocketException {
+      throw ApiException(
+        'Cannot reach the server. Start the backend on ${ApiConstants.baseUrl}.',
+      );
+    } on HttpException {
+      throw ApiException(
+        'Cannot reach the server. Start the backend on ${ApiConstants.baseUrl}.',
+      );
+    } on FormatException {
+      throw const ApiException('The server returned an unexpected response.');
+    } catch (error) {
+      if (error is ApiException) rethrow;
+      throw ApiException(
+        'Cannot reach the server. Start the backend on ${ApiConstants.baseUrl}.',
+      );
+    }
   }
 
   Future<Map<String, dynamic>> _send(
@@ -35,6 +102,7 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     bool auth = false,
+    Duration? timeout,
   }) async {
     final uri = Uri.parse('${ApiConstants.baseUrl}$path');
     final headers = <String, String>{
@@ -55,7 +123,7 @@ class ApiClient {
         ..headers.addAll(headers)
         ..body = body == null ? '' : jsonEncode(body);
       final streamed = await _client.send(request).timeout(
-            const Duration(seconds: 30),
+            timeout ?? const Duration(seconds: 30),
           );
       response = await http.Response.fromStream(streamed);
     } on SocketException {
@@ -75,6 +143,10 @@ class ApiClient {
       );
     }
 
+    return _decodeResponse(response);
+  }
+
+  Map<String, dynamic> _decodeResponse(http.Response response) {
     if (response.statusCode == 204) return {};
 
     dynamic decoded = {};
