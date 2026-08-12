@@ -39,6 +39,8 @@ dependencies:
   flutter_secure_storage: ^10.0.0
   google_fonts: ^6.3.2
   iconsax_flutter: ^1.0.1
+  file_picker: ^10.3.2
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
