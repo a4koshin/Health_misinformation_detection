@@ -54,8 +54,8 @@ class AppBottomNav extends StatelessWidget {
                           onTap: () => onChanged(0),
                         ),
                         _TabButton(
-                          label: 'Search',
-                          icon: Iconsax.search_normal_copy,
+                          label: 'Corrections',
+                          icon: Iconsax.message_edit_copy,
                           selected: index == 1,
                           onTap: () => onChanged(1),
                         ),
