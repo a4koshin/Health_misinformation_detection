@@ -63,97 +63,84 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final loading = context.watch<AuthProvider>().isLoading;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(28, 24, 28, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Iconsax.arrow_left),
-                      color: AppColors.ink,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const AuthHeadline(
-                      lead: 'Create',
-                      accent: 'Account',
-                      subtitle: 'Register as a user to check health claims',
-                    ),
-                    const SizedBox(height: 36),
-                    TextField(
-                      controller: _name,
-                      textCapitalization: TextCapitalization.words,
-                      textInputAction: TextInputAction.next,
-                      decoration: authInputDecoration(hint: 'Full name'),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      decoration: authInputDecoration(hint: 'Email'),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _password,
-                      obscureText: _obscure,
-                      onSubmitted: (_) => loading ? null : _submit(),
-                      decoration: authInputDecoration(
-                        hint: 'Password',
-                        suffix: IconButton(
-                          onPressed: () =>
-                              setState(() => _obscure = !_obscure),
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(36, 36),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: EdgeInsets.zero,
-                          ),
-                          icon: Icon(
-                            _obscure ? Iconsax.eye : Iconsax.eye_slash,
-                            color: AppColors.placeholder,
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    AuthPrimaryButton(
-                      label: 'Sign Up',
-                      loading: loading,
-                      onPressed: _submit,
-                    ),
-                  ],
+    return AuthScaffold(
+      showBack: true,
+      footer: AuthFooterPrompt(
+        prompt: 'Already have an account? ',
+        action: 'Sign In',
+        onTap: loading ? null : () => Navigator.of(context).pop(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AuthHeader(
+            title: 'Create account',
+            subtitle: 'Sign up to check Somali health claims',
+          ),
+          const SizedBox(height: 28),
+          TextField(
+            controller: _name,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              label: 'Full name',
+              hint: 'Your full name',
+              prefix: const Icon(
+                Iconsax.user,
+                size: 18,
+                color: AppColors.placeholder,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            decoration: authInputDecoration(
+              label: 'Email',
+              hint: 'you@example.com',
+              prefix: const Icon(
+                Iconsax.sms,
+                size: 18,
+                color: AppColors.placeholder,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _password,
+            obscureText: _obscure,
+            onSubmitted: (_) => loading ? null : _submit(),
+            decoration: authInputDecoration(
+              label: 'Password',
+              hint: 'At least 8 characters',
+              prefix: const Icon(
+                Iconsax.lock,
+                size: 18,
+                color: AppColors.placeholder,
+              ),
+              suffix: IconButton(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure ? Iconsax.eye : Iconsax.eye_slash,
+                  color: AppColors.placeholder,
+                  size: 18,
                 ),
               ),
             ),
-            AuthFooterPrompt(
-              prompt: 'Already have an account? ',
-              action: 'Sign In',
-              onTap: loading ? null : () => Navigator.of(context).pop(),
-            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 14),
+            AuthMessage(text: _error!),
           ],
-        ),
+          const SizedBox(height: 20),
+          AuthPrimaryButton(
+            label: 'Sign Up',
+            loading: loading,
+            onPressed: _submit,
+          ),
+        ],
       ),
     );
   }
