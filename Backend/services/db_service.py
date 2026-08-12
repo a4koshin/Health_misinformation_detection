@@ -277,52 +277,6 @@ def _build_report_payload(
             }
             for doctor in doctors
         ],
-                "advisor_name": (
-                    (advisor.full_name or "").strip()
-                    or (advisor.email.split("@")[0] if advisor else None)
-                ),
-                "source": (
-                    "UploadedFile"
-                    if (row.source or "") == "UploadedFile" or row.upload_batch_id
-                    else "Manual check"
-                ),
-                "created_at": row.created_at.isoformat() if row.created_at else None,
-            }
-        [
-            "user_name",
-            "user_email",
-            "user_role",
-            "claim",
-            "label",
-            "source",
-            "reviewed_by",
-            "created_at",
-        ]
-    )
-    for row in report.get("rows", []):
-        writer.writerow(
-            [
-                row.get("user_name", ""),
-                row.get("user_email", ""),
-                row.get("user_role", ""),
-                row.get("claim", ""),
-                row.get("label", ""),
-                row.get("source") or "Manual check",
-                row.get("advisor_name") or "",
-        else 0.0,
-        "non_reliable_percent": round((non_reliable_count / total_claims) * 100, 1)
-        if total_claims
-        else 0.0,
-        "doctors_who_can_review": len(doctors),
-        "doctors": [
-            {
-                "id": str(doctor.id),
-                "name": (doctor.full_name or "").strip() or doctor.email.split("@")[0],
-                "email": doctor.email,
-                "corrections": doctor_corrections.get(doctor.id, 0),
-            }
-            for doctor in doctors
-        ],
         "rows": report_rows,
     }
 
