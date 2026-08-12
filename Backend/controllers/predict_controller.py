@@ -79,13 +79,6 @@ def predict():
                 "message": "Healthcare advisors cannot run predictions.",
             }
         ), 403
-    if user.is_healthcare_advisor:
-        return jsonify(
-            {
-                "error": True,
-                "message": "Healthcare advisors cannot run predictions.",
-            }
-        ), 403
 
     try:
         result = predictor_service.classify_claim(text)
@@ -119,13 +112,6 @@ def predict_media():
     kind = (request.form.get("kind") or "").strip().lower()
     if kind not in {"audio", "video"}:
         return jsonify(
-    if user.is_healthcare_advisor:
-        return jsonify(
-            {
-                "error": True,
-                "message": "Healthcare advisors cannot run predictions.",
-            }
-        ), 403
             {"error": True, "message": "Upload kind must be 'audio' or 'video'."}
         ), 400
 
@@ -133,6 +119,13 @@ def predict_media():
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
         return jsonify({"error": True, "message": "User not found."}), 404
+    if user.is_healthcare_advisor:
+        return jsonify(
+            {
+                "error": True,
+                "message": "Healthcare advisors cannot run predictions.",
+            }
+        ), 403
 
     try:
         transcript = media_service.transcribe_media(file, kind=kind)
