@@ -25,12 +25,6 @@ def _resolve_model_dir() -> Path:
     for name in _MODEL_CANDIDATES:
         path = ML_DIR / name
         if path.is_dir() and _has_weights(path):
-
-
-def _resolve_model_dir() -> Path:
-    for name in _MODEL_CANDIDATES:
-        path = ML_DIR / name
-        if path.is_dir() and _has_weights(path):
             return path
     return ML_DIR / _MODEL_CANDIDATES[0]
 
@@ -64,12 +58,6 @@ def load_models() -> None:
     TASK_A_DIR = _resolve_model_dir()
     MODEL_NAME = TASK_A_DIR.name
     if not _has_weights(TASK_A_DIR):
-    weight_files = (
-        TASK_A_DIR / "model.safetensors",
-        TASK_A_DIR / "pytorch_model.bin",
-        TASK_A_DIR / "model.bin",
-    )
-    if not any(path.exists() for path in weight_files):
         raise FileNotFoundError(
             f"Model folder {TASK_A_DIR.name} is missing weights "
             f"(expected model.safetensors)."
@@ -151,13 +139,13 @@ def _predict_with_transformer(
     return {
         "label": label,
         "confidence": confidence,
-    """Run SomBERTb from ml_models/sombertb_task_a.
+        "pred_id": pred_id,
         "probs": [float(p) for p in probs.tolist()],
     }
 
 
 def predict_reliability(text: str) -> dict[str, Any]:
-    """Run SomBERTb from ml_models/sombertb_Model.
+    """Run SomBERTb from ml_models/sombertb_task_a.
 
     Returns {label, confidence, pred_id, probs, model}.
     """
@@ -342,7 +330,7 @@ def build_message(
     is_medical: bool,
     label: str | None,
 ) -> str:
-    """Somali user-facing copy — kept in sync with run_full_pipeline messages."""
+    """Somali user-facing copy - kept in sync with run_full_pipeline messages."""
     if not is_medical:
         return (
             "Jumladaan ma aha mid caafimaad ku saabsan. "
