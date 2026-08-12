@@ -64,79 +64,51 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(28, 24, 28, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Iconsax.arrow_left),
-                      color: AppColors.ink,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 44,
-                        minHeight: 44,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const AuthHeadline(
-                      lead: 'Forgot',
-                      accent: 'Password',
-                      subtitle: 'Enter your email and we will send a reset link',
-                    ),
-                    const SizedBox(height: 40),
-                    TextField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _sending ? null : _submit(),
-                      decoration: authInputDecoration(hint: 'Email'),
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: AppColors.danger,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                    if (_success != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _success!,
-                        style: const TextStyle(
-                          color: AppColors.inkMuted,
-                          fontSize: 11,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    AuthPrimaryButton(
-                      label: 'Send Reset Link',
-                      loading: _sending,
-                      onPressed: _submit,
-                    ),
-                  ],
-                ),
+    return AuthScaffold(
+      showBack: true,
+      footer: AuthFooterPrompt(
+        prompt: 'Remember your password? ',
+        action: 'Sign In',
+        onTap: () => Navigator.of(context).pop(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const AuthHeader(
+            title: 'Forgot password',
+            subtitle: 'Enter your email and we will send a reset link',
+          ),
+          const SizedBox(height: 32),
+          TextField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _sending ? null : _submit(),
+            decoration: authInputDecoration(
+              label: 'Email',
+              hint: 'you@example.com',
+              prefix: const Icon(
+                Iconsax.sms,
+                size: 18,
+                color: AppColors.placeholder,
               ),
             ),
-            AuthFooterPrompt(
-              prompt: 'Remember your password? ',
-              action: 'Sign In',
-              onTap: () => Navigator.of(context).pop(),
-            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 14),
+            AuthMessage(text: _error!),
           ],
-        ),
+          if (_success != null) ...[
+            const SizedBox(height: 14),
+            AuthMessage(text: _success!, isError: false),
+          ],
+          const SizedBox(height: 20),
+          AuthPrimaryButton(
+            label: 'Send Reset Link',
+            loading: _sending,
+            onPressed: _submit,
+          ),
+        ],
       ),
     );
   }
