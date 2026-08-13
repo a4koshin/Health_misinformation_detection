@@ -31,9 +31,12 @@ class Prediction(db.Model):
     needs_review = db.Column(db.Boolean, nullable=False, default=False)
     review_status = db.Column(db.String(20), nullable=True)
     advisor_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    assigned_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    assigned_at = db.Column(db.DateTime, nullable=True)
     advisor_note = db.Column(db.Text, nullable=True)
     corrected_claim_text = db.Column(db.Text, nullable=True)
     reviewed_at = db.Column(db.DateTime, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(
         db.DateTime,
         nullable=False,
@@ -70,6 +73,9 @@ class Prediction(db.Model):
             "original_claim_text": self.claim_text,
             "corrected_claim_text": self.corrected_claim_text,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "assigned_at": self.assigned_at.isoformat() if self.assigned_at else None,
+            "assigned_by_id": str(self.assigned_by_id) if self.assigned_by_id else None,
+            "is_active": bool(self.is_active if self.is_active is not None else True),
             # Frontend Detection compatibility
             "input_text": self.claim_text,
             "confidence": confidence,
@@ -87,6 +93,7 @@ class Prediction(db.Model):
 
         user_ids = {row.user_id for row in rows}
         user_ids.update(row.advisor_id for row in rows if row.advisor_id)
+        user_ids.update(row.assigned_by_id for row in rows if row.assigned_by_id)
         users = (
             {user.id: user for user in User.query.filter(User.id.in_(user_ids)).all()}
             if user_ids
@@ -97,8 +104,12 @@ class Prediction(db.Model):
             payload = row.to_review_dict() if review else row.to_dict()
             owner = users.get(row.user_id)
             advisor = users.get(row.advisor_id) if row.advisor_id else None
+            assigned_by = (
+                users.get(row.assigned_by_id) if row.assigned_by_id else None
+            )
             payload["user_name"] = _display_name(owner)
             payload["user_email"] = owner.email if owner else None
             payload["advisor_name"] = _display_name(advisor)
+            payload["assigned_by_name"] = _display_name(assigned_by)
             items.append(payload)
         return items
