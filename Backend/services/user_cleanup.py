@@ -22,6 +22,7 @@ def purge_user_dependencies(user_id: int) -> None:
     )
     Prediction.query.filter_by(user_id=user_id).delete(synchronize_session=False)
 
+    _safe_execute("DELETE FROM doctors WHERE user_id = :uid", user_id)
     _safe_execute("DELETE FROM upload_batches WHERE user_id = :uid", user_id)
     _safe_execute("DELETE FROM password_resets WHERE user_id = :uid", user_id)
     _safe_execute("DELETE FROM conversations WHERE user_id = :uid", user_id)
