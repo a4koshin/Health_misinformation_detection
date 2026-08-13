@@ -35,7 +35,7 @@ def create_app() -> Flask:
     app.register_blueprint(notification_bp)
 
     # Import models so SQLAlchemy knows the tables.
-    from models import AuditLog, Notification, PasswordReset, Prediction, User  # noqa: F401
+    from models import AuditLog, Doctor, Notification, PasswordReset, Prediction, User  # noqa: F401
 
     with app.app_context():
         db.create_all()
@@ -88,6 +88,36 @@ def create_app() -> Flask:
             )
             db.session.execute(
                 text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS assigned_by_id INTEGER "
+                    "REFERENCES users(id)"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS is_active "
+                    "BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            # Unassigned shared-queue rows become admin assignment queue.
+            db.session.execute(
+                text(
+                    "UPDATE predictions "
+                    "SET review_status = 'awaiting_assignment' "
+                    "WHERE needs_review = TRUE "
+                    "AND review_status = 'pending' "
+                    "AND advisor_id IS NULL"
+                )
+            )
+            db.session.execute(
+                text(
                     "ALTER TABLE users "
                     "ADD COLUMN IF NOT EXISTS advisor_since TIMESTAMP"
                 )
@@ -95,8 +125,15 @@ def create_app() -> Flask:
             db.session.execute(
                 text(
                     "UPDATE users "
+                    "SET role = 'doctor' "
+                    "WHERE LOWER(role) = 'healthcare_advisor'"
+                )
+            )
+            db.session.execute(
+                text(
+                    "UPDATE users "
                     "SET advisor_since = created_at "
-                    "WHERE LOWER(role) = 'healthcare_advisor' "
+                    "WHERE LOWER(role) = 'doctor' "
                     "AND advisor_since IS NULL"
                 )
             )
@@ -115,8 +152,47 @@ def create_app() -> Flask:
             )
             db.session.execute(
                 text(
-                    "ALTER TABLE users "
-                    "ADD COLUMN IF NOT EXISTS advisor_since TIMESTAMP"
+                    "CREATE TABLE IF NOT EXISTS doctors ("
+                    "id SERIAL PRIMARY KEY, "
+                    "user_id INTEGER NOT NULL UNIQUE REFERENCES users(id), "
+                    "name VARCHAR(120) NOT NULL, "
+                    "license VARCHAR(255) NOT NULL, "
+                    "profile_image VARCHAR(255) NOT NULL DEFAULT '', "
+                    "job_title VARCHAR(120) NOT NULL, "
+                    "workplace VARCHAR(180) NOT NULL, "
+                    "created_at TIMESTAMP NOT NULL DEFAULT NOW(), "
+                    "updated_at TIMESTAMP NOT NULL DEFAULT NOW()"
+                    ")"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE doctors "
+                    "ADD COLUMN IF NOT EXISTS profile_image "
+                    "VARCHAR(255) NOT NULL DEFAULT ''"
+                )
+            )
+            try:
+                with db.session.begin_nested():
+                    db.session.execute(
+                        text(
+                            "ALTER TABLE doctors "
+                            "ALTER COLUMN license TYPE VARCHAR(255)"
+                        )
+                    )
+            except Exception:
+                pass
+            # Backfill profiles for migrated doctor accounts.
+            db.session.execute(
+                text(
+                    "INSERT INTO doctors "
+                    "(user_id, name, license, profile_image, job_title, workplace) "
+                    "SELECT u.id, "
+                    "COALESCE(NULLIF(TRIM(u.full_name), ''), SPLIT_PART(u.email, '@', 1)), "
+                    "'', '', 'Doctor', 'Not specified' "
+                    "FROM users u "
+                    "WHERE LOWER(u.role) = 'doctor' "
+                    "AND NOT EXISTS (SELECT 1 FROM doctors d WHERE d.user_id = u.id)"
                 )
             )
             db.session.execute(
@@ -165,8 +241,6 @@ def create_app() -> Flask:
             db.session.rollback()
             app.logger.exception("Admin seed failed")
 
-        from services.seed_service import seed_admin
-
     @app.before_request
     def reject_deactivated_users():
         if request.method == "OPTIONS":
@@ -189,12 +263,6 @@ def create_app() -> Flask:
                 }
             ), 403
         return None
-
-        try:
-            seed_admin()
-        except Exception:
-            db.session.rollback()
-            app.logger.exception("Admin seed failed")
 
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
