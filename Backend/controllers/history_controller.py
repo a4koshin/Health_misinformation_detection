@@ -96,15 +96,40 @@ def get_history():
     if not user:
         return jsonify({"error": True, "message": "User not found."}), 404
     page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 50, type=int)
+    per_page = request.args.get("per_page", 100, type=int)
 
+    is_admin = (user.role or "").strip().lower() == "admin"
     result = db_service.get_user_predictions(
         user.id,
         page=page,
         per_page=per_page,
-        include_reviewed=user.is_healthcare_advisor,
+        include_reviewed=user.is_doctor and not is_admin,
+        is_admin=is_admin,
     )
     return jsonify(result["items"]), 200
+
+
+@jwt_required()
+def get_corrections():
+    user = auth_service.get_user_by_id(get_jwt_identity())
+    if not user:
+        return jsonify({"error": True, "message": "User not found."}), 404
+
+    is_admin = (user.role or "").strip().lower() == "admin"
+    if user.is_doctor and not is_admin:
+        return jsonify(
+            {"error": True, "message": "Doctors use the Review page."}
+        ), 403
+
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 100, type=int)
+    result = db_service.get_corrections(
+        user_id=user.id,
+        is_admin=is_admin,
+        page=page,
+        per_page=per_page,
+    )
+    return jsonify(result), 200
 
 
 @jwt_required()
@@ -232,7 +257,10 @@ def edit_message(prediction_id: int, message_id: str):
     prediction.cleaned_text = result.get("cleaned_text")
     prediction.label = resolved_label
     prediction.confidence = resolved_confidence
-    was_pending = prediction.review_status == "pending"
+    was_pending = (prediction.review_status or "") in {
+        "pending",
+        "awaiting_assignment",
+    }
     prediction.label_confidence = conf
     prediction.source = (
         "non_medical" if not result["is_medical"] else (prediction.source or "pipeline")
@@ -241,17 +269,21 @@ def edit_message(prediction_id: int, message_id: str):
     prediction.risk = resolved_risk
     if resolved_label in {"Non-Reliable", "Misinformation"}:
         prediction.needs_review = True
-        if prediction.review_status != "pending":
-            prediction.review_status = "pending"
+        if prediction.review_status not in {"awaiting_assignment", "pending"}:
+            prediction.review_status = "awaiting_assignment"
             prediction.advisor_id = None
+            prediction.assigned_by_id = None
+            prediction.assigned_at = None
             prediction.advisor_note = None
             prediction.corrected_claim_text = None
             prediction.reviewed_at = None
     else:
         prediction.needs_review = False
-        if prediction.review_status == "pending":
+        if prediction.review_status in {"awaiting_assignment", "pending"}:
             prediction.review_status = None
             prediction.advisor_id = None
+            prediction.assigned_by_id = None
+            prediction.assigned_at = None
             prediction.advisor_note = None
             prediction.corrected_claim_text = None
             prediction.reviewed_at = None
@@ -266,7 +298,11 @@ def edit_message(prediction_id: int, message_id: str):
         ip_address=_client_ip(),
         commit=False,
     )
-    if prediction.needs_review and prediction.review_status == "pending" and not was_pending:
+    if (
+        prediction.needs_review
+        and prediction.review_status == "awaiting_assignment"
+        and not was_pending
+    ):
         notification_service.notify_non_reliable_claim(prediction)
     db.session.commit()
 
@@ -277,27 +313,47 @@ def edit_message(prediction_id: int, message_id: str):
 
 @jwt_required()
 def delete_history_item(prediction_id: int):
+    return jsonify(
+        {
+            "error": True,
+            "message": "History records cannot be deleted.",
+        }
+    ), 403
+
+
+@jwt_required()
+def set_prediction_active(prediction_id: int):
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
         return jsonify({"error": True, "message": "User not found."}), 404
-
-    deleted = db_service.delete_prediction(user.id, prediction_id)
-    if not deleted:
+    if (user.role or "").strip().lower() != "admin":
         return jsonify(
-            {
-                "error": True,
-                "message": "Prediction not found.",
-                "detail": "Prediction not found.",
-            }
-        ), 404
+            {"error": True, "message": "Admin access required."}
+        ), 403
+
+    data = request.get_json(silent=True) or {}
+    if "is_active" not in data:
+        return jsonify(
+            {"error": True, "message": "is_active is required."}
+        ), 400
+
+    prediction = db_service.set_prediction_active(
+        prediction_id=prediction_id,
+        is_active=bool(data.get("is_active")),
+    )
+    if not prediction:
+        return jsonify({"error": True, "message": "Prediction not found."}), 404
 
     audit_service.log_action(
         actor_id=user.id,
         actor_email=user.email,
-        action="prediction.delete",
+        action="prediction.deactivate" if not prediction.is_active else "prediction.activate",
         entity_type="prediction",
-        entity_id=prediction_id,
-        details=f"Deleted prediction #{prediction_id}",
+        entity_id=prediction.id,
+        details=(
+            f"{'Deactivated' if not prediction.is_active else 'Activated'} "
+            f"prediction #{prediction.id}"
+        ),
         ip_address=_client_ip(),
     )
-    return "", 204
+    return jsonify(Prediction.serialize_many([prediction], review=True)[0]), 200
