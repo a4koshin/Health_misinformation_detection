@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { PanelLeftIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { SearchChatsDialog } from "@/components/chat/search-chats-dialog";
@@ -73,7 +74,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const isAdmin = user?.role === "admin";
-  const isAdvisor = user?.role === "healthcare_advisor";
+  const isAdvisor = user?.role === "doctor";
 
   function go(path: string) {
     router.push(path);
@@ -208,7 +209,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
               aria-label="Close sidebar"
               title="Collapse sidebar"
             >
-              <MaterialIcon name="left_panel_close" size={18} />
+              <PanelLeftIcon className="size-[18px]" />
             </button>
           </div>
         </div>
@@ -259,14 +260,6 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                 onClick={() => go("/corrections")}
               />
             ) : null}
-            {isAdmin ? (
-              <NavItem
-                icon="download"
-                label="Report"
-                active={pathname === "/report"}
-                onClick={() => go("/report")}
-              />
-            ) : null}
           </div>
 
           {isAdmin ? (
@@ -280,6 +273,24 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                   label="Users"
                   active={pathname === "/users"}
                   onClick={() => go("/users")}
+                />
+                <NavItem
+                  icon="medical_services"
+                  label="Doctors"
+                  active={pathname === "/doctors"}
+                  onClick={() => go("/doctors")}
+                />
+                <NavItem
+                  icon="assignment_ind"
+                  label="Assign reviews"
+                  active={pathname === "/assign-reviews"}
+                  onClick={() => go("/assign-reviews")}
+                />
+                <NavItem
+                  icon="download"
+                  label="Report"
+                  active={pathname === "/report"}
+                  onClick={() => go("/report")}
                 />
                 <NavItem
                   icon="policy"
@@ -357,7 +368,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                   </div>
                   <span
                     className={
-                      user.role === "healthcare_advisor"
+                      user.role === "doctor"
                         ? "shrink-0 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-800"
                         : "shrink-0 rounded-full bg-brand/10 px-2.5 py-0.5 text-[11px] font-semibold text-brand-deep"
                     }
