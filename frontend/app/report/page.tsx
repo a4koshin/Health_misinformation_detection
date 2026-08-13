@@ -243,7 +243,7 @@ function ReportContent() {
       const userId = row.user_id || row.user_email || "";
       if (userFilter !== "all" && userId !== userFilter) return false;
 
-      if (roleFilter === "healthcare_advisor" && !row.advisor_id) {
+      if (roleFilter === "doctor" && !row.advisor_id) {
         return false;
       }
 
@@ -349,11 +349,11 @@ function ReportContent() {
     setIsDownloading(true);
     try {
       downloadReportCsv(
-        roleFilter === "healthcare_advisor"
+        roleFilter === "doctor"
           ? filtered.map((row) => ({
               ...row,
-              user_role: "healthcare_advisor",
-              user_name: row.advisor_name || "Healthcare Advisor",
+              user_role: "doctor",
+              user_name: row.advisor_name || "Doctor",
               user_email: row.advisor_email || "",
             }))
           : filtered,
@@ -531,7 +531,7 @@ function ReportContent() {
                   >
                     <option value="all">All roles</option>
                     <option value="user">User</option>
-                    <option value="healthcare_advisor">Healthcare Advisor</option>
+                    <option value="doctor">Doctor</option>
                     <option value="admin">Admin</option>
                   </GlassSelect>
                 </div>
@@ -694,14 +694,14 @@ function ReportContent() {
                     <GlassTableCell>
                       <div className="min-w-0">
                         <p className="truncate font-medium text-[#0f172a]">
-                          {roleFilter === "healthcare_advisor"
-                            ? row.advisor_name || "Healthcare Advisor"
+                          {roleFilter === "doctor"
+                            ? row.advisor_name || "Doctor"
                             : row.user_name ||
                               row.user_email?.split("@")[0] ||
                               "User"}
                         </p>
                         <p className="truncate text-xs text-[#64748b]">
-                          {roleFilter === "healthcare_advisor"
+                          {roleFilter === "doctor"
                             ? row.advisor_email || "—"
                             : row.user_email || "—"}
                         </p>
@@ -710,14 +710,14 @@ function ReportContent() {
                     <GlassTableCell>
                       <GlassBadge
                         tone={roleBadgeTone(
-                          roleFilter === "healthcare_advisor"
-                            ? "healthcare_advisor"
+                          roleFilter === "doctor"
+                            ? "doctor"
                             : row.user_role,
                         )}
                       >
                         {displayRoleLabel(
-                          roleFilter === "healthcare_advisor"
-                            ? "healthcare_advisor"
+                          roleFilter === "doctor"
+                            ? "doctor"
                             : row.user_role,
                         )}
                       </GlassBadge>
