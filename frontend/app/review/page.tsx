@@ -182,7 +182,7 @@ function ReviewContent() {
   return (
     <PrivatePage
       title="Review queue"
-      description="Every doctor sees Non-Reliable claims. After one doctor corrects a sentence, other doctors cannot correct it."
+      description="Only claims an admin assigned to you appear here. Correct or confirm each Non-Reliable claim."
     >
       <DataTableCard
         header={
@@ -375,7 +375,7 @@ function ReviewContent() {
 
 export default function ReviewPage() {
   return (
-    <ProtectedRoute roles={["healthcare_advisor"]}>
+    <ProtectedRoute roles={["doctor"]}>
       <AppShell>
         <ReviewContent />
       </AppShell>
