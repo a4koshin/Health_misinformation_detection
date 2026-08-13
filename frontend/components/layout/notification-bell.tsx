@@ -182,7 +182,7 @@ export function NotificationBell({ className }: { className?: string }) {
 }
 
 function fallbackHref(role: string | undefined) {
-  if (role === "healthcare_advisor") return "/review";
-  if (role === "admin") return "/audit-log";
+  if (role === "doctor") return "/review";
+  if (role === "admin") return "/assign-reviews";
   return "/corrections";
 }
