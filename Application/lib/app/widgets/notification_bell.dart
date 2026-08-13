@@ -27,7 +27,7 @@ class NotificationBell extends StatelessWidget {
           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
         ),
         child: const Icon(
-          Iconsax.notification,
+          Iconsax.notification_copy,
           size: 24,
           color: AppColors.ink,
         ),
