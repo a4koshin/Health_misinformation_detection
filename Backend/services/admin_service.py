@@ -32,7 +32,7 @@ def get_admin_dashboard_stats() -> dict:
     )
     total_advisors = (
         db.session.query(func.count(User.id))
-        .filter(func.lower(User.role) == "healthcare_advisor")
+        .filter(func.lower(User.role).in_(("doctor", "healthcare_advisor")))
         .scalar()
         or 0
     )
@@ -57,6 +57,9 @@ def get_admin_dashboard_stats() -> dict:
         or 0
     )
 
+    review_awaiting = sum(
+        1 for row in predictions if (row.review_status or "") == "awaiting_assignment"
+    )
     review_pending = sum(
         1 for row in predictions if (row.review_status or "") == "pending"
     )
@@ -67,7 +70,11 @@ def get_admin_dashboard_stats() -> dict:
         1 for row in predictions if (row.review_status or "") == "corrected"
     )
     review_unreviewed = max(
-        total_predictions - review_pending - review_confirmed - review_corrected,
+        total_predictions
+        - review_awaiting
+        - review_pending
+        - review_confirmed
+        - review_corrected,
         0,
     )
 
@@ -89,12 +96,13 @@ def get_admin_dashboard_stats() -> dict:
 
     roles = [
         {"name": "User", "count": total_regular_users, "key": "user"},
-        {"name": "Healthcare Advisor", "count": total_advisors, "key": "healthcare_advisor"},
+        {"name": "Doctor", "count": total_advisors, "key": "doctor"},
         {"name": "Admin", "count": total_admins, "key": "admin"},
     ]
 
     reviews = [
-        {"name": "Pending", "count": review_pending, "key": "pending"},
+        {"name": "Awaiting assignment", "count": review_awaiting, "key": "awaiting_assignment"},
+        {"name": "Assigned", "count": review_pending, "key": "pending"},
         {"name": "Confirmed", "count": review_confirmed, "key": "confirmed"},
         {"name": "Corrected", "count": review_corrected, "key": "corrected"},
         {"name": "No review", "count": review_unreviewed, "key": "none"},
@@ -186,6 +194,7 @@ def get_admin_dashboard_stats() -> dict:
         "total_users": total_users,
         "total_admins": total_admins,
         "total_advisors": total_advisors,
+        "total_doctors": total_advisors,
         "total_regular_users": total_regular_users,
         "total_detections": total_predictions,
         "total_predictions": total_predictions,
@@ -194,6 +203,7 @@ def get_admin_dashboard_stats() -> dict:
         "non_reliable_count": non_reliable_count,
         "pending_count": pending_count,
         "review_pending_count": review_pending,
+        "review_awaiting_count": review_awaiting,
         "review_confirmed_count": review_confirmed,
         "review_corrected_count": review_corrected,
         "daily": daily,
@@ -213,10 +223,11 @@ def list_users() -> list[dict]:
 
 def _normalize_role(role: str | None) -> str:
     value = (role or "user").strip().lower()
-    if value not in {"user", "admin", "healthcare_advisor"}:
-        raise ValueError(
-            "Role must be 'user', 'admin', or 'healthcare_advisor'."
-        )
+    # Legacy alias during migration.
+    if value == "healthcare_advisor":
+        value = "doctor"
+    if value not in {"user", "admin", "doctor"}:
+        raise ValueError("Role must be 'user', 'admin', or 'doctor'.")
     return value
 
 
@@ -238,13 +249,15 @@ def create_user(
         raise ValueError("Email is already registered.")
 
     resolved_role = _normalize_role(role)
+    if resolved_role == "doctor":
+        raise ValueError(
+            "Create doctors from the Doctors page so license and workplace are saved."
+        )
     user = User(
         email=email,
         full_name=next_name or None,
         role=resolved_role,
-        advisor_since=(
-            datetime.now(timezone.utc) if resolved_role == "healthcare_advisor" else None
-        ),
+        advisor_since=None,
     )
     user.set_password(password)
     db.session.add(user)
@@ -299,11 +312,21 @@ def update_user(
             )
             if admin_count <= 1:
                 raise ValueError("Cannot demote the last admin.")
+        if next_role == "doctor":
+            raise ValueError(
+                "Create or manage doctors from the Doctors page."
+            )
+        previous_normalized = (
+            "doctor"
+            if previous_role in {"doctor", "healthcare_advisor"}
+            else previous_role
+        )
         user.role = next_role
-        if next_role == "healthcare_advisor" and previous_role != "healthcare_advisor":
-            user.advisor_since = datetime.now(timezone.utc)
-        elif next_role != "healthcare_advisor":
+        if previous_normalized == "doctor" and next_role != "doctor":
             user.advisor_since = None
+            from models.doctor import Doctor
+
+            Doctor.query.filter_by(user_id=user.id).delete(synchronize_session=False)
 
     db.session.commit()
     return user
@@ -327,7 +350,29 @@ def approve_account_deletion(*, user_id: int, actor_id: int) -> User:
     return user
 
 
-def delete_user(*, user_id: int, actor_id: int) -> dict:
+def set_user_active(*, user_id: int, actor_id: int, is_active: bool) -> User:
+    """Soft-disable or restore an account. History and related data are kept."""
+    user = auth_service.get_user_by_id(user_id)
+    if not user:
+        raise LookupError("User not found.")
+    if user.id == actor_id:
+        raise ValueError("You cannot deactivate your own account.")
+    if (user.role or "").lower() == "admin":
+        raise ValueError("Admin accounts cannot be deactivated this way.")
+
+    next_active = bool(is_active)
+    if bool(user.is_active) == next_active:
+        return user
+
+    user.is_active = next_active
+    if next_active:
+        user.deletion_requested_at = None
+    db.session.commit()
+    return user
+
+
+def hard_delete_user(*, user_id: int, actor_id: int) -> dict:
+    """Internal hard-delete (e.g. removing a doctor account). Prefer set_user_active."""
     user = auth_service.get_user_by_id(user_id)
     if not user:
         raise LookupError("User not found.")
@@ -344,5 +389,7 @@ def delete_user(*, user_id: int, actor_id: int) -> dict:
         db.session.commit()
     except IntegrityError as exc:
         db.session.rollback()
-        raise ValueError("Unable to delete this user because related records remain.") from exc
+        raise ValueError(
+            "Unable to delete this user because related records remain."
+        ) from exc
     return {"id": str(user_id), "email": email, "role": role}
