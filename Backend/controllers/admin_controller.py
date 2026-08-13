@@ -101,28 +101,66 @@ def update_user(user_id: int):
 
 @jwt_required()
 def delete_user(user_id: int):
+    return (
+        jsonify(
+            {
+                "error": True,
+                "message": "Users cannot be deleted. Deactivate the account instead.",
+            }
+        ),
+        403,
+    )
+
+
+@jwt_required()
+def set_user_active(user_id: int):
     try:
         admin = admin_service.require_admin()
     except PermissionError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 403
 
+    data = request.get_json(silent=True) or {}
+    if "is_active" not in data:
+        return (
+            jsonify({"error": True, "message": "is_active is required."}),
+            400,
+        )
+
     try:
-        deleted = admin_service.delete_user(user_id=user_id, actor_id=admin.id)
+        user = admin_service.set_user_active(
+            user_id=user_id,
+            actor_id=admin.id,
+            is_active=bool(data.get("is_active")),
+        )
     except LookupError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 404
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 400
 
+    action = "user.activate" if user.is_active else "user.deactivate"
     audit_service.log_action(
         actor_id=admin.id,
         actor_email=admin.email,
-        action="user.delete",
+        action=action,
         entity_type="user",
-        entity_id=user_id,
-        details=f"Deleted user {deleted['email']} ({deleted['role']})",
+        entity_id=user.id,
+        details=(
+            f"{'Activated' if user.is_active else 'Deactivated'} "
+            f"user {user.email} ({user.role})"
+        ),
         ip_address=_client_ip(),
     )
-    return jsonify({"message": "User deleted.", **deleted}), 200
+    return (
+        jsonify(
+            {
+                "message": (
+                    "Account activated." if user.is_active else "Account deactivated."
+                ),
+                **user.to_dict(),
+            }
+        ),
+        200,
+    )
 
 
 @jwt_required()
