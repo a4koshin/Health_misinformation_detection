@@ -23,6 +23,12 @@ history_bp.add_url_rule(
     endpoint="get_history_stats",
 )
 history_bp.add_url_rule(
+    "/history/corrections",
+    view_func=history_controller.get_corrections,
+    methods=["GET"],
+    endpoint="get_corrections",
+)
+history_bp.add_url_rule(
     "/history/<int:prediction_id>",
     view_func=history_controller.get_conversation,
     methods=["GET"],
@@ -33,6 +39,12 @@ history_bp.add_url_rule(
     view_func=history_controller.delete_history_item,
     methods=["DELETE"],
     endpoint="delete_history_item",
+)
+history_bp.add_url_rule(
+    "/history/<int:prediction_id>/active",
+    view_func=history_controller.set_prediction_active,
+    methods=["PATCH"],
+    endpoint="set_prediction_active",
 )
 history_bp.add_url_rule(
     "/history/<int:prediction_id>/messages",
