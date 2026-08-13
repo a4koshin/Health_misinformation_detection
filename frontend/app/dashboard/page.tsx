@@ -54,7 +54,7 @@ const COLORS = {
   corrected: "#7c3aed",
   none: "#94a3b8",
   user: "#ff5c00",
-  advisor: "#2563eb",
+  doctor: "#2563eb",
   admin: "#0f172a",
   uploaded: "#ea580c",
   manual: "#0d9488",
@@ -242,7 +242,7 @@ function DashboardContent() {
     if (!stats) return [];
     const roleColor: Record<string, string> = {
       user: COLORS.user,
-      healthcare_advisor: COLORS.advisor,
+      doctor: COLORS.doctor,
       admin: COLORS.admin,
     };
     const items = (stats.roles ?? []).map((role) => ({
@@ -273,7 +273,8 @@ function DashboardContent() {
   const reviewData = useMemo(() => {
     if (!stats) return [];
     const reviewColor: Record<string, string> = {
-      pending: COLORS.pending,
+      awaiting_assignment: COLORS.pending,
+      pending: COLORS.blue,
       confirmed: COLORS.confirmed,
       corrected: COLORS.corrected,
       none: COLORS.none,
@@ -317,7 +318,7 @@ function DashboardContent() {
               tone="bg-[#ff5c00]/10 text-[#ff5c00]"
             />
             <StatCard
-              label="Advisors"
+              label="Doctors"
               value={stats.total_advisors ?? 0}
               icon="medical_services"
               tone="bg-blue-500/10 text-blue-700"
@@ -405,7 +406,7 @@ function DashboardContent() {
                   Accounts by role
                 </h2>
                 <p className="text-sm text-[#475569]">
-                  User, advisor, and admin mix.
+                  User, Doctor, and Admin mix.
                 </p>
               </div>
               <div className="h-56">
@@ -598,7 +599,7 @@ function DashboardContent() {
             <GlassCard className="p-6">
               <div className="mb-4">
                 <h2 className="text-base font-semibold text-[#0f172a]">
-                  Advisor review pipeline
+                  Doctor review pipeline
                 </h2>
                 <p className="text-sm text-[#475569]">
                   Pending, confirmed, corrected, and unreviewed claims.
