@@ -741,7 +741,7 @@ export function PredictionWorkspace() {
                   </p>
                   {result.label === "Non-Reliable" ? (
                     <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">
-                      This claim was sent to a Healthcare Advisor for review.
+                      This claim is waiting for an admin to assign a doctor for review.
                       Open History to see when they correct it.
                     </p>
                   ) : null}
