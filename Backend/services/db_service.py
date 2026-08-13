@@ -39,7 +39,7 @@ def save_prediction(
         source=resolved_source,
         risk=resolved_risk,
         needs_review=needs_review,
-        review_status="pending" if needs_review else None,
+        review_status="awaiting_assignment" if needs_review else None,
     )
     db.session.add(prediction)
     if commit:
@@ -53,25 +53,36 @@ def get_user_predictions(
     per_page: int = 20,
     *,
     include_reviewed: bool = False,
+    is_admin: bool = False,
 ) -> dict:
+    """
+    Role-scoped prediction history:
+    - admin: all predictions
+    - doctor: own predictions + claims assigned/reviewed by them
+    - user: own predictions only
+    """
     page = max(page, 1)
-    per_page = min(max(per_page, 1), 100)
+    per_page = min(max(per_page, 1), 200)
 
-    query = Prediction.query.filter_by(user_id=user_id)
-    if include_reviewed:
+    if is_admin:
+        query = Prediction.query
+    elif include_reviewed:
         query = Prediction.query.filter(
             or_(
                 Prediction.user_id == user_id,
                 Prediction.advisor_id == user_id,
-            )
+            ),
+            Prediction.is_active.is_(True),
         )
+    else:
+        query = Prediction.query.filter_by(user_id=user_id, is_active=True)
 
     pagination = query.order_by(Prediction.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
 
     return {
-        "items": Prediction.serialize_many(pagination.items),
+        "items": Prediction.serialize_many(pagination.items, review=True),
         "page": pagination.page,
         "per_page": pagination.per_page,
         "total": pagination.total,
@@ -79,13 +90,76 @@ def get_user_predictions(
     }
 
 
-def delete_prediction(user_id: int, prediction_id: int) -> bool:
-    prediction = Prediction.query.filter_by(id=prediction_id, user_id=user_id).first()
+def get_corrections(
+    *,
+    user_id: int,
+    is_admin: bool = False,
+    page: int = 1,
+    per_page: int = 100,
+) -> dict:
+    """Corrected claims for a user, or all corrections for admins."""
+    page = max(page, 1)
+    per_page = min(max(per_page, 1), 200)
+
+    query = Prediction.query.filter(
+        or_(
+            Prediction.review_status == "corrected",
+            Prediction.corrected_claim_text.isnot(None),
+        ),
+        Prediction.is_active.is_(True),
+    )
+    if not is_admin:
+        query = query.filter(Prediction.user_id == user_id)
+
+    pending_query = Prediction.query.filter(
+        Prediction.needs_review.is_(True),
+        Prediction.is_active.is_(True),
+        Prediction.review_status.in_(("awaiting_assignment", "pending")),
+    )
+    if not is_admin:
+        pending_query = pending_query.filter(Prediction.user_id == user_id)
+
+    pagination = query.order_by(
+        Prediction.reviewed_at.desc().nullslast(),
+        Prediction.created_at.desc(),
+    ).paginate(page=page, per_page=per_page, error_out=False)
+
+    return {
+        "items": Prediction.serialize_many(pagination.items, review=True),
+        "page": pagination.page,
+        "per_page": pagination.per_page,
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "pending_count": int(pending_query.count() or 0),
+    }
+
+
+def delete_prediction(
+    user_id: int,
+    prediction_id: int,
+) -> bool:
+    """Hard-delete is only for the owning user — admins deactivate instead."""
+    prediction = Prediction.query.filter_by(
+        id=prediction_id, user_id=user_id
+    ).first()
     if not prediction:
         return False
     db.session.delete(prediction)
     db.session.commit()
     return True
+
+
+def set_prediction_active(
+    *,
+    prediction_id: int,
+    is_active: bool,
+) -> Prediction | None:
+    prediction = db.session.get(Prediction, prediction_id)
+    if not prediction:
+        return None
+    prediction.is_active = bool(is_active)
+    db.session.commit()
+    return prediction
 
 
 def get_user_dashboard_stats(user_id: int) -> dict:
@@ -131,11 +205,13 @@ def get_platform_report(
         query = query.filter_by(user_id=user_id)
 
     resolved_role = (role or "").strip().lower()
-    if resolved_role == "healthcare_advisor":
+    if resolved_role in {"doctor", "healthcare_advisor"}:
         advisor_user = aliased(User)
         query = query.join(
             advisor_user, Prediction.advisor_id == advisor_user.id
-        ).filter(func.lower(advisor_user.role) == "healthcare_advisor")
+        ).filter(
+            func.lower(advisor_user.role).in_(("doctor", "healthcare_advisor"))
+        )
     elif resolved_role in {"user", "admin"}:
         query = query.join(User, User.id == Prediction.user_id).filter(
             func.lower(User.role) == resolved_role
@@ -187,7 +263,7 @@ def _build_report_payload(
 
     doctors = (
         User.query.filter(
-            func.lower(User.role) == "healthcare_advisor",
+            func.lower(User.role).in_(("doctor", "healthcare_advisor")),
             User.is_active.is_(True),
         )
         .order_by(User.full_name.asc(), User.email.asc())
@@ -218,7 +294,10 @@ def _build_report_payload(
             user.email.split("@")[0] if user else "Unknown"
         )
         submitter_role = (user.role if user else "user") or "user"
-        advisor_view = (role or "").strip().lower() == "healthcare_advisor"
+        advisor_view = (role or "").strip().lower() in {
+            "doctor",
+            "healthcare_advisor",
+        }
         report_rows.append(
             {
                 "id": str(row.id),
@@ -228,7 +307,7 @@ def _build_report_payload(
                     else str(row.user_id)
                 ),
                 "user_name": (
-                    advisor_name or "Healthcare Advisor"
+                    advisor_name or "Doctor"
                     if advisor_view
                     else submitter_name
                 ),
@@ -238,7 +317,7 @@ def _build_report_payload(
                     else (user.email if user else "")
                 ),
                 "user_role": (
-                    "healthcare_advisor" if advisor_view else submitter_role
+                    "doctor" if advisor_view else submitter_role
                 ),
                 "claim": row.claim_text,
                 "label": label,
