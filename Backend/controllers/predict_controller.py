@@ -72,11 +72,11 @@ def predict():
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
         return jsonify({"error": True, "message": "User not found."}), 404
-    if user.is_healthcare_advisor:
+    if user.is_doctor:
         return jsonify(
             {
                 "error": True,
-                "message": "Healthcare advisors cannot run predictions.",
+                "message": "Doctors cannot run predictions.",
             }
         ), 403
 
@@ -119,11 +119,11 @@ def predict_media():
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
         return jsonify({"error": True, "message": "User not found."}), 404
-    if user.is_healthcare_advisor:
+    if user.is_doctor:
         return jsonify(
             {
                 "error": True,
-                "message": "Healthcare advisors cannot run predictions.",
+                "message": "Doctors cannot run predictions.",
             }
         ), 403
 
