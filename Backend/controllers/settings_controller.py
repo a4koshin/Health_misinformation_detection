@@ -138,28 +138,12 @@ def upload_avatar():
 
 @jwt_required()
 def delete_history():
-    try:
-        deleted = settings_service.delete_history(_current_user_id())
-    except LookupError as exc:
-        return jsonify({"error": True, "message": str(exc)}), 404
-
-    user = settings_service.get_user(_current_user_id())
-    if user:
-        audit_service.log_action(
-            actor_id=user.id,
-            actor_email=user.email,
-            action="settings.history_delete",
-            entity_type="prediction",
-            details=f"Deleted {deleted} prediction(s)",
-            ip_address=_client_ip(),
-        )
-
     return jsonify(
         {
-            "message": "Your prediction history has been deleted.",
-            "deleted_count": deleted,
+            "error": True,
+            "message": "History records cannot be deleted.",
         }
-    ), 200
+    ), 403
 
 
 @jwt_required()
