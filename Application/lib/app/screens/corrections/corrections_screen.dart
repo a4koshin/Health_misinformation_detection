@@ -67,7 +67,7 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
         children: [
           const PageHeader(
             title: 'Corrections',
-            description: 'Sentences a healthcare advisor rewrote for you.',
+            description: 'Sentences a doctor rewrote for you.',
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -93,7 +93,7 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
 
     if (_error != null) {
       return EmptyPlaceholder(
-        icon: Iconsax.warning_2,
+        icon: Iconsax.warning_2_copy,
         title: 'Could not load corrections',
         description: _error!,
       );
@@ -101,10 +101,10 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
 
     if (_items.isEmpty) {
       return const EmptyPlaceholder(
-        icon: Iconsax.message_edit,
+        icon: Iconsax.message_edit_copy,
         title: 'No corrections yet',
         description:
-            'When an advisor corrects a Non-Reliable claim, it will appear here.',
+            'When a doctor corrects a Non-Reliable claim, it will appear here.',
       );
     }
 
@@ -145,7 +145,7 @@ class _CorrectionRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
-                  Iconsax.message_edit,
+                  Iconsax.message_edit_copy,
                   size: 18,
                   color: AppColors.brand,
                 ),
