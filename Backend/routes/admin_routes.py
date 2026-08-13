@@ -1,6 +1,6 @@
 from flask import Blueprint
 
-from controllers import admin_controller
+from controllers import admin_controller, admin_review_controller, doctor_controller
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/api/admin")
 
@@ -33,10 +33,52 @@ admin_bp.add_url_rule(
     endpoint="delete_user",
 )
 admin_bp.add_url_rule(
+    "/users/<int:user_id>/active",
+    view_func=admin_controller.set_user_active,
+    methods=["PATCH"],
+    endpoint="set_user_active",
+)
+admin_bp.add_url_rule(
     "/users/<int:user_id>/approve-deletion",
     view_func=admin_controller.approve_account_deletion,
     methods=["POST"],
     endpoint="approve_account_deletion",
+)
+admin_bp.add_url_rule(
+    "/doctors",
+    view_func=doctor_controller.list_doctors,
+    methods=["GET"],
+    endpoint="list_doctors",
+)
+admin_bp.add_url_rule(
+    "/doctors",
+    view_func=doctor_controller.create_doctor,
+    methods=["POST"],
+    endpoint="create_doctor",
+)
+admin_bp.add_url_rule(
+    "/doctors/<int:doctor_id>",
+    view_func=doctor_controller.update_doctor,
+    methods=["PATCH"],
+    endpoint="update_doctor",
+)
+admin_bp.add_url_rule(
+    "/doctors/<int:doctor_id>",
+    view_func=doctor_controller.delete_doctor,
+    methods=["DELETE"],
+    endpoint="delete_doctor",
+)
+admin_bp.add_url_rule(
+    "/review/queue",
+    view_func=admin_review_controller.list_assignment_queue,
+    methods=["GET"],
+    endpoint="admin_review_queue",
+)
+admin_bp.add_url_rule(
+    "/review/assign",
+    view_func=admin_review_controller.assign_review,
+    methods=["POST"],
+    endpoint="admin_review_assign",
 )
 admin_bp.add_url_rule(
     "/audit-logs",
