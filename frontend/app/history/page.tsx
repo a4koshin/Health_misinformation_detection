@@ -19,7 +19,7 @@ import {
   GlassTableHeaderCell,
   GlassTableRow,
 } from "@/components/glass/glass-table";
-import { TableDeleteButton } from "@/components/glass/table-icon-button";
+import { TableIconButton } from "@/components/glass/table-icon-button";
 import {
   TablePagination,
   useTablePagination,
@@ -28,7 +28,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import { ApiError } from "@/lib/api";
-import { deleteConversation, getHistory } from "@/lib/history";
+import { getHistory, setPredictionActive } from "@/lib/history";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
 import type { Detection } from "@/types/api";
@@ -59,15 +59,16 @@ function labelTone(label: string | null) {
 function reviewTone(status: Detection["review_status"]) {
   if (status === "confirmed") return "success" as const;
   if (status === "corrected") return "info" as const;
-  if (status === "pending") return "brand" as const;
+  if (status === "pending" || status === "awaiting_assignment") return "brand" as const;
   return "neutral" as const;
 }
 
 function reviewLabel(item: Detection) {
-  if (item.review_status === "pending") return "Pending";
+  if (item.review_status === "awaiting_assignment") return "Awaiting assignment";
+  if (item.review_status === "pending") return "Assigned";
   if (item.review_status === "confirmed") return "Confirmed";
   if (item.review_status === "corrected") return "Corrected";
-  if (item.needs_review) return "Pending";
+  if (item.needs_review) return "Awaiting assignment";
   return null;
 }
 
@@ -92,17 +93,19 @@ function correctedText(item: Detection) {
 
 function HistoryContent() {
   const { user, token } = useAuth();
-  const isAdvisor = user?.role === "healthcare_advisor";
+  const isAdvisor = user?.role === "doctor";
+  const isAdmin = user?.role === "admin";
   const historyRevision = useChatStore((state) => state.historyRevision);
-  const removeChat = useChatStore((state) => state.removeChat);
-  const columnCount = isAdvisor ? 7 : 8;
+  const columnCount = isAdvisor ? 7 : isAdmin ? 9 : 7;
 
   const [history, setHistory] = useState<Detection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [labelFilter, setLabelFilter] = useState<LabelFilter>("all");
-  const [pendingDelete, setPendingDelete] = useState<Detection | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingDeactivate, setPendingDeactivate] = useState<Detection | null>(
+    null,
+  );
+  const [isTogglingActive, setIsTogglingActive] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -168,30 +171,48 @@ function HistoryContent() {
 
   const pagination = useTablePagination(filtered, 10);
 
-  async function handleDelete() {
-    if (!token || !pendingDelete) return;
-    setIsDeleting(true);
+  async function handleToggleActive() {
+    if (!token || !pendingDeactivate || !isAdmin) return;
+    const nextActive = pendingDeactivate.is_active === false;
+    setIsTogglingActive(true);
     try {
-      await deleteConversation(token, pendingDelete.id);
-      setHistory((prev) => prev.filter((item) => item.id !== pendingDelete.id));
-      removeChat(pendingDelete.id);
-      setPendingDelete(null);
-      toast.success("Prediction deleted.");
+      const updated = await setPredictionActive(
+        token,
+        pendingDeactivate.id,
+        nextActive,
+      );
+      setHistory((prev) =>
+        prev.map((item) =>
+          item.id === updated.id
+            ? { ...item, is_active: updated.is_active !== false }
+            : item,
+        ),
+      );
+      setPendingDeactivate(null);
+      toast.success(
+        nextActive ? "Prediction activated." : "Prediction deactivated.",
+      );
     } catch (error) {
       const message =
         error instanceof ApiError
           ? error.message
-          : "Unable to delete prediction.";
+          : "Unable to update prediction status.";
       toast.error(message);
     } finally {
-      setIsDeleting(false);
+      setIsTogglingActive(false);
     }
   }
 
   return (
     <PrivatePage
       title="Prediction History"
-      description="Saved detections, including advisor corrections with the original and rewritten claim."
+      description={
+        isAdmin
+          ? "All platform detections. Admins can deactivate records but cannot delete them."
+          : isAdvisor
+            ? "Your predictions and claims assigned to you for review."
+            : "Your saved detections, including doctor corrections. History cannot be deleted."
+      }
     >
       <DataTableCard
         header={
@@ -200,7 +221,9 @@ function HistoryContent() {
               Predictions
             </h2>
             <p className="text-sm text-[#475569]">
-              Search, filter, and page through your detection records.
+              {isAdmin
+                ? "Search and filter every detection on the platform."
+                : "Search, filter, and page through your detection records."}
             </p>
           </div>
         }
@@ -218,7 +241,11 @@ function HistoryContent() {
                   id="history-search"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search claim, ID, or source..."
+                  placeholder={
+                    isAdmin
+                      ? "Search claim, user, doctor, ID, or source…"
+                      : "Search claim, ID, or source..."
+                  }
                   className="rounded-xl bg-white pl-10"
                 />
               </div>
@@ -266,11 +293,14 @@ function HistoryContent() {
             <GlassTableHeaderCell>
               {isAdvisor ? "Reviewed" : "Review"}
             </GlassTableHeaderCell>
-            {isAdvisor ? null : (
+            {isAdmin ? (
+              <GlassTableHeaderCell>Status</GlassTableHeaderCell>
+            ) : null}
+            {isAdmin ? (
               <GlassTableHeaderCell className="text-right">
                 Action
               </GlassTableHeaderCell>
-            )}
+            ) : null}
           </GlassTableRow>
         </GlassTableHead>
         <GlassTableBody>
@@ -304,8 +334,12 @@ function HistoryContent() {
                 pagination.pageItems.map((item) => {
                   const previous = item.original_claim_text || claimText(item);
                   const corrected = correctedText(item);
+                  const isActive = item.is_active !== false;
                   return (
-                  <GlassTableRow key={item.id}>
+                  <GlassTableRow
+                    key={item.id}
+                    className={isActive ? undefined : "opacity-60"}
+                  >
                     <GlassTableCell className="whitespace-nowrap">
                       <p className="font-medium text-[#0f172a]">
                         {item.user_name || "User"}
@@ -350,7 +384,9 @@ function HistoryContent() {
                               ? `Reviewed by ${item.advisor_name}`
                               : "Reviewed"}
                           </GlassBadge>
-                        ) : item.review_status === "pending" || item.needs_review ? (
+                        ) : item.review_status === "pending" ||
+                          item.review_status === "awaiting_assignment" ||
+                          item.needs_review ? (
                           <span className="text-sm text-[#94a3b8]">Waiting</span>
                         ) : (
                           <span className="text-[#94a3b8]">—</span>
@@ -370,18 +406,31 @@ function HistoryContent() {
                         <span className="text-[#94a3b8]">—</span>
                       )}
                     </GlassTableCell>
-                    {isAdvisor ? null : (
+                    {isAdmin ? (
+                      <GlassTableCell>
+                        <GlassBadge tone={isActive ? "success" : "danger"}>
+                          {isActive ? "Active" : "Inactive"}
+                        </GlassBadge>
+                      </GlassTableCell>
+                    ) : null}
+                    {isAdmin ? (
                       <GlassTableCell className="text-right">
-                        <TableDeleteButton
-                          onClick={() => setPendingDelete(item)}
+                        <TableIconButton
+                          icon={isActive ? "block" : "check_circle"}
+                          tone={isActive ? "danger" : "brand"}
+                          onClick={() => setPendingDeactivate(item)}
                           disabled={
-                            item.user_id !== user?.id ||
-                            (isDeleting && pendingDelete?.id === item.id)
+                            isTogglingActive &&
+                            pendingDeactivate?.id === item.id
                           }
-                          label={`Delete prediction ${item.id}`}
+                          label={
+                            isActive
+                              ? `Deactivate prediction ${item.id}`
+                              : `Activate prediction ${item.id}`
+                          }
                         />
                       </GlassTableCell>
-                    )}
+                    ) : null}
                   </GlassTableRow>
                   );
                 })
@@ -390,17 +439,32 @@ function HistoryContent() {
       </DataTableCard>
 
       <DeleteAlertModal
-        open={Boolean(pendingDelete)}
+        open={Boolean(pendingDeactivate)}
         onOpenChange={(open) => {
-          if (!open && !isDeleting) setPendingDelete(null);
+          if (!open && !isTogglingActive) setPendingDeactivate(null);
         }}
+        title={
+          pendingDeactivate?.is_active === false
+            ? "Activate this prediction?"
+            : "Deactivate this prediction?"
+        }
+        description={
+          pendingDeactivate?.is_active === false
+            ? "This prediction will become visible again for users and doctors."
+            : "History records cannot be deleted. Deactivating hides this prediction from users and doctors without removing it."
+        }
         itemLabel={
-          pendingDelete
-            ? formatPredictionId(pendingDelete.id)
+          pendingDeactivate
+            ? formatPredictionId(pendingDeactivate.id)
             : undefined
         }
-        isLoading={isDeleting}
-        onConfirm={handleDelete}
+        confirmLabel={
+          pendingDeactivate?.is_active === false
+            ? "Yes, activate"
+            : "Yes, deactivate"
+        }
+        isLoading={isTogglingActive}
+        onConfirm={handleToggleActive}
       />
     </PrivatePage>
   );
