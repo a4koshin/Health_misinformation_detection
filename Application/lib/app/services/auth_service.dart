@@ -72,12 +72,12 @@ class AuthService {
   UserModel _requireUser(UserModel user) {
     if (!user.isUser) {
       throw const ApiException(
-        'This app is for users only. Use the web app for admin and advisor accounts.',
+        'This app is for users only. Use the web app for admin and doctor accounts.',
       );
     }
     if (user.role.toLowerCase() != ApiConstants.userRole) {
       throw const ApiException(
-        'This app is for users only. Use the web app for admin and advisor accounts.',
+        'This app is for users only. Use the web app for admin and doctor accounts.',
       );
     }
     return user;
