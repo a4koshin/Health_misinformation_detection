@@ -88,7 +88,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               label: 'Email',
               hint: 'you@example.com',
               prefix: const Icon(
-                Iconsax.sms,
+                Iconsax.sms_copy,
                 size: 18,
                 color: AppColors.placeholder,
               ),
