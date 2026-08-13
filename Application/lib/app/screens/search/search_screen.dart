@@ -130,7 +130,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 else if (_error != null)
                   EmptyPlaceholder(
-                    icon: Iconsax.warning_2,
+                    icon: Iconsax.warning_2_copy,
                     title: 'Could not load search',
                     description: _error!,
                   )
