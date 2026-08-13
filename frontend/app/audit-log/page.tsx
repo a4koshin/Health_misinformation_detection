@@ -52,10 +52,15 @@ function actionLabel(action: string) {
     "user.create": "Created user",
     "user.update": "Updated user",
     "user.delete": "Deleted user",
+    "user.deactivate": "Deactivated user",
+    "user.activate": "Activated user",
     "user.profile_update": "Updated profile",
     "prediction.create": "Prediction",
     "prediction.delete": "Deleted prediction",
-    "review.queued": "Sent to advisor",
+    "prediction.deactivate": "Deactivated prediction",
+    "prediction.activate": "Activated prediction",
+    "review.queued": "Awaiting doctor assignment",
+    "review.assigned": "Assigned to doctor",
     "review.corrected": "Claim corrected",
     "report.download": "Downloaded report",
   };
@@ -160,7 +165,7 @@ function AuditLogContent() {
   return (
     <PrivatePage
       title="Audit log"
-      description="Sign-ins, predictions, advisor reviews, and report downloads in one place."
+      description="Sign-ins, predictions, doctor reviews, and report downloads in one place."
     >
       <DataTableCard
         header={
@@ -206,7 +211,7 @@ function AuditLogContent() {
                 <option value="all">All actions</option>
                 <option value="auth">Auth</option>
                 <option value="prediction">Predictions</option>
-                <option value="review">Advisor reviews</option>
+                <option value="review">Doctor reviews</option>
                 <option value="report">Reports</option>
               </GlassSelect>
             </div>
