@@ -78,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
               label: 'Email',
               hint: 'you@example.com',
               prefix: const Icon(
-                Iconsax.sms,
+                Iconsax.sms_copy,
                 size: 18,
                 color: AppColors.placeholder,
               ),
@@ -94,14 +94,14 @@ class _LoginScreenState extends State<LoginScreen> {
               label: 'Password',
               hint: 'Enter your password',
               prefix: const Icon(
-                Iconsax.lock,
+                Iconsax.lock_copy,
                 size: 18,
                 color: AppColors.placeholder,
               ),
               suffix: IconButton(
                 onPressed: () => setState(() => _obscure = !_obscure),
                 icon: Icon(
-                  _obscure ? Iconsax.eye : Iconsax.eye_slash,
+                  _obscure ? Iconsax.eye_copy : Iconsax.eye_slash_copy,
                   color: AppColors.placeholder,
                   size: 18,
                 ),
