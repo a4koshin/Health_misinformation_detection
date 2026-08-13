@@ -23,8 +23,8 @@ import {
   GlassTableRow,
 } from "@/components/glass/glass-table";
 import {
-  TableDeleteButton,
   TableEditButton,
+  TableIconButton,
 } from "@/components/glass/table-icon-button";
 import {
   TablePagination,
@@ -35,8 +35,8 @@ import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import {
   createUser,
-  deleteUser,
   listUsers,
+  setUserActive,
   updateUser,
 } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
@@ -69,8 +69,8 @@ function UsersContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<User | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingToggle, setPendingToggle] = useState<User | null>(null);
+  const [isTogglingActive, setIsTogglingActive] = useState(false);
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [formErrors, setFormErrors] = useState<{
@@ -85,7 +85,7 @@ function UsersContent() {
     setIsLoading(true);
     try {
       const data = await listUsers(token);
-      setUsers(data);
+      setUsers(data.filter((item) => item.role !== "doctor"));
     } catch (error) {
       const message =
         error instanceof ApiError ? error.message : "Unable to load users.";
@@ -180,38 +180,45 @@ function UsersContent() {
     }
   }
 
-  async function handleDeleteUser() {
-    if (!token || !pendingDelete) return;
-    if (pendingDelete.id === currentUser?.id) {
-      toast.error("You cannot delete your own account.");
-      setPendingDelete(null);
+  async function handleToggleActive() {
+    if (!token || !pendingToggle) return;
+    if (pendingToggle.id === currentUser?.id) {
+      toast.error("You cannot deactivate your own account.");
+      setPendingToggle(null);
       return;
     }
-    if (pendingDelete.role === "admin") {
-      toast.error("Admin accounts cannot be deleted.");
-      setPendingDelete(null);
+    if (pendingToggle.role === "admin") {
+      toast.error("Admin accounts cannot be deactivated this way.");
+      setPendingToggle(null);
       return;
     }
 
-    setIsDeleting(true);
+    const nextActive = pendingToggle.is_active === false;
+    setIsTogglingActive(true);
     try {
-      await deleteUser(token, pendingDelete.id);
-      toast.success("User deleted.");
-      setPendingDelete(null);
-      await loadUsers();
+      const updated = await setUserActive(token, pendingToggle.id, nextActive);
+      setUsers((prev) =>
+        prev.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      setPendingToggle(null);
+      toast.success(
+        nextActive ? "Account activated." : "Account deactivated.",
+      );
     } catch (error) {
       const message =
-        error instanceof ApiError ? error.message : "Unable to delete user.";
+        error instanceof ApiError
+          ? error.message
+          : "Unable to update account status.";
       toast.error(message);
     } finally {
-      setIsDeleting(false);
+      setIsTogglingActive(false);
     }
   }
 
   return (
     <PrivatePage
       title="Users"
-      description="Create, view, update, and delete accounts. Admin accounts cannot be deleted."
+      description="Create and manage user and admin accounts. Deactivate accounts instead of deleting them. Doctors are managed on the Doctors page."
       actions={
         <GlassButton type="button" size="sm" onClick={openCreateForm}>
           <MaterialIcon name="person_add" size={18} />
@@ -327,7 +334,8 @@ function UsersContent() {
           <div>
             <h2 className="text-base font-semibold text-[#0f172a]">Users</h2>
             <p className="text-sm text-[#475569]">
-              Manage accounts, roles, and access across HealthAI.
+              Manage accounts and roles. Deactivated users cannot sign in; their
+              data is kept.
             </p>
           </div>
         }
@@ -387,6 +395,8 @@ function UsersContent() {
             pagination.pageItems.map((user) => {
               const isActive = user.is_active !== false;
               const requested = Boolean(user.deletion_requested_at);
+              const canToggle =
+                user.role !== "admin" && user.id !== currentUser?.id;
               return (
               <GlassTableRow key={user.id}>
                 <GlassTableCell className="font-medium">
@@ -410,15 +420,22 @@ function UsersContent() {
                 <GlassTableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
                     <TableEditButton onClick={() => openEditForm(user)} />
-                    <TableDeleteButton
-                      onClick={() => setPendingDelete(user)}
+                    <TableIconButton
+                      icon={isActive ? "block" : "check_circle"}
+                      tone={isActive ? "danger" : "brand"}
+                      onClick={() => setPendingToggle(user)}
                       disabled={
-                        user.role === "admin" || user.id === currentUser?.id
+                        !canToggle ||
+                        (isTogglingActive && pendingToggle?.id === user.id)
                       }
                       label={
-                        user.role === "admin"
-                          ? "Admin accounts cannot be deleted"
-                          : `Delete ${user.email}`
+                        !canToggle
+                          ? user.role === "admin"
+                            ? "Admin accounts cannot be deactivated"
+                            : "You cannot deactivate your own account"
+                          : isActive
+                            ? `Deactivate ${user.email}`
+                            : `Activate ${user.email}`
                       }
                     />
                   </div>
@@ -431,15 +448,27 @@ function UsersContent() {
       </DataTableCard>
 
       <DeleteAlertModal
-        open={Boolean(pendingDelete)}
+        open={Boolean(pendingToggle)}
         onOpenChange={(open) => {
-          if (!open && !isDeleting) setPendingDelete(null);
+          if (!open && !isTogglingActive) setPendingToggle(null);
         }}
-        title="Delete this user?"
-        description={`This permanently deletes ${pendingDelete?.email ?? "this account"} and their predictions. Admin accounts cannot be deleted.`}
-        confirmLabel="Yes, delete"
-        isLoading={isDeleting}
-        onConfirm={handleDeleteUser}
+        title={
+          pendingToggle?.is_active === false
+            ? "Activate this account?"
+            : "Deactivate this account?"
+        }
+        description={
+          pendingToggle?.is_active === false
+            ? `${pendingToggle.email} will be able to sign in again.`
+            : `Users cannot be deleted. Deactivating ${pendingToggle?.email ?? "this account"} blocks sign-in and keeps their history.`
+        }
+        confirmLabel={
+          pendingToggle?.is_active === false
+            ? "Yes, activate"
+            : "Yes, deactivate"
+        }
+        isLoading={isTogglingActive}
+        onConfirm={handleToggleActive}
       />
     </PrivatePage>
   );
