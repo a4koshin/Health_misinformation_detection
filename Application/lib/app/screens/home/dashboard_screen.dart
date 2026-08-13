@@ -52,7 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   )
                 else if (dash.error != null && stats == null)
                   _EmptyNote(
-                    icon: Iconsax.danger,
+                    icon: Iconsax.danger_copy,
                     title: 'Could not load your data',
                     description: dash.error!,
                   )
@@ -91,7 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           setState(() => _recentHidden = !_recentHidden);
                         },
                         icon: Icon(
-                          _recentHidden ? Iconsax.eye_slash : Iconsax.eye,
+                          _recentHidden ? Iconsax.eye_slash_copy : Iconsax.eye_copy,
                           size: 16,
                           color: _recentHidden
                               ? AppColors.inkMuted
@@ -103,7 +103,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 8),
                   if (dash.recent.isEmpty)
                     const _EmptyNote(
-                      icon: Iconsax.message,
+                      icon: Iconsax.message_copy,
                       title: 'No chats yet',
                       description:
                           'When you check a claim, it will show up here.',
@@ -433,19 +433,19 @@ class _StatsRow extends StatelessWidget {
         _StatCell(
           label: 'Reliable',
           value: '$reliable',
-          icon: Iconsax.tick_circle,
+          icon: Iconsax.tick_circle_copy,
           color: const Color(0xFF059669),
         ),
         _StatCell(
           label: 'Non-Reliable',
           value: '$nonReliable',
-          icon: Iconsax.close_circle,
+          icon: Iconsax.close_circle_copy,
           color: AppColors.danger,
         ),
         _StatCell(
           label: 'Chats',
           value: '$chats',
-          icon: Iconsax.message,
+          icon: Iconsax.message_copy,
           color: AppColors.brand,
         ),
       ],
@@ -532,7 +532,7 @@ class _ChatRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
-              Iconsax.message,
+              Iconsax.message_copy,
               size: 18,
               color: AppColors.brand,
             ),
