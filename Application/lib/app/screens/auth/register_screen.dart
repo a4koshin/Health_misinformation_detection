@@ -86,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               label: 'Full name',
               hint: 'Your full name',
               prefix: const Icon(
-                Iconsax.user,
+                Iconsax.user_copy,
                 size: 18,
                 color: AppColors.placeholder,
               ),
@@ -101,7 +101,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               label: 'Email',
               hint: 'you@example.com',
               prefix: const Icon(
-                Iconsax.sms,
+                Iconsax.sms_copy,
                 size: 18,
                 color: AppColors.placeholder,
               ),
@@ -116,14 +116,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
               label: 'Password',
               hint: 'At least 8 characters',
               prefix: const Icon(
-                Iconsax.lock,
+                Iconsax.lock_copy,
                 size: 18,
                 color: AppColors.placeholder,
               ),
               suffix: IconButton(
                 onPressed: () => setState(() => _obscure = !_obscure),
                 icon: Icon(
-                  _obscure ? Iconsax.eye : Iconsax.eye_slash,
+                  _obscure ? Iconsax.eye_copy : Iconsax.eye_slash_copy,
                   color: AppColors.placeholder,
                   size: 18,
                 ),
