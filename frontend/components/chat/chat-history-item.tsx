@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { toast } from "sonner";
 
-import { DeleteAlertModal } from "@/components/glass/delete-alert-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,9 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MaterialIcon } from "@/components/ui/material-icon";
-import { ApiError } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/chat";
-import { deleteConversation } from "@/lib/history";
 import { truncateText } from "@/lib/user";
 import { cn } from "@/lib/utils";
 import type { Detection } from "@/types/api";
@@ -24,20 +20,15 @@ type ChatHistoryItemProps = {
   token: string;
   variant?: "sidebar" | "search";
   onSelect: (id: string) => void;
-  onDeleted: (id: string) => void;
+  onDeleted?: (id: string) => void;
 };
 
 export function ChatHistoryItem({
   item,
   isActive,
-  token,
   variant = "sidebar",
   onSelect,
-  onDeleted,
 }: ChatHistoryItemProps) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-
   async function handleShare(event: Event) {
     event.preventDefault();
 
@@ -62,111 +53,66 @@ export function ChatHistoryItem({
     }
   }
 
-  function requestDelete(event: Event) {
-    event.preventDefault();
-    setConfirmOpen(true);
-  }
-
-  async function handleDelete() {
-    setIsDeleting(true);
-    try {
-      await deleteConversation(token, item.id);
-      toast.success("Chat deleted.");
-      setConfirmOpen(false);
-      onDeleted(item.id);
-    } catch (error) {
-      const message =
-        error instanceof ApiError ? error.message : "Unable to delete chat.";
-      toast.error(message);
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
   const actions = (
-    <ChatActionsMenu
-      isActive={isActive}
-      onShare={handleShare}
-      onDelete={requestDelete}
-    />
-  );
-
-  const confirmModal = (
-    <DeleteAlertModal
-      open={confirmOpen}
-      onOpenChange={(open) => {
-        if (!open && !isDeleting) setConfirmOpen(false);
-      }}
-      itemLabel={truncateText(item.input_text, 48)}
-      isLoading={isDeleting}
-      onConfirm={handleDelete}
-    />
+    <ChatActionsMenu isActive={isActive} onShare={handleShare} />
   );
 
   if (variant === "search") {
     return (
-      <>
-        <div
-          className={cn(
-            "group flex items-center gap-1 rounded-xl transition-colors hover:bg-orange-50",
-            isActive && "bg-[#ffefe6]",
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => onSelect(item.id)}
-            className="min-w-0 flex-1 cursor-pointer px-3 py-2.5 text-left"
-          >
-            <span className="block truncate text-sm text-[#1f1f1f]">
-              {truncateText(item.input_text, 56)}
-            </span>
-            <span className="mt-0.5 block text-xs text-[#444746]">
-              {formatRelativeTime(item.created_at)}
-              {item.message_count && item.message_count > 1
-                ? ` · ${item.message_count} messages`
-                : ""}
-            </span>
-          </button>
-          {actions}
-        </div>
-        {confirmModal}
-      </>
-    );
-  }
-
-  return (
-    <>
       <div
         className={cn(
-          "group flex items-center gap-0.5 rounded-full transition-colors hover:bg-orange-50",
+          "group flex items-center gap-1 rounded-xl transition-colors hover:bg-orange-50",
           isActive && "bg-[#ffefe6]",
         )}
       >
         <button
           type="button"
           onClick={() => onSelect(item.id)}
-          className={cn(
-            "min-w-0 flex-1 cursor-pointer truncate py-2 pr-1 pl-3.5 text-left text-[13px]",
-            isActive ? "font-medium text-[#1f1f1f]" : "text-[#444746]",
-          )}
+          className="min-w-0 flex-1 cursor-pointer px-3 py-2.5 text-left"
         >
-          {truncateText(item.input_text, 24)}
+          <span className="block truncate text-sm text-[#1f1f1f]">
+            {truncateText(item.input_text, 56)}
+          </span>
+          <span className="mt-0.5 block text-xs text-[#444746]">
+            {formatRelativeTime(item.created_at)}
+            {item.message_count && item.message_count > 1
+              ? ` · ${item.message_count} messages`
+              : ""}
+          </span>
         </button>
         {actions}
       </div>
-      {confirmModal}
-    </>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-0.5 rounded-full transition-colors hover:bg-orange-50",
+        isActive && "bg-[#ffefe6]",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => onSelect(item.id)}
+        className={cn(
+          "min-w-0 flex-1 cursor-pointer truncate py-2 pr-1 pl-3.5 text-left text-[13px]",
+          isActive ? "font-medium text-[#1f1f1f]" : "text-[#444746]",
+        )}
+      >
+        {truncateText(item.input_text, 24)}
+      </button>
+      {actions}
+    </div>
   );
 }
 
 function ChatActionsMenu({
   isActive,
   onShare,
-  onDelete,
 }: {
   isActive?: boolean;
   onShare: (event: Event) => void;
-  onDelete: (event: Event) => void;
 }) {
   return (
     <DropdownMenu>
@@ -187,14 +133,6 @@ function ChatActionsMenu({
         <DropdownMenuItem className="cursor-pointer" onSelect={onShare}>
           <MaterialIcon name="share" size={18} />
           Share
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          variant="destructive"
-          className="cursor-pointer"
-          onSelect={onDelete}
-        >
-          <MaterialIcon name="delete" size={18} />
-          Delete
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
