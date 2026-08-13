@@ -71,7 +71,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: EmptyPlaceholder(
-                      icon: Iconsax.notification,
+                      icon: Iconsax.notification_copy,
                       title: 'Could not load notifications',
                       description: notifications.error!,
                     ),
@@ -84,10 +84,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   Padding(
                     padding: EdgeInsets.all(20),
                     child: EmptyPlaceholder(
-                      icon: Iconsax.notification,
+                      icon: Iconsax.notification_copy,
                       title: 'No notifications yet',
                       description:
-                          'When an advisor corrects a claim, it will show up here.',
+                          'When a doctor corrects a claim, it will show up here.',
                     ),
                   ),
                 ],
