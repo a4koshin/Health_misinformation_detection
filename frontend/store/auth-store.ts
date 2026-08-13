@@ -22,26 +22,35 @@ type AuthState = {
   initialize: () => Promise<void>;
 };
 
+function normalizeRole(role: string | undefined | null): User["role"] {
+  if (role === "admin") return "admin";
+  if (role === "doctor" || role === "healthcare_advisor") return "doctor";
+  return "user";
+}
+
 function userFromAuthPayload(data: {
   user?: User;
   access_token?: string;
   id?: string;
   email?: string;
-  role?: User["role"];
+  role?: User["role"] | "healthcare_advisor";
   full_name?: string | null;
   avatar_url?: string | null;
   language_preference?: User["language_preference"];
   created_at?: string;
 }): User | null {
   if (data.user?.id && data.user.email) {
-    return data.user;
+    return {
+      ...data.user,
+      role: normalizeRole(data.user.role),
+    };
   }
   if (data.id && data.email && data.role && data.created_at) {
     return {
       id: data.id,
       email: data.email,
       full_name: data.full_name ?? null,
-      role: data.role,
+      role: normalizeRole(data.role),
       avatar_url: data.avatar_url,
       language_preference: data.language_preference,
       created_at: data.created_at,
