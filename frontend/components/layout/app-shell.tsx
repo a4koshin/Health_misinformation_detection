@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PanelLeftIcon } from "lucide-react";
 
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { Sidebar } from "@/components/layout/sidebar";
-import { MaterialIcon } from "@/components/ui/material-icon";
 import { cn } from "@/lib/utils";
 
 const LG_QUERY = "(min-width: 1024px)";
@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="flex size-10 cursor-pointer items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-orange-50 hover:text-brand"
               aria-label="Open sidebar"
             >
-              <MaterialIcon name="menu" size={22} />
+              <PanelLeftIcon className="size-5" />
             </button>
           ) : (
             <span className="size-10" aria-hidden="true" />
