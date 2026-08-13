@@ -1,4 +1,4 @@
-"""HTTP handlers for the Healthcare Advisor review queue."""
+"""HTTP handlers for the Doctor review queue."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ def _require_advisor():
     user = auth_service.get_user_by_id(get_jwt_identity())
     if not user:
         return None, (jsonify({"error": True, "message": "User not found."}), 404)
-    if not user.is_healthcare_advisor:
+    if not user.is_doctor:
         return None, (
             jsonify(
                 {
                     "error": True,
-                    "message": "Healthcare advisor role required.",
+                    "message": "Doctor role required.",
                 }
             ),
             403,
