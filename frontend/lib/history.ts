@@ -9,7 +9,7 @@ import type {
 
 export async function getHistory(token: string): Promise<Detection[]> {
   const data = await apiFetch<Detection[] | { items?: Detection[] }>(
-    "/api/history?per_page=100",
+    "/api/history?per_page=200",
     {},
     token,
   );
@@ -23,6 +23,32 @@ export async function getHistory(token: string): Promise<Detection[]> {
   }
 
   return [];
+}
+
+export type CorrectionsResponse = {
+  items: Detection[];
+  pending_count?: number;
+  total?: number;
+};
+
+export async function getCorrections(
+  token: string,
+): Promise<CorrectionsResponse> {
+  const data = await apiFetch<Detection[] | CorrectionsResponse>(
+    "/api/history/corrections?per_page=200",
+    {},
+    token,
+  );
+
+  if (Array.isArray(data)) {
+    return { items: data, pending_count: 0 };
+  }
+
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    pending_count: data?.pending_count ?? 0,
+    total: data?.total,
+  };
 }
 
 export async function getUserDashboardStats(
@@ -180,6 +206,21 @@ export async function deleteConversation(
   await apiFetch<void>(
     `/api/history/${conversationId}`,
     { method: "DELETE" },
+    token,
+  );
+}
+
+export async function setPredictionActive(
+  token: string,
+  predictionId: string,
+  isActive: boolean,
+): Promise<Detection> {
+  return apiFetch<Detection>(
+    `/api/history/${predictionId}/active`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ is_active: isActive }),
+    },
     token,
   );
 }
