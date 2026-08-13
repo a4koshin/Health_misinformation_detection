@@ -1,6 +1,6 @@
 # SomAI mobile (user role)
 
-Flutter app for **users only**. Admin and Healthcare Advisor accounts use the web app.
+Flutter app for **users only**. Admin and Doctor accounts use the web app.
 
 ## Run
 
