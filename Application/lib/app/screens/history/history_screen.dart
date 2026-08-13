@@ -88,7 +88,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     if (_error != null) {
       return EmptyPlaceholder(
-        icon: Iconsax.warning_2,
+        icon: Iconsax.warning_2_copy,
         title: 'Could not load history',
         description: _error!,
       );
@@ -96,7 +96,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     if (_items.isEmpty) {
       return const EmptyPlaceholder(
-        icon: Iconsax.clock,
+        icon: Iconsax.clock_copy,
         title: 'No history yet',
         description: 'Checked claims will show up here once you submit them.',
       );
@@ -142,7 +142,7 @@ class _HistoryRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
-              Iconsax.message,
+              Iconsax.message_copy,
               size: 18,
               color: AppColors.brand,
             ),
