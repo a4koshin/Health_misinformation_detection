@@ -4,8 +4,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from extensions import db
 
-# Allowed role strings: "user", "admin", "healthcare_advisor".
-# Assign roles via the admin Users page (POST/PATCH /api/admin/users).
+# Allowed role strings: "user", "admin", "doctor".
+# Assign roles via the admin Users / Doctors pages.
 # Not self-service — registration always creates role="user".
 
 
@@ -23,12 +23,10 @@ class User(db.Model):
     avatar_url = db.Column("avatar_path", db.String(255), nullable=True)
     language_preference = db.Column(
         db.String(10), nullable=False, default="so")
-    # When this account became a healthcare advisor. Review queue starts here.
+    # When this account became a doctor. Review queue starts here.
     advisor_since = db.Column(db.DateTime, nullable=True)
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     deletion_requested_at = db.Column(db.DateTime, nullable=True)
-    # When this account became a healthcare advisor. Review queue starts here.
-    advisor_since = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(
         db.DateTime,
         nullable=False,
@@ -42,16 +40,25 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     @property
+    def is_doctor(self) -> bool:
+        value = (self.role or "").strip().lower()
+        return value in {"doctor", "healthcare_advisor"}
+
+    # Backward-compatible alias during migration.
+    @property
     def is_healthcare_advisor(self) -> bool:
-        return (self.role or "").strip().lower() == "healthcare_advisor"
+        return self.is_doctor
 
     def to_dict(self) -> dict:
+        role = self.role or "user"
+        if role.lower() == "healthcare_advisor":
+            role = "doctor"
         return {
             "id": str(self.id),
             "email": self.email,
             "full_name": self.full_name,
             "name": self.full_name,
-            "role": self.role or "user",
+            "role": role,
             "is_active": bool(self.is_active),
             "deletion_requested_at": (
                 self.deletion_requested_at.isoformat()
@@ -61,9 +68,15 @@ class User(db.Model):
             "avatar_url": self.avatar_url,
             "language_preference": self.language_preference or "so",
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "advisor_since": (
+                self.advisor_since.isoformat() if self.advisor_since else None
+            ),
         }
 
     def to_settings_profile(self) -> dict:
+        role = self.role or "user"
+        if role.lower() == "healthcare_advisor":
+            role = "doctor"
         return {
             "name": self.full_name,
             "email": self.email,
@@ -75,6 +88,6 @@ class User(db.Model):
                 else None
             ),
             "language_preference": self.language_preference or "so",
-            "role": self.role or "user",
+            "role": role,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
