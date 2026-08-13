@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/theme/app_colors.dart';
-import '../../widgets/page_header.dart';
 
 class PredictionScreen extends StatefulWidget {
   const PredictionScreen({super.key});
@@ -239,13 +238,64 @@ class _PredictionScreenState extends State<PredictionScreen> {
     await _scrollToBottom();
   }
 
+  void _clear() {
+    if (_isBusy) return;
+    setState(() {
+      _controller.clear();
+      _items.clear();
+    });
+    _focusNode.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final canClear =
+        !_isBusy && (_items.isNotEmpty || _controller.text.trim().isNotEmpty);
+
     return Column(
       children: [
-        const PageHeader(
-          title: 'Prediction',
-          description: 'Check a Somali health claim with SomBERTb.',
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 12, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Prediction',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.3,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Check a Somali health claim with SomBERTb.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.45,
+                        color: AppColors.inkMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: canClear ? _clear : null,
+                icon: const Icon(Iconsax.trash_copy, size: 16),
+                label: const Text('Clear'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.inkMuted,
+                  disabledForegroundColor: AppColors.border,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+              ),
+            ],
+          ),
         ),
         _ComposerBar(
           controller: _controller,
@@ -254,6 +304,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
           isUploading: _isUploading,
           onSend: _submit,
           onUploadDataset: _uploadDataset,
+          onChanged: () => setState(() {}),
         ),
         Expanded(
           child: _items.isEmpty && !_isBusy
@@ -305,6 +356,7 @@ class _ComposerBar extends StatelessWidget {
     required this.isUploading,
     required this.onSend,
     required this.onUploadDataset,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -313,6 +365,7 @@ class _ComposerBar extends StatelessWidget {
   final bool isUploading;
   final VoidCallback onSend;
   final VoidCallback onUploadDataset;
+  final VoidCallback? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -345,7 +398,7 @@ class _ComposerBar extends StatelessWidget {
                       ),
                     )
                   : const Icon(
-                      Iconsax.add,
+                      Iconsax.add_copy,
                       size: 18,
                       color: AppColors.brand,
                     ),
@@ -359,6 +412,7 @@ class _ComposerBar extends StatelessWidget {
                 minLines: 1,
                 maxLines: 4,
                 textInputAction: TextInputAction.send,
+                onChanged: (_) => onChanged?.call(),
                 onSubmitted: (_) => onSend(),
                 decoration: const InputDecoration(
                   hintText: 'Geli sheegasho caafimaad…',
@@ -402,7 +456,7 @@ class _ComposerBar extends StatelessWidget {
                           ),
                         )
                       : Icon(
-                          Iconsax.send_1,
+                          Iconsax.send_1_copy,
                           size: 16,
                           color: canSend ? Colors.white : AppColors.placeholder,
                         ),
@@ -692,7 +746,7 @@ class _SourceCard extends StatelessWidget {
       return Container(
         color: AppColors.brandSoft,
         child: const Icon(
-          Iconsax.global,
+          Iconsax.global_copy,
           size: 18,
           color: AppColors.brand,
         ),
@@ -704,7 +758,7 @@ class _SourceCard extends StatelessWidget {
       errorBuilder: (_, error, stackTrace) => Container(
         color: AppColors.brandSoft,
         child: const Icon(
-          Iconsax.global,
+          Iconsax.global_copy,
           size: 18,
           color: AppColors.brand,
         ),
@@ -856,7 +910,7 @@ class _FileMessage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
-                Iconsax.document_upload,
+                Iconsax.document_upload_copy,
                 size: 16,
                 color: AppColors.brand,
               ),
