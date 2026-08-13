@@ -101,7 +101,7 @@ class AppBottomNav extends StatelessWidget {
                         : null,
                   ),
                   child: const Icon(
-                    Iconsax.scan,
+                    Iconsax.scan_copy,
                     color: Colors.white,
                     size: 26,
                   ),
