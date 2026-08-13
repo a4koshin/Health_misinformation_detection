@@ -9,7 +9,6 @@ import { PasswordInput } from "@/components/auth/password-input";
 import { GlassBadge } from "@/components/glass/glass-badge";
 import { GlassButton } from "@/components/glass/glass-button";
 import { GlassCard } from "@/components/glass/glass-card";
-import { DeleteAlertModal } from "@/components/glass/delete-alert-modal";
 import { GlassInput, GlassLabel } from "@/components/glass/glass-input";
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
@@ -18,7 +17,6 @@ import { ApiError } from "@/lib/api";
 import { displayRoleLabel, roleBadgeTone } from "@/lib/roles";
 import {
   changePassword,
-  deleteHistory,
   getProfile,
   requestAccountDeletion,
   resolveAvatarUrl,
@@ -113,8 +111,6 @@ function SettingsContent() {
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [editingPassword, setEditingPassword] = useState(false);
 
-  const [historyConfirmOpen, setHistoryConfirmOpen] = useState(false);
-  const [isDeletingHistory, setIsDeletingHistory] = useState(false);
 
   const [accountConfirmOpen, setAccountConfirmOpen] = useState(false);
   const [accountPassword, setAccountPassword] = useState("");
@@ -276,28 +272,6 @@ function SettingsContent() {
       toast.error(message);
     } finally {
       setIsSavingPassword(false);
-    }
-  }
-
-  async function handleDeleteHistory() {
-    if (!token) return;
-    setIsDeletingHistory(true);
-    try {
-      const result = await deleteHistory(token);
-      startNewChat();
-      useChatStore.setState((state) => ({
-        historyRevision: state.historyRevision + 1,
-      }));
-      setHistoryConfirmOpen(false);
-      toast.success(result.message || "History deleted.");
-    } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : "Unable to delete history.";
-      toast.error(message);
-    } finally {
-      setIsDeletingHistory(false);
     }
   }
 
@@ -627,14 +601,6 @@ function SettingsContent() {
             </SectionCard>
           ) : null}
 
-          <ActionRow
-            title="Delete my history"
-            description="Remove all of your saved predictions and chats."
-            buttonLabel="Delete history"
-            destructive
-            onClick={() => setHistoryConfirmOpen(true)}
-          />
-
           {isAdmin ? (
             <ActionRow
               title="Delete all database data"
@@ -674,18 +640,6 @@ function SettingsContent() {
           ) : null}
         </div>
       )}
-      <DeleteAlertModal
-        open={historyConfirmOpen}
-        onOpenChange={(open) => {
-          if (!open && !isDeletingHistory) setHistoryConfirmOpen(false);
-        }}
-        title="Are you sure you want to delete this item?"
-        description="This will permanently delete all of your prediction history."
-        confirmLabel="Yes, I'm sure"
-        isLoading={isDeletingHistory}
-        onConfirm={handleDeleteHistory}
-      />
-
       <DialogPrimitive.Root
         open={accountConfirmOpen}
         onOpenChange={(open) => {
