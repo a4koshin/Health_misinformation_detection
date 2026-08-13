@@ -12,14 +12,6 @@ from models.prediction import Prediction
 from models.user import User
 
 
-def _naive_utc(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is not None:
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
-    return value
-
-
 def _excerpt(text: str | None, limit: int = 140) -> str | None:
     value = " ".join((text or "").split())
     if not value:
@@ -42,19 +34,6 @@ def _active_users_with_role(role: str) -> list[User]:
             User.is_active.is_(True),
         ).all()
     )
-
-
-def _eligible_advisors(prediction: Prediction) -> list[User]:
-    created = _naive_utc(prediction.created_at) or datetime.now(timezone.utc).replace(
-        tzinfo=None
-    )
-    advisors = []
-    for advisor in _active_users_with_role("healthcare_advisor"):
-        since = _naive_utc(advisor.advisor_since or advisor.created_at)
-        if since is not None and created < since:
-            continue
-        advisors.append(advisor)
-    return advisors
 
 
 def _already_sent(*, recipient_id: int, type: str, prediction_id: int | None) -> bool:
@@ -125,27 +104,10 @@ def _notify_non_reliable_claim(prediction: Prediction) -> None:
     excerpt = _excerpt(prediction.claim_text)
     owner_name = _display_name(owner)
     title = "New Non-Reliable claim"
-    advisor_body = (
-        f"{owner_name} submitted a Non-Reliable claim that needs your review."
-    )
     admin_body = (
-        f"{owner_name} submitted a Non-Reliable claim. Advisors can now review it."
+        f"{owner_name} submitted a Non-Reliable claim. "
+        "Assign a doctor to review it."
     )
-
-    for advisor in _eligible_advisors(prediction):
-        _add_notification(
-            recipient=advisor,
-            audience="advisor",
-            type="review_queued",
-            title=title,
-            body=advisor_body,
-            prediction_id=prediction.id,
-            actor=owner,
-            other_user=None,
-            claim_excerpt=excerpt,
-            corrected_excerpt=None,
-            href="/review",
-        )
 
     for admin in _active_users_with_role("admin"):
         _add_notification(
@@ -159,7 +121,7 @@ def _notify_non_reliable_claim(prediction: Prediction) -> None:
             other_user=None,
             claim_excerpt=excerpt,
             corrected_excerpt=None,
-            href="/audit-log",
+            href="/assign-reviews",
         )
 
     from services import audit_service
@@ -170,7 +132,7 @@ def _notify_non_reliable_claim(prediction: Prediction) -> None:
         action="review.queued",
         entity_type="prediction",
         entity_id=prediction.id,
-        details=f"Non-Reliable claim sent to advisors: {excerpt or ''}".strip(),
+        details=f"Non-Reliable claim waiting for admin assignment: {excerpt or ''}".strip(),
         commit=False,
     )
 
@@ -201,29 +163,12 @@ def _notify_non_reliable_batch(predictions: list[Prediction], *, user_id: int) -
     owner_name = _display_name(owner)
     count = len(queued)
     title = "New Non-Reliable claims"
-    advisor_body = (
-        f"{owner_name} uploaded {count} Non-Reliable claims that need review."
-    )
     admin_body = (
-        f"{owner_name} uploaded {count} Non-Reliable claims. Advisors can now review them."
+        f"{owner_name} uploaded {count} Non-Reliable claims. "
+        "Assign doctors to review them."
     )
     first_id = queued[0].id
     excerpt = _excerpt(queued[0].claim_text)
-
-    for advisor in _eligible_advisors(queued[0]):
-        _add_notification(
-            recipient=advisor,
-            audience="advisor",
-            type="review_queued",
-            title=title,
-            body=advisor_body,
-            prediction_id=first_id,
-            actor=owner,
-            other_user=None,
-            claim_excerpt=excerpt,
-            corrected_excerpt=None,
-            href="/review",
-        )
 
     for admin in _active_users_with_role("admin"):
         _add_notification(
@@ -237,7 +182,7 @@ def _notify_non_reliable_batch(predictions: list[Prediction], *, user_id: int) -
             other_user=None,
             claim_excerpt=excerpt,
             corrected_excerpt=None,
-            href="/audit-log",
+            href="/assign-reviews",
         )
 
     from services import audit_service
@@ -248,10 +193,80 @@ def _notify_non_reliable_batch(predictions: list[Prediction], *, user_id: int) -
         action="review.queued",
         entity_type="prediction",
         entity_id=first_id,
-        details=f"{owner_name} uploaded {count} Non-Reliable claims for advisor review.",
+        details=(
+            f"{owner_name} uploaded {count} Non-Reliable claims "
+            "waiting for admin assignment."
+        ),
         commit=False,
     )
 
+    db.session.commit()
+
+
+def notify_review_assigned(
+    prediction: Prediction,
+    *,
+    doctor: User,
+    admin: User,
+) -> None:
+    try:
+        _notify_review_assigned(prediction, doctor=doctor, admin=admin)
+    except Exception:
+        db.session.rollback()
+
+
+def _notify_review_assigned(
+    prediction: Prediction,
+    *,
+    doctor: User,
+    admin: User,
+) -> None:
+    if not prediction or not doctor:
+        return
+
+    # Allow reassignment to notify the newly chosen doctor.
+    Notification.query.filter_by(
+        type="review_assigned",
+        prediction_id=prediction.id,
+    ).delete(synchronize_session=False)
+
+    owner = db.session.get(User, prediction.user_id)
+    excerpt = _excerpt(prediction.claim_text)
+    admin_name = _display_name(admin)
+    owner_name = _display_name(owner)
+    title = "Claim assigned to you"
+
+    _add_notification(
+        recipient=doctor,
+        audience="advisor",
+        type="review_assigned",
+        title=title,
+        body=(
+            f"{admin_name} assigned you a Non-Reliable claim from {owner_name} "
+            "to review."
+        ),
+        prediction_id=prediction.id,
+        actor=admin,
+        other_user=owner,
+        claim_excerpt=excerpt,
+        corrected_excerpt=None,
+        href="/review",
+    )
+
+    from services import audit_service
+
+    audit_service.log_action(
+        actor_id=admin.id,
+        actor_email=admin.email,
+        action="review.assigned",
+        entity_type="prediction",
+        entity_id=prediction.id,
+        details=(
+            f"Assigned claim to {_display_name(doctor)} "
+            f"({doctor.email}): {excerpt or ''}"
+        ).strip(),
+        commit=False,
+    )
     db.session.commit()
 
 
