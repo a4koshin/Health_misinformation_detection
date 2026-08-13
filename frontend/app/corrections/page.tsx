@@ -20,7 +20,7 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
-import { getHistory } from "@/lib/history";
+import { getCorrections } from "@/lib/history";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
 import type { Detection } from "@/types/api";
@@ -50,19 +50,15 @@ function correctedClaim(item: Detection) {
   return "";
 }
 
-function isAdvisorCorrection(item: Detection) {
-  return (
-    item.review_status === "corrected" || Boolean((item.corrected_claim_text || "").trim())
-  );
-}
-
 function CorrectionsContent() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const historyRevision = useChatStore((state) => state.historyRevision);
   const [items, setItems] = useState<Detection[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const columnCount = isAdmin ? 5 : 4;
 
   useEffect(() => {
     let active = true;
@@ -79,19 +75,12 @@ function CorrectionsContent() {
 
       setIsLoading(true);
       try {
-        const history = await getHistory(token);
-        const rows = Array.isArray(history) ? history : [];
-        const corrections = rows.filter(
-          (item) => isAdvisorCorrection(item) && Boolean(correctedClaim(item)),
-        );
-        const pending = rows.filter(
-          (item) =>
-            item.review_status === "pending" ||
-            (item.needs_review && !item.review_status),
-        ).length;
+        const data = await getCorrections(token);
+        const rows = Array.isArray(data.items) ? data.items : [];
+        const corrections = rows.filter((item) => Boolean(correctedClaim(item)));
         if (active) {
           setItems(corrections);
-          setPendingCount(pending);
+          setPendingCount(data.pending_count ?? 0);
         }
       } catch {
         if (active) {
@@ -118,6 +107,8 @@ function CorrectionsContent() {
         previousClaim(item),
         correctedClaim(item),
         item.advisor_name ?? "",
+        item.user_name ?? "",
+        item.user_email ?? "",
       ]
         .join(" ")
         .toLowerCase()
@@ -129,8 +120,12 @@ function CorrectionsContent() {
 
   return (
     <PrivatePage
-      title="Advisor corrections"
-      description="Your original claims next to the Healthcare Advisor rewrite and who corrected them."
+      title="Doctor corrections"
+      description={
+        isAdmin
+          ? "All doctor rewrites across the platform — original claim, correction, user, and doctor."
+          : "Your original claims next to the Doctor rewrite and who corrected them."
+      }
     >
       <DataTableCard
         header={
@@ -139,7 +134,9 @@ function CorrectionsContent() {
               Corrected sentences
             </h2>
             <p className="text-sm text-[#475569]">
-              Only claims a Healthcare Advisor corrected appear here.
+              {isAdmin
+                ? "Every claim a doctor corrected appears here for admin oversight."
+                : "Only claims a Doctor corrected appear here."}
             </p>
           </div>
         }
@@ -156,7 +153,11 @@ function CorrectionsContent() {
                 id="corrections-search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search original claim, correction, or advisor…"
+                placeholder={
+                  isAdmin
+                    ? "Search claim, correction, user, or doctor…"
+                    : "Search original claim, correction, or doctor…"
+                }
                 className="rounded-xl bg-white pl-10"
               />
             </div>
@@ -180,6 +181,9 @@ function CorrectionsContent() {
       >
         <GlassTableHead>
           <GlassTableRow>
+            {isAdmin ? (
+              <GlassTableHeaderCell>User</GlassTableHeaderCell>
+            ) : null}
             <GlassTableHeaderCell>Previous claim</GlassTableHeaderCell>
             <GlassTableHeaderCell>Corrected sentence</GlassTableHeaderCell>
             <GlassTableHeaderCell>Corrected by</GlassTableHeaderCell>
@@ -190,14 +194,14 @@ function CorrectionsContent() {
           {isLoading ? (
             Array.from({ length: 4 }).map((_, index) => (
               <GlassTableRow key={index}>
-                <GlassTableCell colSpan={4}>
+                <GlassTableCell colSpan={columnCount}>
                   <div className="h-8 animate-pulse rounded-lg bg-gray-50" />
                 </GlassTableCell>
               </GlassTableRow>
             ))
           ) : pagination.pageItems.length === 0 ? (
             <GlassTableRow>
-              <GlassTableCell colSpan={4}>
+              <GlassTableCell colSpan={columnCount}>
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
                   <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                     <MaterialIcon name="rate_review" size={24} />
@@ -207,8 +211,10 @@ function CorrectionsContent() {
                   </p>
                   <p className="text-sm text-[#475569]">
                     {pendingCount > 0
-                      ? `${pendingCount} Non-Reliable claim${pendingCount === 1 ? "" : "s"} still waiting in the advisor Review queue. After the advisor submits a rewrite, it will appear here.`
-                      : "When a Healthcare Advisor rewrites one of your Non-Reliable claims, it will show up here."}
+                      ? `${pendingCount} Non-Reliable claim${pendingCount === 1 ? "" : "s"} still waiting for doctor review. After a doctor submits a rewrite, it will appear here.`
+                      : isAdmin
+                        ? "When a doctor corrects a Non-Reliable claim, it will show up here."
+                        : "When a Doctor rewrites one of your Non-Reliable claims, it will show up here."}
                   </p>
                 </div>
               </GlassTableCell>
@@ -216,6 +222,18 @@ function CorrectionsContent() {
           ) : (
             pagination.pageItems.map((item) => (
               <GlassTableRow key={item.id}>
+                {isAdmin ? (
+                  <GlassTableCell>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-[#0f172a]">
+                        {item.user_name || "User"}
+                      </p>
+                      <p className="truncate text-xs text-[#64748b]">
+                        {item.user_email || "—"}
+                      </p>
+                    </div>
+                  </GlassTableCell>
+                ) : null}
                 <GlassTableCell className="max-w-[320px]">
                   <p className="line-clamp-4 text-sm text-[#0f172a]">
                     {previousClaim(item) || "—"}
@@ -228,7 +246,7 @@ function CorrectionsContent() {
                 </GlassTableCell>
                 <GlassTableCell className="whitespace-nowrap">
                   <p className="font-medium text-[#0f172a]">
-                    {item.advisor_name || "Healthcare Advisor"}
+                    {item.advisor_name || "Doctor"}
                   </p>
                 </GlassTableCell>
                 <GlassTableCell className="whitespace-nowrap text-[#475569]">
