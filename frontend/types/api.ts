@@ -1,4 +1,4 @@
-export type UserRole = "user" | "admin" | "healthcare_advisor";
+export type UserRole = "user" | "admin" | "doctor";
 export type AppLanguage = "so" | "en";
 
 export type User = {
@@ -46,7 +46,12 @@ export type Detection = {
   created_at: string;
   message_count?: number;
   needs_review?: boolean;
-  review_status?: "pending" | "confirmed" | "corrected" | null;
+  review_status?:
+    | "awaiting_assignment"
+    | "pending"
+    | "confirmed"
+    | "corrected"
+    | null;
   advisor_note?: string | null;
   original_claim_text?: string | null;
   corrected_claim_text?: string | null;
@@ -54,7 +59,11 @@ export type Detection = {
   user_email?: string | null;
   advisor_id?: string | null;
   advisor_name?: string | null;
+  assigned_by_id?: string | null;
+  assigned_by_name?: string | null;
+  assigned_at?: string | null;
   reviewed_at?: string | null;
+  is_active?: boolean;
 };
 
 export type Conversation = Detection & {
@@ -66,6 +75,7 @@ export type DashboardStats = {
   total_users: number;
   total_admins: number;
   total_advisors?: number;
+  total_doctors?: number;
   total_regular_users?: number;
   total_detections: number;
   total_predictions: number;
@@ -116,7 +126,12 @@ export type ReportRow = {
   user_role?: UserRole | string | null;
   claim: string;
   label: string | null;
-  review_status?: "pending" | "confirmed" | "corrected" | null;
+  review_status?:
+    | "awaiting_assignment"
+    | "pending"
+    | "confirmed"
+    | "corrected"
+    | null;
   advisor_id?: string | null;
   advisor_name?: string | null;
   advisor_email?: string | null;
@@ -156,6 +171,45 @@ export type AdminUserUpdate = {
   full_name?: string | null;
   password?: string;
   role?: UserRole;
+};
+
+export type DoctorProfile = {
+  id: string;
+  user_id: string;
+  name: string;
+  license: string;
+  license_url?: string | null;
+  profile_image: string;
+  profile_image_url?: string | null;
+  job_title: string;
+  workplace: string;
+  email?: string;
+  role?: UserRole | string;
+  is_active?: boolean;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type DoctorCreate = {
+  email: string;
+  password: string;
+  name: string;
+  job_title: string;
+  workplace: string;
+  license: File;
+  profile_image: File;
+};
+
+export type DoctorUpdate = {
+  email?: string;
+  password?: string;
+  name?: string;
+  job_title?: string;
+  workplace?: string;
+  license?: File | null;
+  profile_image?: File | null;
 };
 
 export type DatasetPredictionRow = {
