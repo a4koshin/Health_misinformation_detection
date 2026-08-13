@@ -150,8 +150,10 @@ def request_account_deletion(user_id, password: str) -> User:
 def wipe_all_data(admin_id, password: str) -> dict:
     """Admin-only: delete all app data. Keeps the calling admin account."""
     from sqlalchemy import text
+    from sqlalchemy.exc import IntegrityError
 
     from models.audit_log import AuditLog
+    from models.notification import Notification
     from models.password_reset import PasswordReset
 
     admin = get_user(admin_id)
@@ -164,6 +166,10 @@ def wipe_all_data(admin_id, password: str) -> dict:
     if not admin.check_password(password):
         raise ValueError("Password is incorrect.")
 
+    # Clear dependent rows first so user deletes do not hit FK constraints.
+    notifications_deleted = int(
+        Notification.query.delete(synchronize_session=False) or 0
+    )
     predictions_deleted = int(
         Prediction.query.delete(synchronize_session=False) or 0
     )
@@ -174,6 +180,20 @@ def wipe_all_data(admin_id, password: str) -> dict:
         AuditLog.query.delete(synchronize_session=False) or 0
     )
 
+    doctors_deleted = 0
+    try:
+        from models.doctor import Doctor
+
+        doctors_deleted = int(Doctor.query.delete(synchronize_session=False) or 0)
+    except Exception:
+        doctors_deleted = 0
+        try:
+            with db.session.begin_nested():
+                result = db.session.execute(text("DELETE FROM doctors"))
+                doctors_deleted = int(result.rowcount or 0)
+        except Exception:
+            doctors_deleted = 0
+
     upload_batches_deleted = 0
     try:
         with db.session.begin_nested():
@@ -181,6 +201,14 @@ def wipe_all_data(admin_id, password: str) -> dict:
             upload_batches_deleted = int(result.rowcount or 0)
     except Exception:
         upload_batches_deleted = 0
+
+    conversations_deleted = 0
+    try:
+        with db.session.begin_nested():
+            result = db.session.execute(text("DELETE FROM conversations"))
+            conversations_deleted = int(result.rowcount or 0)
+    except Exception:
+        conversations_deleted = 0
 
     other_users = User.query.filter(
         User.id != admin.id,
@@ -200,11 +228,21 @@ def wipe_all_data(admin_id, password: str) -> dict:
         db.session.delete(user)
         users_deleted += 1
 
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError as exc:
+        db.session.rollback()
+        raise ValueError(
+            "Unable to wipe the database because related records remain. "
+            "Try again after clearing notifications and user history."
+        ) from exc
+
     return {
         "predictions_deleted": predictions_deleted,
         "users_deleted": users_deleted,
         "audit_logs_deleted": audit_logs_deleted,
         "password_resets_deleted": password_resets_deleted,
         "upload_batches_deleted": upload_batches_deleted,
+        "notifications_deleted": notifications_deleted,
+        "conversations_deleted": conversations_deleted,
     }
