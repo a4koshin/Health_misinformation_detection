@@ -50,9 +50,9 @@ def has_llm_key() -> bool:
 
 def _llm_timeout_seconds() -> float:
     try:
-        return max(2.0, float(os.getenv("LLM_TIMEOUT_SECONDS", "8")))
+        return max(2.0, float(os.getenv("LLM_TIMEOUT_SECONDS", "25")))
     except ValueError:
-        return 8.0
+        return 25.0
 
 
 def _openai_client(api_key: str, base_url: Optional[str] = None) -> Any:
