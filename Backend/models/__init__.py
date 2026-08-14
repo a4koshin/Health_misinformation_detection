@@ -1,4 +1,6 @@
+from models.appointment import Appointment
 from models.audit_log import AuditLog
+from models.availability import DoctorAvailability
 from models.doctor import Doctor
 from models.notification import Notification
 from models.password_reset import PasswordReset
@@ -12,4 +14,6 @@ __all__ = [
     "PasswordReset",
     "Notification",
     "Doctor",
+    "Appointment",
+    "DoctorAvailability",
 ]
