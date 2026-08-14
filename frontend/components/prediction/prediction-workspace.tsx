@@ -21,11 +21,9 @@ import {
 import {
   enrichPrediction,
   predictText,
-  transcribeMediaUrl,
   type PredictionSource,
   type TextPredictionResponse,
 } from "@/lib/predict";
-import { validateSocialMediaUrl } from "@/lib/social-media-url";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
 import { cn } from "@/lib/utils";
@@ -36,7 +34,6 @@ const FILE_ACCEPT =
 
 const INPUT_MODES = [
   { id: "text" as const, label: "Text" },
-  { id: "link" as const, label: "Link", disabled: true },
   { id: "file" as const, label: "Dataset" },
 ];
 
@@ -216,10 +213,7 @@ export function PredictionWorkspace() {
   const [datasetEmptyMessage, setDatasetEmptyMessage] = useState<string | null>(
     null,
   );
-  const [mediaBusyLabel, setMediaBusyLabel] = useState<string | null>(null);
-  const [mediaUrl, setMediaUrl] = useState("");
-  const [mediaUrlError, setMediaUrlError] = useState<string | null>(null);
-  const [inputMode, setInputMode] = useState<"text" | "link" | "file">("text");
+  const [inputMode, setInputMode] = useState<"text" | "file">("text");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -342,17 +336,6 @@ export function PredictionWorkspace() {
     requestAnimationFrame(() => textareaRef.current?.focus());
   }
 
-  function handleDraftChange(value: string) {
-    const next = value.slice(0, MAX_CHARS);
-    setDraft(next);
-    if (!next.trim()) {
-      setInputError(null);
-      return;
-    }
-    const validation = validateSomaliClaimInput(next);
-    setInputError(validation.ok ? null : validation.message || null);
-  }
-
   async function handleFileUpload(file: File) {
     if (!token || isAnalyzing) return;
 
@@ -435,73 +418,15 @@ export function PredictionWorkspace() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  function handleMediaUrlChange(value: string) {
-    setMediaUrl(value);
-    if (!value.trim()) {
-      setMediaUrlError(null);
+  function handleDraftChange(value: string) {
+    const next = value.slice(0, MAX_CHARS);
+    setDraft(next);
+    if (!next.trim()) {
+      setInputError(null);
       return;
     }
-    const validation = validateSocialMediaUrl(value);
-    setMediaUrlError(validation.ok ? null : validation.message || null);
-  }
-
-  async function handleMediaUrl() {
-    if (!token || analyzeLock.current || isAnalyzing) return;
-    const url = mediaUrl.trim();
-    const validation = validateSocialMediaUrl(url);
-    if (!validation.ok) {
-      const message = validation.message || "This social link is not allowed.";
-      setMediaUrlError(message);
-      toast.error(message);
-      return;
-    }
-
-    setMediaUrlError(null);
-    analyzeLock.current = true;
-    setIsAnalyzing(true);
-    setMediaBusyLabel("Downloading and transcribing…");
-
-    let transcript = "";
-    try {
-      const { transcribed_text } = await transcribeMediaUrl(
-        token,
-        url,
-        "video",
-      );
-      transcript = (transcribed_text || "").trim();
-      if (!transcript) {
-        toast.error("No speech could be transcribed from that link.");
-        return;
-      }
-      const clipped = transcript.slice(0, MAX_CHARS);
-      setDraft(clipped);
-      setResult(null);
-      setInputMode("text");
-      toast.success("Transcript ready. Running SomBERTb…");
-      transcript = clipped;
-    } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : "Unable to download or transcribe that link.";
-      setMediaUrlError(
-        message.toLowerCase().includes("link") ||
-          message.toLowerCase().includes("facebook") ||
-          message.toLowerCase().includes("youtube")
-          ? message
-          : null,
-      );
-      toast.error(message);
-      transcript = "";
-    } finally {
-      analyzeLock.current = false;
-      setIsAnalyzing(false);
-      setMediaBusyLabel(null);
-    }
-
-    if (transcript) {
-      await analyzeClaim(transcript);
-    }
+    const validation = validateSomaliClaimInput(next);
+    setInputError(validation.ok ? null : validation.message || null);
   }
 
   const charCount = draft.length;
@@ -547,16 +472,10 @@ export function PredictionWorkspace() {
                   type="button"
                   role="tab"
                   aria-selected={inputMode === mode.id}
-                  aria-disabled={mode.disabled}
-                  disabled={isAnalyzing || mode.disabled}
-                  title={mode.disabled ? "Link checks are disabled." : undefined}
-                  onClick={() => {
-                    if (mode.disabled) return;
-                    setInputMode(mode.id);
-                  }}
+                  disabled={isAnalyzing}
+                  onClick={() => setInputMode(mode.id)}
                   className={cn(
                     "relative -mb-px cursor-pointer pb-2.5 text-sm transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50",
-                    mode.disabled && "opacity-40 hover:text-ink-muted",
                     inputMode === mode.id
                       ? "font-medium text-ink after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-brand"
                       : "text-ink-muted hover:text-ink",
@@ -630,27 +549,14 @@ export function PredictionWorkspace() {
                       }
                       className="bg-brand bg-none shadow-none hover:bg-[#e65300] hover:shadow-none"
                     >
-                      {isAnalyzing && !mediaBusyLabel ? (
+                      {isAnalyzing ? (
                         <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                       ) : null}
-                      {isAnalyzing && !mediaBusyLabel
-                        ? "Predicting...."
-                        : "Predict"}
+                      {isAnalyzing ? "Predicting...." : "Predict"}
                     </GlassButton>
                   </div>
                 </div>
               </div>
-            ) : null}
-
-            {inputMode === "link" ? (
-              <SocialLinkField
-                value={mediaUrl}
-                error={mediaUrlError}
-                disabled={isAnalyzing}
-                checking={mediaBusyLabel === "Downloading and transcribing…"}
-                onChange={handleMediaUrlChange}
-                onSubmit={() => void handleMediaUrl()}
-              />
             ) : null}
 
             {inputMode === "file" ? (
@@ -957,80 +863,6 @@ function DatasetResultsTable({
         rowsPerPage={pagination.rowsPerPage}
         onRowsPerPageChange={pagination.setRowsPerPage}
       />
-    </div>
-  );
-}
-
-function SocialLinkField({
-  value,
-  error,
-  disabled,
-  checking,
-  onChange,
-  onSubmit,
-}: {
-  value: string;
-  error: string | null;
-  disabled: boolean;
-  checking: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <label
-        htmlFor="media-link-input"
-        className="text-sm font-medium text-ink"
-      >
-        Video link
-      </label>
-      <input
-        id="media-link-input"
-        type="url"
-        inputMode="url"
-        autoComplete="off"
-        spellCheck={false}
-        value={value}
-        disabled={disabled}
-        placeholder="https://www.youtube.com/watch?v=… or Facebook / TikTok link"
-        aria-invalid={Boolean(error)}
-        aria-describedby={error ? "media-link-error" : "media-link-help"}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            if (!disabled && value.trim()) onSubmit();
-          }
-        }}
-        className={cn(
-          "min-h-11 w-full rounded-xl border bg-white px-3 py-2.5 text-[15px] leading-relaxed text-ink outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-ink-muted/50 focus:ring-2 disabled:opacity-60",
-          error
-            ? "border-red-400 focus:border-red-500 focus:ring-red-500/15"
-            : "border-gray-200 focus:border-brand/50 focus:ring-brand/15",
-        )}
-      />
-      {error ? (
-        <p id="media-link-error" role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
-      ) : (
-        <p id="media-link-help" className="text-xs text-ink-muted">
-          Paste a Facebook, YouTube, TikTok, Instagram, or X link. We transcribe
-          Somali speech (up to 15 minutes), then SomBERTb predicts.
-        </p>
-      )}
-      <GlassButton
-        type="button"
-        size="sm"
-        disabled={disabled || !value.trim() || Boolean(error)}
-        onClick={onSubmit}
-        className="bg-brand bg-none shadow-none hover:bg-[#e65300] hover:shadow-none"
-      >
-        {checking ? (
-          <span className="size-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-        ) : null}
-        {checking ? "Working…" : "Check link"}
-      </GlassButton>
     </div>
   );
 }
