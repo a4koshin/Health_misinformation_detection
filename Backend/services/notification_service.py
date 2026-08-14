@@ -341,6 +341,92 @@ def _notify_claim_corrected(prediction: Prediction, advisor: User) -> None:
     db.session.commit()
 
 
+def notify_appointment_requested(
+    appointment, user: User, doctor: User
+) -> None:
+    try:
+        _notify_appointment_requested(appointment, user, doctor)
+    except Exception:
+        db.session.rollback()
+
+
+def _notify_appointment_requested(appointment, user: User, doctor: User) -> None:
+    from models.prediction import Prediction
+
+    prediction = db.session.get(Prediction, appointment.prediction_id)
+    excerpt = _excerpt(
+        (prediction.corrected_claim_text if prediction else None)
+        or (prediction.claim_text if prediction else None)
+    )
+    user_name = _display_name(user)
+    Notification.query.filter_by(
+        recipient_id=doctor.id,
+        type="appointment_requested",
+        prediction_id=appointment.prediction_id,
+    ).delete(synchronize_session=False)
+    _add_notification(
+        recipient=doctor,
+        audience="advisor",
+        type="appointment_requested",
+        title="Appointment request",
+        body=(
+            f"{user_name} booked {appointment.starts_at.strftime('%Y-%m-%d %H:%M') if appointment.starts_at else 'a time'} "
+            "to ask more about a claim you corrected."
+        ),
+        prediction_id=appointment.prediction_id,
+        actor=user,
+        other_user=doctor,
+        claim_excerpt=excerpt,
+        corrected_excerpt=_excerpt(appointment.note),
+        href="/appointments",
+    )
+    db.session.commit()
+
+
+def notify_appointment_status(appointment, *, doctor: User, user: User) -> None:
+    try:
+        _notify_appointment_status(appointment, doctor=doctor, user=user)
+    except Exception:
+        db.session.rollback()
+
+
+def _notify_appointment_status(appointment, *, doctor: User, user: User) -> None:
+    doctor_name = _display_name(doctor)
+    confirmed = appointment.status == "confirmed"
+    notify_type = "appointment_confirmed" if confirmed else "appointment_declined"
+    Notification.query.filter(
+        Notification.recipient_id == user.id,
+        Notification.prediction_id == appointment.prediction_id,
+        Notification.type.in_(("appointment_confirmed", "appointment_declined")),
+    ).delete(synchronize_session=False)
+    _add_notification(
+        recipient=user,
+        audience="user",
+        type=notify_type,
+        title="Appointment confirmed" if confirmed else "Appointment declined",
+        body=(
+            (
+                f"{doctor_name} confirmed your appointment"
+                + (
+                    f" on {appointment.starts_at.strftime('%Y-%m-%d %H:%M')}"
+                    if appointment.starts_at
+                    else ""
+                )
+                + "."
+            )
+            if confirmed
+            else f"{doctor_name} cannot take this appointment right now."
+        ),
+        prediction_id=appointment.prediction_id,
+        actor=doctor,
+        other_user=user,
+        claim_excerpt=None,
+        corrected_excerpt=None,
+        href="/corrections",
+    )
+    db.session.commit()
+
+
 def list_notifications(user_id: int, *, limit: int = 40) -> list[dict]:
     limit = min(max(int(limit or 40), 1), 100)
     rows = (
