@@ -62,6 +62,9 @@ function actionLabel(action: string) {
     "review.queued": "Awaiting doctor assignment",
     "review.assigned": "Assigned to doctor",
     "review.corrected": "Claim corrected",
+    "appointment.requested": "Appointment requested",
+    "appointment.confirmed": "Appointment confirmed",
+    "appointment.declined": "Appointment declined",
     "report.download": "Downloaded report",
   };
   return map[action] ?? action;
