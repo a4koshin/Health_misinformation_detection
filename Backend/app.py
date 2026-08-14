@@ -11,6 +11,7 @@ from routes.history_routes import history_bp
 from routes.predict_routes import predict_bp
 from routes.report_routes import report_bp
 from routes.notification_routes import notification_bp
+from routes.appointment_routes import appointment_bp
 from routes.review_routes import review_bp
 from routes.settings_routes import settings_bp
 from routes.transcription_routes import transcription_bp
@@ -33,9 +34,19 @@ def create_app() -> Flask:
     app.register_blueprint(transcription_bp)
     app.register_blueprint(review_bp)
     app.register_blueprint(notification_bp)
+    app.register_blueprint(appointment_bp)
 
     # Import models so SQLAlchemy knows the tables.
-    from models import AuditLog, Doctor, Notification, PasswordReset, Prediction, User  # noqa: F401
+    from models import (  # noqa: F401
+        Appointment,
+        AuditLog,
+        Doctor,
+        DoctorAvailability,
+        Notification,
+        PasswordReset,
+        Prediction,
+        User,
+    )
 
     with app.app_context():
         db.create_all()
@@ -227,6 +238,53 @@ def create_app() -> Flask:
                     "read_at TIMESTAMP, "
                     "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
                     ")"
+                )
+            )
+            db.session.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS doctor_availability ("
+                    "id SERIAL PRIMARY KEY, "
+                    "doctor_user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "starts_at TIMESTAMP NOT NULL, "
+                    "ends_at TIMESTAMP NOT NULL, "
+                    "created_at TIMESTAMP NOT NULL DEFAULT NOW()"
+                    ")"
+                )
+            )
+            db.session.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS appointments ("
+                    "id SERIAL PRIMARY KEY, "
+                    "user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "doctor_user_id INTEGER NOT NULL REFERENCES users(id), "
+                    "prediction_id INTEGER NOT NULL REFERENCES predictions(id), "
+                    "availability_id INTEGER REFERENCES doctor_availability(id), "
+                    "starts_at TIMESTAMP, "
+                    "ends_at TIMESTAMP, "
+                    "note TEXT, "
+                    "status VARCHAR(20) NOT NULL DEFAULT 'pending', "
+                    "created_at TIMESTAMP NOT NULL DEFAULT NOW(), "
+                    "updated_at TIMESTAMP NOT NULL DEFAULT NOW()"
+                    ")"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE appointments "
+                    "ADD COLUMN IF NOT EXISTS availability_id INTEGER "
+                    "REFERENCES doctor_availability(id)"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE appointments "
+                    "ADD COLUMN IF NOT EXISTS starts_at TIMESTAMP"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE appointments "
+                    "ADD COLUMN IF NOT EXISTS ends_at TIMESTAMP"
                 )
             )
             db.session.commit()
