@@ -66,6 +66,38 @@ export type Detection = {
   is_active?: boolean;
 };
 
+export type AppointmentStatus = "pending" | "confirmed" | "declined";
+
+export type DoctorAvailability = {
+  id: string;
+  doctor_user_id: string;
+  starts_at: string;
+  ends_at: string;
+  created_at?: string | null;
+  booked?: boolean;
+};
+
+export type Appointment = {
+  id: string;
+  user_id: string;
+  doctor_user_id: string;
+  prediction_id: string;
+  availability_id?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  note: string | null;
+  status: AppointmentStatus;
+  created_at: string | null;
+  updated_at: string | null;
+  user_name?: string | null;
+  user_email?: string | null;
+  doctor_name?: string | null;
+  doctor_job_title?: string | null;
+  doctor_workplace?: string | null;
+  claim_text?: string | null;
+  corrected_claim_text?: string | null;
+};
+
 export type Conversation = Detection & {
   messages: StoredChatMessage[];
   enrichment_pending?: boolean;
@@ -229,7 +261,12 @@ export type DatasetPredictionResponse = {
   results: DatasetPredictionRow[];
 };
 
-export type NotificationType = "review_queued" | "claim_corrected";
+export type NotificationType =
+  | "review_queued"
+  | "claim_corrected"
+  | "appointment_requested"
+  | "appointment_confirmed"
+  | "appointment_declined";
 
 export type AppNotification = {
   id: string;
