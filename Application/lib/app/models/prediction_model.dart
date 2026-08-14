@@ -8,6 +8,8 @@ class PredictionModel {
     this.source,
     this.reviewStatus,
     this.correctedClaim,
+    this.advisorId,
+    this.advisorName,
   });
 
   final String id;
@@ -18,6 +20,8 @@ class PredictionModel {
   final String? source;
   final String? reviewStatus;
   final String? correctedClaim;
+  final String? advisorId;
+  final String? advisorName;
 
   bool get isReliable {
     final value = label.toLowerCase();
@@ -41,6 +45,8 @@ class PredictionModel {
       source: json['source'] as String?,
       reviewStatus: json['review_status'] as String?,
       correctedClaim: json['corrected_claim_text'] as String?,
+      advisorId: json['advisor_id']?.toString(),
+      advisorName: json['advisor_name'] as String?,
     );
   }
 }
