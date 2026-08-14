@@ -259,7 +259,22 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                 active={pathname === "/corrections"}
                 onClick={() => go("/corrections")}
               />
-            ) : null}
+            ) : (
+              <>
+                <NavItem
+                  icon="schedule"
+                  label="Available times"
+                  active={pathname === "/availability"}
+                  onClick={() => go("/availability")}
+                />
+                <NavItem
+                  icon="event_available"
+                  label="Appointments"
+                  active={pathname === "/appointments"}
+                  onClick={() => go("/appointments")}
+                />
+              </>
+            )}
           </div>
 
           {isAdmin ? (
