@@ -33,14 +33,23 @@ NON_MEDICAL"""
 # "healthai" / "Admin123" do not count as medical.
 _MEDICAL_HINTS = re.compile(
     r"(?<![A-Za-z])("
-    r"caafimaad|cudur|cudurrada|daawo|dawo|daweyn|xanuun|jirrro|jirrada|"
-    r"fiitamiin|vitamin|vitamins|tallaal|vaccine|dawooyin|dhiig|maskax|"
-    r"calool|neef|qanjidh|ubax|ubaxa|uur|hourka|hour|"
+    r"caafimaad|caafimaadka|cudur|cudurka|cudurrada|daawo|daawada|dawo|"
+    r"daweyn|daaweyn|daawayn|xanuun|xanuunka|jirrro|jirro|jirrada|"
+    r"fiitamiin|vitamin|vitamins|tallaal|tallaalka|vaccine|dawooyin|"
+    r"dhiig|dhiigga|maskax|calool|neef|neefta|qanjidh|ubax|ubaxa|"
+    r"uur|uurka|hourka|hour|qandho|qufac|madaxxanuun|caloolxanuun|"
     r"cunto.*(caafimaad|jirka)|jirka|jidhka|bukaansho|bukaan|"
     r"antibiotic|insulin|covid|corona|malaria|cholera|diabetes|"
+    r"kanser|cancer|hiv|aids|dengue|"
     r"medicine|medical|health|disease|symptom|treatment|hospital|"
     r"doctor|nurse|clinic|infection|immune|nutrition"
     r")(?![A-Za-z])",
+    re.IGNORECASE,
+)
+
+_NON_MEDICAL_BLOCK = re.compile(
+    r"(password|passwd|api[_-]?key|secret[_-]?key|Bearer\s+[A-Za-z0-9._-]+|"
+    r"DATABASE_URL|JWT_SECRET)",
     re.IGNORECASE,
 )
 
@@ -72,6 +81,15 @@ def _parse_label(raw: str) -> Optional[bool]:
     return None
 
 
+def _fallback_is_medical(claim: str, hint_medical: bool) -> bool:
+    """When Cerebras/Groq are down, keep predictions working."""
+    if hint_medical:
+        return True
+    if _NON_MEDICAL_BLOCK.search(claim or ""):
+        return False
+    return len((claim or "").split()) >= 3
+
+
 def check_is_medical(text: str) -> bool:
     """Cerebras → Groq medical gatekeeper. True = medical, False = non-medical."""
     claim = (text or "").strip()
@@ -83,13 +101,10 @@ def check_is_medical(text: str) -> bool:
     hint_medical = _has_medical_hints(claim)
 
     if not has_llm_key():
-        if hint_medical:
-            logger.warning("No LLM key; keyword fallback MEDICAL.")
-            print("[gatekeeper] no API key; keyword fallback MEDICAL")
-            return True
-        raise RuntimeError(
-            "No LLM API key set. Add CEREBRAS_API_KEY and/or GROQ_API_KEY to Backend/.env."
-        )
+        medical = _fallback_is_medical(claim, hint_medical)
+        logger.warning("No LLM key; keyword fallback %s.", "MEDICAL" if medical else "NON_MEDICAL")
+        print("[gatekeeper] no API key; keyword fallback " + ("MEDICAL" if medical else "NON_MEDICAL"))
+        return medical
 
     try:
         content = chat_completion(
@@ -109,12 +124,9 @@ def check_is_medical(text: str) -> bool:
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("Gatekeeper LLM failed on all providers: %s", exc)
-        if hint_medical:
-            print("[gatekeeper] API failed; keyword fallback MEDICAL")
-            return True
-        raise RuntimeError(
-            "Medical gatekeeper is unavailable. Check CEREBRAS_API_KEY / GROQ_API_KEY and try again."
-        ) from exc
+        medical = _fallback_is_medical(claim, hint_medical)
+        print("[gatekeeper] API failed; keyword fallback " + ("MEDICAL" if medical else "NON_MEDICAL"))
+        return medical
 
     parsed = _parse_label(content)
     if parsed is None:
