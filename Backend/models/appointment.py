@@ -38,6 +38,18 @@ class Appointment(db.Model):
     ends_at = db.Column(db.DateTime, nullable=True)
     note = db.Column(db.Text, nullable=True)
     status = db.Column(db.String(20), nullable=False, default="pending", index=True)
+    payment_status = db.Column(
+        db.String(20), nullable=False, default="unpaid", index=True
+    )
+    payment_amount = db.Column(db.String(20), nullable=True)
+    payment_currency = db.Column(db.String(8), nullable=True)
+    payment_method = db.Column(db.String(40), nullable=True)
+    payer_phone = db.Column(db.String(20), nullable=True)
+    payment_reference = db.Column(db.String(64), nullable=True)
+    payment_invoice_id = db.Column(db.String(64), nullable=True)
+    payment_request_id = db.Column(db.String(64), nullable=True)
+    paid_at = db.Column(db.DateTime, nullable=True)
+    queue_number = db.Column(db.Integer, nullable=True, index=True)
     created_at = db.Column(
         db.DateTime,
         nullable=False,
@@ -83,6 +95,15 @@ class Appointment(db.Model):
             "ends_at": isoformat_utc(self.ends_at),
             "note": self.note,
             "status": self.status,
+            "payment_status": self.payment_status or "unpaid",
+            "payment_amount": self.payment_amount,
+            "payment_currency": self.payment_currency,
+            "payment_method": self.payment_method,
+            "payer_phone": self.payer_phone,
+            "payment_reference": self.payment_reference,
+            "payment_invoice_id": self.payment_invoice_id,
+            "paid_at": isoformat_utc(self.paid_at),
+            "queue_number": self.queue_number,
             "created_at": isoformat_utc(self.created_at),
             "updated_at": isoformat_utc(self.updated_at),
             "user_name": (
