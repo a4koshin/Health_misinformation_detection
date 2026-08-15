@@ -11,48 +11,48 @@ import { PageSection } from "@/components/marketing/page-shell";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 const stats = [
-  { value: "10K+", label: "Claims analyzed" },
-  { value: "94%", label: "Model accuracy" },
-  { value: "<1s", label: "Average response" },
-  { value: "100%", label: "Somali focused" },
+  { value: "SomBERTb", label: "Prediction model" },
+  { value: "2 labels", label: "Reliable / Non-Reliable" },
+  { value: "3 roles", label: "User · Doctor · Admin" },
+  { value: "Web + app", label: "Cross-platform access" },
 ];
 
 const features = [
   {
     icon: "bolt",
-    title: "Instant detection",
+    title: "Instant SomBERTb checks",
     description:
-      "Paste any Somali health claim and get a Reliable or Misinformation verdict in under a second.",
+      "Paste a Somali health claim and get a Reliable or Non-Reliable verdict with an explanation.",
   },
   {
-    icon: "language",
-    title: "Somali-first NLP",
+    icon: "health_and_safety",
+    title: "Medical gatekeeper",
     description:
-      "Purpose-built preprocessing and stopword handling tuned specifically for the Somali language.",
+      "Non-medical text is filtered before classification, so SomBERTb only scores real health claims.",
   },
   {
-    icon: "history",
-    title: "Conversation history",
+    icon: "rate_review",
+    title: "Doctor corrections",
     description:
-      "Every check is saved to your private history so you can revisit, share, or delete past analyses.",
+      "Admins assign Non-Reliable claims to doctors. Rewrites appear on Corrections for the user.",
   },
   {
-    icon: "shield_person",
-    title: "Secure accounts",
+    icon: "event_available",
+    title: "Appointments with EVC Plus",
     description:
-      "JWT-protected authentication with role-based access keeps your data private and admin tools locked down.",
+      "After a correction, book a doctor’s published time slot and pay securely with Hormuud EVC Plus before the request is sent.",
   },
   {
     icon: "upload_file",
-    title: "Batch dataset analysis",
+    title: "Dataset predictions",
     description:
-      "Admins can upload entire CSV datasets and classify thousands of claims in a single run.",
+      "Upload .txt, CSV, or Excel files and classify many claims in one run with per-row results.",
   },
   {
     icon: "monitoring",
-    title: "Live dashboard",
+    title: "Admin operations",
     description:
-      "Track users, detections, and the reliable-to-misinformation ratio from a real-time admin dashboard.",
+      "Manage users and doctors, assign reviews, and follow activity in the audit log.",
   },
 ];
 
@@ -61,59 +61,59 @@ const steps = [
     icon: "edit_note",
     title: "Enter a claim",
     description:
-      "Type or paste a Somali health statement — anything you saw on social media, WhatsApp, or the news.",
+      "Type or paste a Somali health statement from social media, WhatsApp, or the news.",
   },
   {
     icon: "neurology",
-    title: "AI analyzes it",
+    title: "SomBERTb analyzes it",
     description:
-      "The text is cleaned, vectorized with TF-IDF, and classified by a trained Support Vector Machine.",
+      "A medical check runs first, then SomBERTb labels the claim Reliable or Non-Reliable.",
   },
   {
     icon: "verified",
-    title: "Get a clear verdict",
+    title: "Review or book help",
     description:
-      "You instantly see whether the claim is Reliable or Misinformation, saved to your history.",
+      "See the verdict and explanation. If Non-Reliable, a doctor can correct it and you can book a time — paid with EVC Plus.",
   },
 ];
 
 const reasons = [
   {
     icon: "science",
-    title: "Research-grade model",
+    title: "Built for Somali health text",
     description:
-      "Trained and evaluated on a curated, labeled Somali health dataset using rigorous ML methodology.",
+      "SomBERTb is trained for Somali claims, with strict validation against empty, English, Arabic, or numeric-only input.",
   },
   {
-    icon: "block",
-    title: "Strict input validation",
+    icon: "clinical_notes",
+    title: "Human review when needed",
     description:
-      "Non-Somali, numeric, or empty input is rejected with clear feedback, so results are never guesswork.",
+      "Non-Reliable results are not the end — doctors rewrite claims, and users can book a paid EVC Plus appointment for follow-up.",
   },
   {
     icon: "diversity_3",
     title: "Built for the community",
     description:
-      "Designed around how health misinformation actually spreads in Somali-speaking communities.",
+      "Designed around how health rumors travel in Somali-speaking communities, on web and mobile.",
   },
 ];
 
 const testimonials = [
   {
     quote:
-      "HealthAI helped me debunk a viral claim in our family group chat within seconds. The verdict was clear and easy to share.",
+      "SomAI helped me check a viral claim in our family group chat within seconds. The Reliable / Non-Reliable label was easy to understand.",
     name: "Amina H.",
     role: "Community health volunteer",
   },
   {
     quote:
-      "As a journalism student, I use it to pre-screen Somali health stories before quoting them. It has become part of my workflow.",
+      "I use prediction and history to pre-screen Somali health stories. When something is Non-Reliable, the doctor rewrite is especially useful.",
     name: "Mohamed A.",
     role: "Journalism student",
   },
   {
     quote:
-      "The batch dataset feature let us classify our entire research corpus overnight. The dashboard makes reporting effortless.",
+      "Dataset upload let us classify a full research file at once, and the doctor workflow closes the loop for claims that need human review.",
     name: "Dr. Layla O.",
     role: "Public health researcher",
   },
@@ -124,13 +124,15 @@ export default function HomePage() {
     <div className="space-y-24 sm:space-y-32">
       <GlassHero />
 
-      {/* Statistics */}
       <PageSection>
         <Reveal>
-          <GlassCard strong className="grid grid-cols-2 gap-8 px-8 py-10 lg:grid-cols-4">
+          <GlassCard
+            strong
+            className="grid grid-cols-2 gap-8 px-8 py-10 lg:grid-cols-4"
+          >
             {stats.map((stat) => (
               <div key={stat.label} className="text-center">
-                <p className="text-gradient-brand text-4xl font-normal tracking-tight">
+                <p className="text-gradient-brand text-3xl font-normal tracking-tight sm:text-4xl">
                   {stat.value}
                 </p>
                 <p className="mt-2 text-sm text-[#475569]">{stat.label}</p>
@@ -140,15 +142,14 @@ export default function HomePage() {
         </Reveal>
       </PageSection>
 
-      {/* Features */}
       <PageSection>
         <Reveal className="mx-auto mb-12 max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
-            Everything you need to fight misinformation
+            Everything you need to verify Somali health claims
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[#475569]">
-            A complete toolkit for verifying Somali health claims, from
-            one-off checks to full dataset audits.
+            From one claim check to doctor corrections and EVC Plus appointments
+            — SomAI covers the full workflow.
           </p>
         </Reveal>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -160,14 +161,14 @@ export default function HomePage() {
         </div>
       </PageSection>
 
-      {/* How it works */}
       <PageSection>
         <Reveal className="mx-auto mb-12 max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
             How it works
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[#475569]">
-            From a suspicious claim to a confident verdict in three steps.
+            From a suspicious claim to a clear verdict — and help when you need
+            it.
           </p>
         </Reveal>
         <div className="grid gap-5 md:grid-cols-3">
@@ -192,19 +193,18 @@ export default function HomePage() {
         </div>
       </PageSection>
 
-      {/* Why choose HealthAI */}
       <PageSection>
         <Reveal>
           <GlassCard strong className="overflow-hidden p-8 sm:p-12">
             <div className="grid items-center gap-10 lg:grid-cols-2">
               <div>
                 <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
-                  Why choose HealthAI
+                  Why choose SomAI
                 </h2>
                 <p className="mt-4 max-w-md text-base leading-relaxed text-[#475569]">
-                  Misinformation spreads faster than facts. HealthAI gives
-                  Somali speakers a scientific, transparent way to verify
-                  health claims before they spread.
+                  Harmful health rumors move fast. SomAI gives Somali speakers a
+                  clear Reliable / Non-Reliable check, plus a path to a
+                  reviewing doctor.
                 </p>
                 <GlassButton asChild size="lg" className="mt-8">
                   <Link href="/about">
@@ -238,14 +238,14 @@ export default function HomePage() {
         </Reveal>
       </PageSection>
 
-      {/* Testimonials */}
       <PageSection>
         <Reveal className="mx-auto mb-12 max-w-2xl text-center">
           <h2 className="text-3xl font-semibold tracking-tight text-[#0f172a] sm:text-4xl">
             Trusted by curious minds
           </h2>
           <p className="mt-4 text-base leading-relaxed text-[#475569]">
-            Students, researchers, and community leaders use HealthAI every day.
+            Students, researchers, and community leaders use SomAI to check
+            claims.
           </p>
         </Reveal>
         <div className="grid gap-5 md:grid-cols-3">
@@ -272,7 +272,6 @@ export default function HomePage() {
         </div>
       </PageSection>
 
-      {/* FAQ preview */}
       <PageSection>
         <div className="grid gap-10 lg:grid-cols-[1fr_1.5fr]">
           <Reveal>
@@ -280,7 +279,7 @@ export default function HomePage() {
               Frequently asked questions
             </h2>
             <p className="mt-4 text-base leading-relaxed text-[#475569]">
-              Quick answers about the model, privacy, and supported languages.
+              Quick answers about SomBERTb, privacy, doctors, and datasets.
             </p>
             <GlassButton asChild variant="glass" size="md" className="mt-6">
               <Link href="/faq">
@@ -295,7 +294,6 @@ export default function HomePage() {
         </div>
       </PageSection>
 
-      {/* Contact CTA */}
       <PageSection>
         <Reveal>
           <div className="relative overflow-hidden rounded-3xl bg-[#ff5c00] px-8 py-14 text-center sm:px-12">
@@ -303,11 +301,11 @@ export default function HomePage() {
             <div className="absolute -bottom-24 -left-16 size-72 rounded-full bg-white/10 blur-3xl" />
             <div className="relative">
               <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                Ready to stop misinformation in its tracks?
+                Ready to check your next Somali health claim?
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-white/80">
-                Create a free account and start verifying Somali health claims
-                today, or reach out with any questions.
+                Create a free account, run a SomBERTb prediction, and follow
+                Non-Reliable claims through doctor review when needed.
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <GlassButton
