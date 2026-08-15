@@ -1,7 +1,9 @@
-from flask import jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask import Response, jsonify, request, stream_with_context
+from flask_jwt_extended import decode_token, get_jwt_identity, jwt_required
+from queue import Empty
+import json
 
-from services import auth_service, notification_service
+from services import auth_service, notification_hub, notification_service
 
 
 @jwt_required()
@@ -46,3 +48,49 @@ def mark_all_read():
         return jsonify({"error": True, "message": "User not found."}), 404
     updated = notification_service.mark_all_read(user.id)
     return jsonify({"updated": updated, "unread_count": 0}), 200
+
+
+def stream_notifications():
+    """Server-Sent Events: push a refresh ping when this user gets a notification."""
+    token = (request.args.get("token") or "").strip()
+    if not token:
+        auth = request.headers.get("Authorization") or ""
+        if auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
+    if not token:
+        return jsonify({"error": True, "message": "Authentication required."}), 401
+
+    try:
+        decoded = decode_token(token)
+        user_id = int(decoded["sub"])
+    except Exception:
+        return jsonify({"error": True, "message": "Invalid or expired token."}), 401
+
+    user = auth_service.get_user_by_id(user_id)
+    if not user or not user.is_active:
+        return jsonify({"error": True, "message": "User not found."}), 404
+
+    queue = notification_hub.subscribe(user_id)
+
+    @stream_with_context
+    def generate():
+        try:
+            yield 'event: connected\ndata: {"ok":true}\n\n'
+            while True:
+                try:
+                    message = queue.get(timeout=20)
+                    yield f"data: {json.dumps(message)}\n\n"
+                except Empty:
+                    yield ": keepalive\n\n"
+        finally:
+            notification_hub.unsubscribe(user_id, queue)
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
