@@ -9,86 +9,88 @@ import { PageHeader, PageSection } from "@/components/marketing/page-shell";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 export const metadata: Metadata = {
-  title: "Features — HealthAI",
+  title: "Features — SomAI",
   description:
-    "Explore HealthAI's features: instant Somali claim detection, history, dashboards, and batch dataset analysis.",
+    "Explore SomAI features: SomBERTb prediction, medical gatekeeper, doctor corrections, EVC Plus appointments, and batch dataset analysis.",
 };
 
 const coreFeatures = [
   {
     icon: "bolt",
-    title: "Instant claim detection",
+    title: "SomBERTb claim detection",
     description:
-      "Submit any Somali health claim and receive a Reliable or Misinformation verdict in under a second, powered by a trained SVM classifier.",
+      "Submit a Somali health claim and receive a Reliable or Non-Reliable verdict powered by the SomBERTb transformer model.",
   },
   {
-    icon: "language",
-    title: "Somali-first NLP pipeline",
+    icon: "health_and_safety",
+    title: "Medical gatekeeper",
     description:
-      "Text cleaning, stopword removal, and TF-IDF vectorization tuned specifically for Somali — with strict rejection of unsupported languages.",
+      "Before classification, a medical check filters out non-health text so SomBERTb only scores real health claims.",
   },
   {
-    icon: "chat",
-    title: "Conversational interface",
+    icon: "rate_review",
+    title: "Doctor corrections",
     description:
-      "A familiar chat experience: ask, get a verdict, and keep the conversation going with follow-up claims.",
+      "Admins assign Non-Reliable claims to doctors. Rewrites appear on Corrections so users see a clearer version.",
+  },
+  {
+    icon: "event_available",
+    title: "EVC Plus appointment booking",
+    description:
+      "Book a doctor’s published slot after a correction and pay with Hormuud EVC Plus before the request is created.",
   },
   {
     icon: "history",
-    title: "Private history",
+    title: "Private prediction history",
     description:
-      "Every analysis is stored in your personal history. Search, revisit, share, or delete conversations at any time.",
+      "Every analysis is stored on your account. Users can revisit results; admins can deactivate or reactivate records when needed.",
   },
   {
     icon: "shield_person",
-    title: "Secure authentication",
+    title: "Secure role-based access",
     description:
-      "JWT-based sessions, password reset by email, and role-based access control protect every account.",
-  },
-  {
-    icon: "block",
-    title: "Smart input validation",
-    description:
-      "Empty, numeric, special-character, Arabic, or English input is rejected with a clear, specific message.",
+      "JWT sessions and User / Doctor / Admin roles protect prediction, review, and operations workflows.",
   },
 ];
 
 const workflowHighlights = [
   {
-    icon: "chat_bubble",
+    icon: "edit_note",
     title: "Ask in plain Somali",
     description: "Type the claim exactly as you heard it — no special format.",
   },
   {
-    icon: "speed",
-    title: "Verdict in under a second",
-    description: "The model classifies the claim instantly, with no queue.",
+    icon: "neurology",
+    title: "SomBERTb classifies it",
+    description:
+      "After the medical gatekeeper, SomBERTb labels the claim Reliable or Non-Reliable.",
   },
   {
-    icon: "folder_shared",
-    title: "Everything saved privately",
-    description: "Your checks live in your history, ready to revisit anytime.",
+    icon: "clinical_notes",
+    title: "Doctors close the loop",
+    description:
+      "Non-Reliable claims can be rewritten, then users book a follow-up and pay with EVC Plus.",
   },
 ];
 
 const adminFeatures = [
   {
     icon: "monitoring",
-    title: "Admin dashboard",
+    title: "Admin operations",
     description:
-      "Real-time counts of users, admins, detections, and the reliable-to-misinformation split.",
+      "Manage users and doctors, assign Non-Reliable reviews, and follow activity in the audit log.",
   },
   {
     icon: "group",
-    title: "User management",
+    title: "Doctor verification",
     description:
-      "Full CRUD over accounts: create users, promote admins, reset passwords, and remove accounts safely.",
+      "Review doctor profiles and licenses, then enable them for corrections and availability.",
   },
   {
     icon: "upload_file",
     title: "Batch dataset predictions",
     description:
-      "Upload a CSV of claims and classify every row at once, with per-row results and error reporting.",
+      "Upload .txt, CSV, or Excel and classify every row, with per-row Reliable / Non-Reliable results.",
   },
 ];
 
@@ -104,7 +106,7 @@ export default function FeaturesPage() {
               <span className="text-brand">beautifully simple</span>
             </>
           }
-          description="From one-off claim checks to full dataset audits, HealthAI covers the entire misinformation detection workflow."
+          description="From one claim check to doctor review and EVC Plus appointments — SomAI covers the full Somali health claim workflow."
         />
       </PageSection>
 
@@ -117,8 +119,8 @@ export default function FeaturesPage() {
             Everything you need to verify a claim
           </h2>
           <p className="mt-4 text-base leading-7 text-ink-muted">
-            Six capabilities that work together, from the moment you type a
-            claim to the moment you get a verdict.
+            Six capabilities that work together — from prediction to human
+            review when a claim is Non-Reliable.
           </p>
         </Reveal>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -138,12 +140,12 @@ export default function FeaturesPage() {
                 Built for everyday use
               </p>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                Checking a claim feels like sending a message
+                Checking a claim stays simple
               </h2>
               <p className="mt-5 text-base leading-7 text-ink-muted">
-                No forms, no jargon, no waiting. HealthAI wraps a production
-                machine learning pipeline in a chat experience anyone can use —
-                so verifying a claim is as easy as forwarding it.
+                SomAI wraps SomBERTb, medical filtering, and doctor workflows in
+                a clear prediction experience on web and mobile — so verifying a
+                claim is as easy as pasting it.
               </p>
               <GlassButton
                 asChild
@@ -193,8 +195,8 @@ export default function FeaturesPage() {
             Complete control for your team
           </h2>
           <p className="mt-4 text-base leading-7 text-ink-muted">
-            Administrators get an operations suite for managing the platform,
-            its users, and large-scale analysis jobs.
+            Administrators get tools for users, doctors, review assignment, and
+            large-scale analysis jobs.
           </p>
         </Reveal>
         <div className="grid gap-5 md:grid-cols-3">
@@ -223,8 +225,8 @@ export default function FeaturesPage() {
               Ready to try it yourself?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-ink-muted">
-              Create a free account and put every one of these features to work
-              in minutes.
+              Create a free account and put SomBERTb prediction and doctor
+              workflows to work in minutes.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <GlassButton
