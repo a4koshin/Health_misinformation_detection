@@ -207,6 +207,18 @@ def audit_logs():
 
 
 @jwt_required()
+def list_payments():
+    try:
+        admin_service.require_admin()
+        from services import payment_service
+
+        data = payment_service.list_payments()
+    except PermissionError as exc:
+        return jsonify({"error": True, "message": str(exc), "detail": str(exc)}), 403
+    return jsonify({"items": data}), 200
+
+
+@jwt_required()
 def predict_dataset():
     """POST /api/admin/dataset/predict — batch Task A on CSV/Excel (any logged-in user)."""
     from flask_jwt_extended import get_jwt_identity
