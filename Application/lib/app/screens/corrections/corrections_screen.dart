@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/format.dart';
 import '../../models/appointment_model.dart';
 import '../../models/prediction_model.dart';
+import '../../providers/notification_provider.dart';
 import '../../services/appointment_service.dart';
 import '../../services/history_service.dart';
 import '../../widgets/empty_placeholder.dart';
@@ -23,21 +25,49 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
   final AppointmentService _appointmentService = AppointmentService();
 
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String? _error;
   List<PredictionModel> _items = const [];
   Map<String, AppointmentModel> _appointments = const {};
+  NotificationProvider? _notifications;
+  int _seenCorrectionsRevision = 0;
 
   @override
   void initState() {
     super.initState();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _notifications = context.read<NotificationProvider>();
+      _seenCorrectionsRevision = _notifications!.correctionsRevision;
+      _notifications!.addListener(_onNotificationsChanged);
+    });
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _notifications?.removeListener(_onNotificationsChanged);
+    super.dispose();
+  }
+
+  void _onNotificationsChanged() {
+    if (!mounted || _notifications == null) return;
+    final revision = _notifications!.correctionsRevision;
+    if (revision == _seenCorrectionsRevision) return;
+    _seenCorrectionsRevision = revision;
+    _load(silent: true);
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    final showSpinner = !silent || _items.isEmpty;
+    if (showSpinner) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         _historyService.listHistory(perPage: 50),
@@ -58,14 +88,20 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
       setState(() {
         _items = items;
         _appointments = map;
+        _error = null;
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _error = '$error';
-      });
+      if (!silent || _items.isEmpty) {
+        setState(() {
+          _error = '$error';
+        });
+      }
     } finally {
-      if (!mounted) return;
+      _isRefreshing = false;
+    }
+    if (!mounted) return;
+    if (showSpinner) {
       setState(() {
         _isLoading = false;
       });
@@ -93,6 +129,7 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
             : 'this doctor',
         correctedClaim: (item.correctedClaim ?? '').trim(),
         loadSlots: () => _appointmentService.listAvailability(doctorId),
+        loadPaymentConfig: () => _appointmentService.paymentConfig(),
       ),
     );
     if (result == null || !mounted) return;
@@ -102,20 +139,123 @@ class _CorrectionsScreenState extends State<CorrectionsScreen> {
         predictionId: item.id,
         availabilityId: result.availabilityId,
         note: result.note,
+        payerPhone: result.payerPhone,
       );
       if (!mounted) return;
       setState(() {
         _appointments = {..._appointments, item.id: created};
       });
+      final queue = created.queueNumber;
+      final queuePart = queue == null ? '' : ' Queue #$queue.';
+      await _showPaymentResultDialog(
+        success: true,
+        title: result.paymentEnabled
+            ? 'Payment successful'
+            : 'Appointment requested',
+        message: result.paymentEnabled
+            ? 'EVC Plus payment received. Appointment requested.$queuePart'
+            : 'Appointment requested.$queuePart',
+      );
     } catch (error) {
       if (!mounted) return;
       final message = error is ApiException
           ? error.message
           : 'Unable to book this appointment.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
+      await _showPaymentResultDialog(
+        success: false,
+        title: result.paymentEnabled ? 'Payment failed' : 'Booking failed',
+        message: message,
       );
     }
+  }
+
+  Future<void> _showPaymentResultDialog({
+    required bool success,
+    required String title,
+    required String message,
+  }) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: success
+                      ? const Color(0xFFECFDF5)
+                      : const Color(0xFFFEF2F2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  success ? Icons.check_circle_rounded : Icons.error_rounded,
+                  size: 32,
+                  color: success
+                      ? const Color(0xFF059669)
+                      : const Color(0xFFDC2626),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  height: 1.45,
+                  color: AppColors.inkMuted,
+                ),
+              ),
+            ],
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(color: AppColors.inkMuted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.brand,
+                      minimumSize: const Size.fromHeight(40),
+                    ),
+                    child: const Text('OK'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -290,48 +430,69 @@ class _CorrectionRow extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'Corrected by $doctorName · ${formatDateTime(item.createdAt)}',
-            style: const TextStyle(
-              fontSize: 10,
-              color: AppColors.placeholder,
-            ),
+            style: const TextStyle(fontSize: 10, color: AppColors.placeholder),
           ),
           const SizedBox(height: 12),
           if (status == 'pending')
             _StatusChip(
-              label: appointment?.startsAt == null
-                  ? 'Appointment requested'
-                  : 'Requested · ${formatSlotRange(appointment?.startsAt, appointment?.endsAt)}',
+              label: [
+                if (appointment?.queueNumber != null)
+                  'Queue #${appointment!.queueNumber}',
+                if (appointment?.startsAt == null)
+                  'Appointment requested'
+                else
+                  'Requested · ${formatSlotRange(appointment?.startsAt, appointment?.endsAt)}',
+              ].join(' · '),
               pending: true,
             )
           else if (status == 'confirmed')
             _StatusChip(
-              label: appointment?.startsAt == null
-                  ? 'Appointment confirmed'
-                  : 'Confirmed · ${formatSlotRange(appointment?.startsAt, appointment?.endsAt)}',
+              label: [
+                if (appointment?.queueNumber != null)
+                  'Queue #${appointment!.queueNumber}',
+                if (appointment?.startsAt == null)
+                  'Appointment confirmed'
+                else
+                  'Confirmed · ${formatSlotRange(appointment?.startsAt, appointment?.endsAt)}',
+              ].join(' · '),
               pending: false,
             )
           else
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: FilledButton.icon(
-                onPressed: item.advisorId == null || item.advisorId!.isEmpty
-                    ? null
-                    : onBook,
-                icon: const Icon(Iconsax.clock_copy, size: 16),
-                label: const Text('Book appointment'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.brand,
-                  foregroundColor: Colors.white,
-                  textStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Hadii aad u baahantahay talooyin caafimaad oo dheeri ah kuna saabsan mowduucaan waxaa qabsataa balan si aad ula kulanto dhakhtarka',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: AppColors.inkMuted,
                   ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: FilledButton.icon(
+                    onPressed: item.advisorId == null || item.advisorId!.isEmpty
+                        ? null
+                        : onBook,
+                    icon: const Icon(Iconsax.clock_copy, size: 16),
+                    label: const Text('Book appointment'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.brand,
+                      foregroundColor: Colors.white,
+                      textStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
         ],
       ),
@@ -368,10 +529,17 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _BookingResult {
-  const _BookingResult({required this.availabilityId, required this.note});
+  const _BookingResult({
+    required this.availabilityId,
+    required this.note,
+    required this.payerPhone,
+    required this.paymentEnabled,
+  });
 
   final String availabilityId;
   final String note;
+  final String payerPhone;
+  final bool paymentEnabled;
 }
 
 class _BookAppointmentDialog extends StatefulWidget {
@@ -379,11 +547,13 @@ class _BookAppointmentDialog extends StatefulWidget {
     required this.doctorName,
     required this.correctedClaim,
     required this.loadSlots,
+    required this.loadPaymentConfig,
   });
 
   final String doctorName;
   final String correctedClaim;
   final Future<List<AvailabilitySlot>> Function() loadSlots;
+  final Future<Map<String, dynamic>> Function() loadPaymentConfig;
 
   @override
   State<_BookAppointmentDialog> createState() => _BookAppointmentDialogState();
@@ -391,10 +561,16 @@ class _BookAppointmentDialog extends StatefulWidget {
 
 class _BookAppointmentDialogState extends State<_BookAppointmentDialog> {
   final TextEditingController _note = TextEditingController();
+  final TextEditingController _phone = TextEditingController();
   List<AvailabilitySlot> _slots = const [];
   String? _selectedId;
   bool _loading = true;
   String? _error;
+  bool _paymentEnabled = false;
+  double _amount = 1;
+  String _currency = 'USD';
+  String _instructions =
+      'Enter your Hormuud EVC Plus number and approve the PIN prompt on your phone.';
 
   @override
   void initState() {
@@ -404,11 +580,24 @@ class _BookAppointmentDialogState extends State<_BookAppointmentDialog> {
 
   Future<void> _load() async {
     try {
-      final slots = await widget.loadSlots();
+      final results = await Future.wait([
+        widget.loadSlots(),
+        widget.loadPaymentConfig().catchError((_) => <String, dynamic>{}),
+      ]);
       if (!mounted) return;
+      final slots = results[0] as List<AvailabilitySlot>;
+      final pay = results[1] as Map<String, dynamic>;
+      final amountRaw = pay['amount'];
       setState(() {
         _slots = slots;
         _selectedId = slots.isEmpty ? null : slots.first.id;
+        _paymentEnabled = pay['enabled'] == true;
+        _amount = amountRaw is num
+            ? amountRaw.toDouble()
+            : double.tryParse('${amountRaw ?? ''}') ?? 1;
+        _currency = '${pay['currency'] ?? 'USD'}';
+        final instructions = '${pay['instructions'] ?? ''}'.trim();
+        if (instructions.isNotEmpty) _instructions = instructions;
         _loading = false;
       });
     } catch (error) {
@@ -425,13 +614,16 @@ class _BookAppointmentDialogState extends State<_BookAppointmentDialog> {
   @override
   void dispose() {
     _note.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final inset = MediaQuery.viewInsetsOf(context).bottom;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.58;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.72;
+    final canSubmit =
+        _selectedId != null && (!_paymentEnabled || _phone.text.trim().isNotEmpty);
     return Padding(
       padding: EdgeInsets.only(bottom: inset),
       child: ConstrainedBox(
@@ -520,18 +712,12 @@ class _BookAppointmentDialogState extends State<_BookAppointmentDialog> {
               else if (_error != null)
                 Text(
                   _error!,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.danger,
-                  ),
+                  style: const TextStyle(fontSize: 12, color: AppColors.danger),
                 )
               else if (_slots.isEmpty)
                 const Text(
                   'This doctor has not published any open times yet.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.inkMuted,
-                  ),
+                  style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
                 )
               else
                 _SlotPicker(
@@ -539,6 +725,94 @@ class _BookAppointmentDialogState extends State<_BookAppointmentDialog> {
                   selectedId: _selectedId,
                   onSelected: (id) => setState(() => _selectedId = id),
                 ),
+              if (_paymentEnabled) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.brand.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.brand.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Pay with EVC Plus',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '\$${_amount.toStringAsFixed(2)} $_currency',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.brand,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _instructions,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.35,
+                          color: AppColors.inkMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _phone,
+                        keyboardType: TextInputType.phone,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: '61xxxxxxx',
+                          hintStyle: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.placeholder,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: AppColors.border,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                              color: AppColors.brand,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 8),
               TextField(
                 controller: _note,
@@ -579,19 +853,25 @@ class _BookAppointmentDialogState extends State<_BookAppointmentDialog> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     FilledButton(
-                      onPressed: _selectedId == null
+                      onPressed: !canSubmit
                           ? null
                           : () => Navigator.of(context).pop(
-                                _BookingResult(
-                                  availabilityId: _selectedId!,
-                                  note: _note.text,
-                                ),
+                              _BookingResult(
+                                availabilityId: _selectedId!,
+                                note: _note.text,
+                                payerPhone: _phone.text,
+                                paymentEnabled: _paymentEnabled,
                               ),
+                            ),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.brand,
                         minimumSize: const Size.fromHeight(40),
                       ),
-                      child: const Text('Book time'),
+                      child: Text(
+                        _paymentEnabled
+                            ? 'Pay \$${_amount.toStringAsFixed(2)} & book'
+                            : 'Book time',
+                      ),
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
@@ -636,9 +916,7 @@ class _SlotPicker extends StatelessWidget {
       if (days.every((item) => item != day)) days.add(day);
     }
     final selected = slots.where((slot) => slot.id == selectedId);
-    final selectedDay = _dayOf(
-      selected.isEmpty ? slots.first : selected.first,
-    );
+    final selectedDay = _dayOf(selected.isEmpty ? slots.first : selected.first);
     final times = slots.where((slot) => _dayOf(slot) == selectedDay).toList();
 
     void selectDay(DateTime day) {
@@ -681,15 +959,18 @@ class _SlotPicker extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        for (final slot in times)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: _SlotCard(
-              slot: slot,
-              selected: slot.id == selectedId,
-              onTap: () => onSelected(slot.id),
-            ),
-          ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final slot in times)
+              _SlotChip(
+                slot: slot,
+                selected: slot.id == selectedId,
+                onTap: () => onSelected(slot.id),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -762,8 +1043,8 @@ class _DateChip extends StatelessWidget {
   }
 }
 
-class _SlotCard extends StatelessWidget {
-  const _SlotCard({
+class _SlotChip extends StatelessWidget {
+  const _SlotChip({
     required this.slot,
     required this.selected,
     required this.onTap,
@@ -776,74 +1057,41 @@ class _SlotCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? AppColors.brandSoft : Colors.white,
+      color: selected ? AppColors.brand : Colors.white,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: selected ? AppColors.brand : AppColors.border,
             ),
           ),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: selected ? Colors.white : AppColors.brandSoft,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Iconsax.clock_copy,
-                  size: 14,
-                  color: selected ? AppColors.brand : AppColors.brandDeep,
+              Text(
+                formatSlotTime(slot.startsAt),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : AppColors.ink,
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${formatSlotTime(slot.startsAt)} – ${formatSlotTime(slot.endsAt)}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    Text(
-                      formatSlotDuration(slot.startsAt, slot.endsAt),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.placeholder,
-                      ),
-                    ),
-                  ],
+              Text(
+                formatSlotTime(slot.endsAt),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: selected
+                      ? Colors.white.withValues(alpha: 0.9)
+                      : AppColors.inkMuted,
                 ),
               ),
-              selected
-                  ? const Icon(
-                      Iconsax.tick_circle_copy,
-                      size: 18,
-                      color: AppColors.brand,
-                    )
-                  : Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.border, width: 1.5),
-                      ),
-                    ),
             ],
           ),
         ),
