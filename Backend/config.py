@@ -28,7 +28,6 @@ class Config:
     }
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "mehelpus")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
     # LLM providers (Cerebras primary, Groq backup by default)
     CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "").strip()
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
@@ -66,3 +65,21 @@ class Config:
         or os.getenv("EMAIL_USER")
         or ""
     ).strip()
+
+    # EVC Plus (WaafiPay merchant API) — keep secrets in Backend/.env only
+    EVC_MERCHANT_UID = (os.getenv("EVC_MERCHANT_UID") or "").strip()
+    EVC_API_USER_ID = (os.getenv("EVC_API_USER_ID") or "").strip()
+    EVC_API_KEY = (os.getenv("EVC_API_KEY") or "").strip()
+    EVC_API_URL = (
+        os.getenv("EVC_API_URL") or "https://api.waafipay.net/asm"
+    ).strip()
+    EVC_TIMEOUT_SECONDS = int(os.getenv("EVC_TIMEOUT_SECONDS") or "120")
+    APPOINTMENT_FEE_USD = float(os.getenv("APPOINTMENT_FEE_USD") or "0.01")
+    _evc_flag = (os.getenv("EVC_PLUS_ENABLED") or "").strip().lower()
+    if _evc_flag in {"1", "true", "yes", "on"}:
+        EVC_PLUS_ENABLED = True
+    elif _evc_flag in {"0", "false", "no", "off"}:
+        EVC_PLUS_ENABLED = False
+    else:
+        # Auto-enable when merchant credentials are present
+        EVC_PLUS_ENABLED = bool(EVC_MERCHANT_UID and EVC_API_USER_ID and EVC_API_KEY)
