@@ -41,6 +41,7 @@ dependencies:
   iconsax_flutter: ^1.0.1
   file_picker: ^10.3.2
   url_launcher: ^6.3.2
+  flutter_local_notifications: ^19.4.0
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +68,7 @@ flutter:
 
   assets:
     - assets/image/icon.png
+    - assets/image/app_icon.png
 
 flutter_launcher_icons:
   android: true
@@ -75,9 +77,9 @@ flutter_launcher_icons:
     generate: true
   web:
     generate: true
-  image_path: assets/image/icon.png
+  image_path: assets/image/app_icon.png
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/image/icon.png
+  adaptive_icon_foreground: assets/image/app_icon_adaptive.png
   adaptive_icon_foreground_inset: 16
   remove_alpha_ios: true
   background_color_ios: "#FFFFFF"
