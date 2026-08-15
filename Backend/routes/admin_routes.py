@@ -86,6 +86,12 @@ admin_bp.add_url_rule(
     methods=["GET"],
 )
 admin_bp.add_url_rule(
+    "/payments",
+    view_func=admin_controller.list_payments,
+    methods=["GET"],
+    endpoint="list_payments",
+)
+admin_bp.add_url_rule(
     "/dataset/predict",
     view_func=admin_controller.predict_dataset,
     methods=["POST"],
