@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ProtectedRoute } from "@/components/auth/protected-route";
@@ -37,6 +37,7 @@ import {
 } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { resolveAvatarUrl } from "@/lib/settings";
+import { cn } from "@/lib/utils";
 import { validateEmailAddress, validateFullName } from "@/lib/user-validation";
 import { useAuth } from "@/store/auth-store";
 import type { DoctorProfile } from "@/types/api";
@@ -84,6 +85,8 @@ function FileField({
   error,
   previewUrl,
   fileName,
+  hint,
+  variant = "document",
   onChange,
 }: {
   id: string;
@@ -93,51 +96,94 @@ function FileField({
   error?: string;
   previewUrl?: string | null;
   fileName?: string | null;
+  hint?: string;
+  variant?: "profile" | "document";
   onChange: (file: File | null) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isImage = Boolean(previewUrl && isImagePath(previewUrl));
+  const hasValue = Boolean(previewUrl || fileName);
+
+  function clearFile() {
+    if (inputRef.current) inputRef.current.value = "";
+    onChange(null);
+  }
+
   return (
     <div className="space-y-2">
       <GlassLabel htmlFor={id}>
         {label}
         {required ? "" : " (optional)"}
       </GlassLabel>
-      <div className="flex items-start gap-3">
-        {previewUrl && isImagePath(previewUrl) ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={previewUrl}
-            alt={label}
-            className="size-14 rounded-xl border border-gray-200 object-cover"
-          />
-        ) : previewUrl ? (
-          <a
-            href={previewUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex size-14 items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-[#ff5c00]"
-            title="Open license document"
-          >
-            <MaterialIcon name="description" size={22} />
-          </a>
-        ) : (
-          <span className="flex size-14 items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-ink-muted">
-            <MaterialIcon name="upload_file" size={22} />
+      <div className="relative">
+        <label
+          htmlFor={id}
+          aria-invalid={Boolean(error)}
+          className={cn(
+            "group relative flex w-full cursor-pointer flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border border-dashed px-4 py-5 text-center transition-[border-color,background-color,box-shadow] duration-200",
+            "border-gray-200 bg-[#fafafa] hover:border-[#ff5c00]/45 hover:bg-[#ffefe6]/35",
+            "focus-within:outline-none focus-within:ring-2 focus-within:ring-[#ff5c00]/25",
+            hasValue &&
+              "border-solid border-gray-200 bg-white hover:border-[#ff5c00]/35",
+            error && "border-red-300 bg-red-50/50 hover:border-red-400",
+          )}
+        >
+          {isImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewUrl!}
+              alt=""
+              className={cn(
+                "object-cover shadow-sm ring-1 ring-black/5",
+                variant === "profile"
+                  ? "size-16 rounded-full"
+                  : "h-16 w-24 rounded-xl",
+              )}
+            />
+          ) : previewUrl ? (
+            <span className="flex size-14 items-center justify-center rounded-2xl bg-[#ffefe6] text-[#ff5c00]">
+              <MaterialIcon name="description" size={24} />
+            </span>
+          ) : (
+            <span className="flex size-12 items-center justify-center rounded-2xl bg-white text-[#ff5c00] shadow-sm ring-1 ring-black/[0.04] transition-transform duration-200 group-hover:scale-[1.03]">
+              <MaterialIcon
+                name={variant === "profile" ? "person" : "badge"}
+                size={22}
+              />
+            </span>
+          )}
+
+          <span className="min-w-0 space-y-0.5">
+            <span className="block text-sm font-medium text-[#0f172a]">
+              {hasValue ? "Replace file" : "Click to upload"}
+            </span>
+            <span className="block truncate text-xs text-[#64748b]">
+              {fileName || hint || "JPG, PNG, or WebP"}
+            </span>
           </span>
-        )}
-        <div className="min-w-0 flex-1 space-y-1.5">
+
           <input
+            ref={inputRef}
             id={id}
             type="file"
             accept={accept}
-            className="block w-full cursor-pointer text-sm text-[#475569] file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[#ff5c00]/10 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[#ff5c00]"
+            className="sr-only"
             onChange={(event) => {
               onChange(event.target.files?.[0] ?? null);
             }}
           />
-          {fileName ? (
-            <p className="truncate text-xs text-[#64748b]">{fileName}</p>
-          ) : null}
-        </div>
+        </label>
+
+        {hasValue ? (
+          <button
+            type="button"
+            onClick={clearFile}
+            className="absolute top-2.5 right-2.5 inline-flex size-7 cursor-pointer items-center justify-center rounded-full bg-white text-[#64748b] shadow-sm ring-1 ring-black/5 transition-colors hover:text-[#ff5c00]"
+            aria-label={`Remove ${label}`}
+          >
+            <MaterialIcon name="close" size={16} />
+          </button>
+        ) : null}
       </div>
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </div>
@@ -442,48 +488,72 @@ function DoctorsContent() {
                 <p className="text-sm text-red-600">{formErrors.workplace}</p>
               ) : null}
             </div>
-            <FileField
-              id="doctor-profile"
-              label="Profile image"
-              accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
-              required={!editingDoctor}
-              error={formErrors.profileFile}
-              previewUrl={profilePreview}
-              fileName={form.profileFile?.name}
-              onChange={(file) => {
-                setForm((current) => ({ ...current, profileFile: file }));
-                setFormErrors((current) => ({ ...current, profileFile: undefined }));
-                if (!file && editingDoctor) {
-                  setProfilePreview(
-                    resolveAvatarUrl(
-                      editingDoctor.profile_image_url ||
-                        editingDoctor.profile_image ||
-                        editingDoctor.avatar_url,
-                    ),
-                  );
-                }
-              }}
-            />
-            <FileField
-              id="doctor-license"
-              label="License card / document"
-              accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,.jpg,.jpeg,.png,.gif,.webp,.pdf"
-              required={!editingDoctor}
-              error={formErrors.licenseFile}
-              previewUrl={licensePreview}
-              fileName={form.licenseFile?.name}
-              onChange={(file) => {
-                setForm((current) => ({ ...current, licenseFile: file }));
-                setFormErrors((current) => ({ ...current, licenseFile: undefined }));
-                if (!file && editingDoctor) {
-                  setLicensePreview(
-                    resolveAvatarUrl(
-                      editingDoctor.license_url || editingDoctor.license,
-                    ),
-                  );
-                }
-              }}
-            />
+            <div className="sm:col-span-2">
+              <div className="mb-3">
+                <p className="text-sm font-medium text-[#0f172a]">Documents</p>
+                <p className="text-xs text-[#64748b]">
+                  Profile photo and license card or PDF.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FileField
+                  id="doctor-profile"
+                  label="Profile image"
+                  variant="profile"
+                  hint="JPG, PNG, or WebP"
+                  accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
+                  required={!editingDoctor}
+                  error={formErrors.profileFile}
+                  previewUrl={profilePreview}
+                  fileName={form.profileFile?.name}
+                  onChange={(file) => {
+                    setForm((current) => ({ ...current, profileFile: file }));
+                    setFormErrors((current) => ({
+                      ...current,
+                      profileFile: undefined,
+                    }));
+                    if (!file) {
+                      setProfilePreview(
+                        editingDoctor
+                          ? resolveAvatarUrl(
+                              editingDoctor.profile_image_url ||
+                                editingDoctor.profile_image ||
+                                editingDoctor.avatar_url,
+                            )
+                          : null,
+                      );
+                    }
+                  }}
+                />
+                <FileField
+                  id="doctor-license"
+                  label="License card"
+                  variant="document"
+                  hint="JPG, PNG, WebP, or PDF"
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,.jpg,.jpeg,.png,.gif,.webp,.pdf"
+                  required={!editingDoctor}
+                  error={formErrors.licenseFile}
+                  previewUrl={licensePreview}
+                  fileName={form.licenseFile?.name}
+                  onChange={(file) => {
+                    setForm((current) => ({ ...current, licenseFile: file }));
+                    setFormErrors((current) => ({
+                      ...current,
+                      licenseFile: undefined,
+                    }));
+                    if (!file) {
+                      setLicensePreview(
+                        editingDoctor
+                          ? resolveAvatarUrl(
+                              editingDoctor.license_url || editingDoctor.license,
+                            )
+                          : null,
+                      );
+                    }
+                  }}
+                />
+              </div>
+            </div>
             <div className="space-y-2 sm:col-span-2">
               <GlassLabel htmlFor="doctor-password">
                 {editingDoctor ? "New password (optional)" : "Password"}
