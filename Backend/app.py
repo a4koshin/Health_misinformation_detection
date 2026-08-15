@@ -44,6 +44,7 @@ def create_app() -> Flask:
         DoctorAvailability,
         Notification,
         PasswordReset,
+        PaymentTransaction,
         Prediction,
         User,
     )
@@ -287,6 +288,52 @@ def create_app() -> Flask:
                     "ADD COLUMN IF NOT EXISTS ends_at TIMESTAMP"
                 )
             )
+            for ddl in (
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) "
+                "NOT NULL DEFAULT 'unpaid'",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_amount VARCHAR(20)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_currency VARCHAR(8)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_method VARCHAR(40)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payer_phone VARCHAR(20)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(64)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_invoice_id VARCHAR(64)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_request_id VARCHAR(64)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS queue_number INTEGER",
+            ):
+                db.session.execute(text(ddl))
+            for ddl in (
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) "
+                "NOT NULL DEFAULT 'unpaid'",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_amount VARCHAR(20)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_currency VARCHAR(8)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_method VARCHAR(40)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payer_phone VARCHAR(20)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_reference VARCHAR(64)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_invoice_id VARCHAR(64)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS payment_request_id VARCHAR(64)",
+                "ALTER TABLE appointments "
+                "ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP",
+            ):
+                db.session.execute(text(ddl))
             db.session.commit()
         except Exception:
             db.session.rollback()
