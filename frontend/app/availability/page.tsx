@@ -36,6 +36,8 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
 import type { DoctorAvailability } from "@/types/api";
 
+const SLOT_MINUTES = 60;
+
 function todayInput() {
   const now = new Date();
   const yyyy = now.getFullYear();
@@ -44,13 +46,15 @@ function todayInput() {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function addMinutes(time: string, minutes: number) {
+function timeToMinutes(time: string) {
   const [hours, mins] = time.split(":").map(Number);
-  const total = (hours || 0) * 60 + (mins || 0) + minutes;
-  const next = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
-  const hh = String(Math.floor(next / 60)).padStart(2, "0");
-  const mm = String(next % 60).padStart(2, "0");
-  return `${hh}:${mm}`;
+  return (hours || 0) * 60 + (mins || 0);
+}
+
+function slotCount(startTime: string, endTime: string) {
+  const total = timeToMinutes(endTime) - timeToMinutes(startTime);
+  if (total < SLOT_MINUTES || total % SLOT_MINUTES !== 0) return 0;
+  return total / SLOT_MINUTES;
 }
 
 function AvailabilityContent() {
@@ -59,8 +63,8 @@ function AvailabilityContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [date, setDate] = useState(todayInput());
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("09:30");
+  const [startTime, setStartTime] = useState("11:00");
+  const [endTime, setEndTime] = useState("20:00");
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -90,6 +94,7 @@ function AvailabilityContent() {
     [items],
   );
   const pagination = useTablePagination(upcoming, 10);
+  const previewCount = slotCount(startTime, endTime);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,15 +105,25 @@ function AvailabilityContent() {
       toast.error("Enter a valid date and time.");
       return;
     }
+    if (previewCount < 1) {
+      toast.error(
+        "Working hours must be at least 1 hour and split evenly into 1-hour slots.",
+      );
+      return;
+    }
     setIsSaving(true);
     try {
       const created = await createAvailability(token, {
         starts_at: starts.toISOString(),
         ends_at: ends.toISOString(),
       });
-      setItems((current) => [...current, created]);
+      setItems((current) => [...current, ...created]);
       setShowForm(false);
-      toast.success("Available time added.");
+      toast.success(
+        created.length === 1
+          ? "1 patient slot added (1 hour)."
+          : `${created.length} patient slots added (1 hour each).`,
+      );
     } catch (error) {
       toast.error(
         error instanceof ApiError
@@ -141,11 +156,11 @@ function AvailabilityContent() {
   return (
     <PrivatePage
       title="Available times"
-      description="Publish the dates and times users can book after you correct a claim."
+      description="Publish your working hours once (for example 11:00–20:00). Patients book one 1-hour slot at a time."
       actions={
         <GlassButton type="button" size="sm" onClick={() => setShowForm(true)}>
           <MaterialIcon name="schedule" size={18} />
-          Add time
+          Add hours
         </GlassButton>
       }
     >
@@ -153,10 +168,10 @@ function AvailabilityContent() {
         header={
           <div>
             <h2 className="text-base font-semibold text-[#0f172a]">
-              Your open slots
+              Your open 1-hour slots
             </h2>
             <p className="text-sm text-[#475569]">
-              Users see these times when they book an appointment with you.
+              Each row is one patient appointment. Booked slots stay reserved.
             </p>
           </div>
         }
@@ -205,7 +220,7 @@ function AvailabilityContent() {
                     No available times yet
                   </p>
                   <p className="text-sm text-[#475569]">
-                    Add a date and time so users can book an appointment.
+                    Add working hours so users can book 1-hour appointments.
                   </p>
                 </div>
               </GlassTableCell>
@@ -243,8 +258,8 @@ function AvailabilityContent() {
         onOpenChange={(open) => {
           if (!open && !isSaving) setShowForm(false);
         }}
-        title="Add available time"
-        description="Users will see this date and time when they book an appointment."
+        title="Add working hours"
+        description="Enter the full day window you are available. We split it into 1-hour patient slots automatically."
       >
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="space-y-2">
@@ -264,13 +279,10 @@ function AvailabilityContent() {
               <GlassInput
                 id="slot-start"
                 type="time"
+                step={3600}
                 required
                 value={startTime}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  setStartTime(next);
-                  setEndTime(addMinutes(next, 30));
-                }}
+                onChange={(event) => setStartTime(event.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -278,12 +290,18 @@ function AvailabilityContent() {
               <GlassInput
                 id="slot-end"
                 type="time"
+                step={3600}
                 required
                 value={endTime}
                 onChange={(event) => setEndTime(event.target.value)}
               />
             </div>
           </div>
+          <p className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-[#475569]">
+            {previewCount > 0
+              ? `This creates ${previewCount} patient slot${previewCount === 1 ? "" : "s"} of 1 hour each.`
+              : "Use times like 11:00–20:00 so the window divides evenly into 1-hour slots."}
+          </p>
           <div className="flex justify-end gap-2">
             <GlassButton
               type="button"
@@ -293,8 +311,8 @@ function AvailabilityContent() {
             >
               Cancel
             </GlassButton>
-            <GlassButton type="submit" disabled={isSaving}>
-              {isSaving ? "Saving…" : "Save time"}
+            <GlassButton type="submit" disabled={isSaving || previewCount < 1}>
+              {isSaving ? "Saving…" : "Save hours"}
             </GlassButton>
           </div>
         </form>
