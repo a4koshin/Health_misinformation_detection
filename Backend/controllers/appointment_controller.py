@@ -43,7 +43,7 @@ def create_availability():
         return error
     data = request.get_json(silent=True) or {}
     try:
-        slot = appointment_service.create_availability(
+        slots = appointment_service.create_availability(
             doctor=user,
             starts_at=data.get("starts_at"),
             ends_at=data.get("ends_at"),
@@ -52,7 +52,16 @@ def create_availability():
         return jsonify({"error": True, "message": str(exc)}), 403
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
-    return jsonify(slot.to_dict(booked=False)), 201
+    return (
+        jsonify(
+            {
+                "items": [slot.to_dict(booked=False) for slot in slots],
+                "count": len(slots),
+                "slot_minutes": 60,
+            }
+        ),
+        201,
+    )
 
 
 @jwt_required()
@@ -71,6 +80,16 @@ def delete_availability(availability_id: int):
     except ValueError as exc:
         return jsonify({"error": True, "message": str(exc)}), 400
     return jsonify({"message": "Available time removed."}), 200
+
+
+@jwt_required()
+def payment_config():
+    from services import evc_plus_service
+
+    user, error = _current_user()
+    if error:
+        return error
+    return jsonify(evc_plus_service.payment_config()), 200
 
 
 @jwt_required()
@@ -93,6 +112,7 @@ def create_appointment():
             prediction_id=int(prediction_id),
             availability_id=int(availability_id),
             note=data.get("note"),
+            payer_phone=data.get("payer_phone") or data.get("phone"),
         )
     except LookupError as exc:
         return jsonify({"error": True, "message": str(exc)}), 404
