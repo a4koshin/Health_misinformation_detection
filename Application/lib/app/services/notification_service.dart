@@ -1,4 +1,11 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../core/constants/api_constants.dart';
 import '../core/network/api_client.dart';
+import '../core/storage/token_storage.dart';
 import '../models/notification_model.dart';
 
 class NotificationListResult {
@@ -12,9 +19,12 @@ class NotificationListResult {
 }
 
 class NotificationService {
-  NotificationService({ApiClient? client}) : _client = client ?? ApiClient();
+  NotificationService({ApiClient? client, TokenStorage? storage})
+    : _client = client ?? ApiClient(),
+      _storage = storage ?? TokenStorage();
 
   final ApiClient _client;
+  final TokenStorage _storage;
 
   Future<NotificationListResult> list({int limit = 40}) async {
     final data = await _client.get(
@@ -59,5 +69,55 @@ class NotificationService {
 
   Future<void> markAllRead() async {
     await _client.post('/api/notifications/read-all', auth: true);
+  }
+
+  /// Long-lived SSE connection. Calls [onEvent] on connect and each refresh ping.
+  /// Returns when the stream ends or [shouldContinue] becomes false.
+  Future<void> listenStream({
+    required void Function() onEvent,
+    required bool Function() shouldContinue,
+  }) async {
+    final token = await _storage.read();
+    if (token == null || token.isEmpty) return;
+
+    final uri = Uri.parse(
+      '${ApiConstants.baseUrl}/api/notifications/stream'
+      '?token=${Uri.encodeQueryComponent(token)}',
+    );
+
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', uri)
+        ..headers.addAll({
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        });
+
+      final response = await client.send(request);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return;
+      }
+
+      var buffer = '';
+      await for (final chunk in response.stream.transform(utf8.decoder)) {
+        if (!shouldContinue()) break;
+        buffer += chunk;
+        while (true) {
+          final sep = buffer.indexOf('\n\n');
+          if (sep < 0) break;
+          final block = buffer.substring(0, sep);
+          buffer = buffer.substring(sep + 2);
+          final hasData = block
+              .split('\n')
+              .any((line) => line.startsWith('data:'));
+          final isConnected = block.contains('event: connected');
+          if (hasData || isConnected) {
+            onEvent();
+          }
+        }
+      }
+    } finally {
+      client.close();
+    }
   }
 }
