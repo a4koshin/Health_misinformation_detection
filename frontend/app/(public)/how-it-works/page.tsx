@@ -8,9 +8,9 @@ import { PageHeader, PageSection } from "@/components/marketing/page-shell";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 export const metadata: Metadata = {
-  title: "How It Works — HealthAI",
+  title: "How It Works — SomAI",
   description:
-    "See how HealthAI turns a Somali health claim into a clear Reliable or Misinformation verdict.",
+    "See how SomAI turns a Somali health claim into a Reliable or Non-Reliable verdict with SomBERTb and doctor review.",
 };
 
 const pipeline = [
@@ -18,58 +18,58 @@ const pipeline = [
     icon: "edit_note",
     title: "You submit a claim",
     description:
-      "Type or paste any Somali health statement into the chat — a WhatsApp forward, a social media post, or something you heard.",
+      "Type or paste a Somali health statement into Prediction — a WhatsApp forward, a social post, or something you heard.",
   },
   {
     icon: "verified_user",
     title: "Input is validated",
     description:
-      "The system checks that the text is genuine Somali. Empty, numeric, English, or Arabic input is rejected with a specific message.",
+      "Empty, mostly numeric, English, or Arabic text is rejected so SomBERTb only sees suitable Somali input.",
   },
   {
-    icon: "cleaning_services",
-    title: "Text is preprocessed",
+    icon: "health_and_safety",
+    title: "Medical gatekeeper",
     description:
-      "The claim is lowercased, cleaned of noise, and stripped of Somali stopwords — exactly matching how the model was trained.",
-  },
-  {
-    icon: "functions",
-    title: "TF-IDF vectorization",
-    description:
-      "The cleaned text is transformed into a numerical vector using the same TF-IDF vocabulary the model learned from.",
+      "A medical check (Cerebras / Groq) confirms the text is health-related before classification runs.",
   },
   {
     icon: "neurology",
-    title: "SVM classification",
+    title: "SomBERTb classifies",
     description:
-      "A trained Support Vector Machine draws the decision boundary and classifies the claim in milliseconds.",
+      "The SomBERTb transformer model scores the claim and returns Reliable or Non-Reliable.",
   },
   {
-    icon: "task_alt",
-    title: "You get a verdict",
+    icon: "menu_book",
+    title: "Explanation & history",
     description:
-      "The prediction is decoded to a human-readable label — Reliable or Misinformation — and saved to your history.",
+      "You get a clear verdict with supporting explanation when available, and the result is saved to your history.",
+  },
+  {
+    icon: "clinical_notes",
+    title: "Doctor review when needed",
+    description:
+      "Non-Reliable claims can be assigned to a doctor for a rewrite. Users can then book a slot and pay with Hormuud EVC Plus.",
   },
 ];
 
 const modelFacts = [
   {
     icon: "neurology",
-    title: "Linear Support Vector Machine",
+    title: "SomBERTb classifier",
     description:
-      "Chosen as the best performer among the models evaluated on the Somali health claims corpus.",
+      "A transformer model trained for Somali health claims, producing Reliable or Non-Reliable labels.",
   },
   {
-    icon: "functions",
-    title: "TF-IDF features",
+    icon: "health_and_safety",
+    title: "Medical gatekeeper",
     description:
-      "Claims are represented with the exact vocabulary and weighting learned during training.",
+      "Non-medical text is filtered before SomBERTb runs, keeping predictions focused on health claims.",
   },
   {
-    icon: "sync",
-    title: "Consistent preprocessing",
+    icon: "diversity_3",
+    title: "Human-in-the-loop + EVC Plus",
     description:
-      "The same cleaning and stopword removal runs at training and inference, so results stay reproducible.",
+      "Doctors correct Non-Reliable claims and publish availability. Users book follow-up help and pay with Hormuud EVC Plus.",
   },
 ];
 
@@ -85,7 +85,7 @@ export default function HowItWorksPage() {
               <span className="text-brand">six steps</span>
             </>
           }
-          description="Under the hood, HealthAI runs a production machine learning pipeline. Here is exactly what happens when you press send."
+          description="Under the hood, SomAI runs SomBERTb with medical filtering and an optional doctor workflow. Here is what happens when you submit a claim."
         />
       </PageSection>
 
@@ -95,11 +95,11 @@ export default function HowItWorksPage() {
             The pipeline
           </p>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-            What happens when you press send
+            What happens when you submit
           </h2>
           <p className="mt-4 text-base leading-7 text-ink-muted">
-            Every claim moves through the same six stages, from raw text to a
-            clear verdict.
+            Every claim moves through the same stages — from raw text to a clear
+            verdict, with doctor help when needed.
           </p>
         </Reveal>
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -135,17 +135,17 @@ export default function HowItWorksPage() {
                 Under the hood
               </p>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                The model behind the magic
+                The system behind the verdict
               </h2>
               <p className="mt-5 text-base leading-7 text-ink-muted">
-                HealthAI uses a Linear Support Vector Machine trained on a
-                labeled corpus of Somali health claims, paired with TF-IDF
-                features and a label encoder.
+                SomAI uses SomBERTb to classify Somali health claims as Reliable
+                or Non-Reliable, after a medical gatekeeper confirms the text is
+                health-related.
               </p>
               <p className="mt-4 text-base leading-7 text-ink-muted">
-                The exact preprocessing used in training is replicated at
-                inference time, so predictions stay consistent and
-                reproducible.
+                Predictions are decision support — not a diagnosis. When a claim
+                is Non-Reliable, doctors can rewrite it and users can book an
+                appointment with EVC Plus payment for more guidance.
               </p>
               <GlassButton
                 asChild
@@ -194,7 +194,7 @@ export default function HowItWorksPage() {
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-ink-muted">
               Create a free account and send your first Somali health claim
-              through all six steps.
+              through SomBERTb.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <GlassButton
