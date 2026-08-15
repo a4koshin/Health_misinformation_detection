@@ -9,8 +9,8 @@ import 'api_exception.dart';
 
 class ApiClient {
   ApiClient({http.Client? client, TokenStorage? storage})
-      : _client = client ?? http.Client(),
-        _storage = storage ?? TokenStorage();
+    : _client = client ?? http.Client(),
+      _storage = storage ?? TokenStorage();
 
   final http.Client _client;
   final TokenStorage _storage;
@@ -92,9 +92,9 @@ class ApiClient {
     }
 
     try {
-      final streamed = await _client.send(request).timeout(
-            const Duration(seconds: 120),
-          );
+      final streamed = await _client
+          .send(request)
+          .timeout(const Duration(seconds: 120));
       final response = await http.Response.fromStream(streamed);
       return _decodeResponse(response);
     } on SocketException {
@@ -140,9 +140,9 @@ class ApiClient {
       final request = http.Request(method, uri)
         ..headers.addAll(headers)
         ..body = body == null ? '' : jsonEncode(body);
-      final streamed = await _client.send(request).timeout(
-            timeout ?? const Duration(seconds: 30),
-          );
+      final streamed = await _client
+          .send(request)
+          .timeout(timeout ?? const Duration(seconds: 30));
       response = await http.Response.fromStream(streamed);
     } on SocketException {
       throw ApiException(
