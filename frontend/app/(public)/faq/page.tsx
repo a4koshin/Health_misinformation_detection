@@ -8,9 +8,9 @@ import { FAQ_ITEMS } from "@/components/marketing/faq-data";
 import { PageHeader, PageSection } from "@/components/marketing/page-shell";
 
 export const metadata: Metadata = {
-  title: "FAQ — HealthAI",
+  title: "FAQ — SomAI",
   description:
-    "Frequently asked questions about HealthAI's Somali health misinformation detection.",
+    "Frequently asked questions about SomAI, SomBERTb, and Somali health claim detection.",
 };
 
 export default function FaqPage() {
