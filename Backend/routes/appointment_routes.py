@@ -5,6 +5,12 @@ from controllers import appointment_controller
 appointment_bp = Blueprint("appointments", __name__, url_prefix="/api")
 
 appointment_bp.add_url_rule(
+    "/appointments/payment-config",
+    view_func=appointment_controller.payment_config,
+    methods=["GET"],
+    endpoint="appointment_payment_config",
+)
+appointment_bp.add_url_rule(
     "/appointments",
     view_func=appointment_controller.list_appointments,
     methods=["GET"],
