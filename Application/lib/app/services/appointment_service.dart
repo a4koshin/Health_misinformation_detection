@@ -33,18 +33,31 @@ class AppointmentService {
         .toList();
   }
 
+  Future<Map<String, dynamic>> paymentConfig() async {
+    final data = await _client.get(
+      '/api/appointments/payment-config',
+      auth: true,
+    );
+    return Map<String, dynamic>.from(data);
+  }
+
   Future<AppointmentModel> book({
     required String predictionId,
     required String availabilityId,
     String? note,
+    String? payerPhone,
   }) async {
     final data = await _client.post(
       '/api/appointments',
       auth: true,
+      // EVC Plus USSD prompt can take up to ~2 minutes.
+      timeout: const Duration(seconds: 130),
       body: {
         'prediction_id': predictionId,
         'availability_id': availabilityId,
         if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+        if (payerPhone != null && payerPhone.trim().isNotEmpty)
+          'payer_phone': payerPhone.trim(),
       },
     );
     return AppointmentModel.fromJson(data);
