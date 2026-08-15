@@ -3,36 +3,37 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/marketing/legal-page";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions — HealthAI",
-  description: "The terms and conditions for using HealthAI.",
+  title: "Terms & Conditions — SomAI",
+  description: "The terms and conditions for using SomAI.",
 };
 
 const sections = [
   {
     heading: "1. Acceptance of terms",
     body: [
-      "By creating an account or using HealthAI you agree to these Terms & Conditions and our Privacy Policy. If you do not agree, please do not use the service.",
+      "By creating an account or using SomAI you agree to these Terms & Conditions and our Privacy Policy. If you do not agree, please do not use the service.",
     ],
   },
   {
     heading: "2. Description of the service",
     body: [
-      "HealthAI is an AI-assisted tool that classifies Somali-language health claims as Reliable or Misinformation using a machine learning model.",
+      "SomAI is an AI-assisted tool that classifies Somali-language health claims as Reliable or Non-Reliable using SomBERTb, with optional doctor corrections and appointment booking paid via Hormuud EVC Plus.",
       "The service is provided for informational and educational purposes. It is a research project and is offered free of charge.",
     ],
   },
   {
     heading: "3. Not medical advice",
     body: [
-      "HealthAI does not provide medical advice, diagnosis, or treatment. Predictions are automated classifications of text and can be wrong.",
-      "Always consult a qualified healthcare professional for medical decisions. Never disregard professional advice because of a HealthAI result.",
+      "SomAI does not provide medical advice, diagnosis, or treatment. Predictions are automated classifications of text and can be wrong. Doctor corrections and appointments are supportive, not a substitute for in-person clinical care.",
+      "Always consult a qualified healthcare professional for medical decisions. Never disregard professional advice because of a SomAI result.",
     ],
   },
   {
     heading: "4. Acceptable use",
     body: [
-      "You agree not to misuse the service, including attempting to access other users' data, overloading the system with automated requests, or using the service to generate or spread misinformation.",
-      "Administrator features may only be used by authorized administrators for legitimate platform management.",
+      "You agree not to misuse the service, including attempting to access other users' data, overloading the system with automated requests, or using the service to generate or spread misleading health claims.",
+      "Administrator and doctor features may only be used by authorized accounts for legitimate platform management and clinical review.",
+      "Appointment payments are processed through Hormuud EVC Plus. You are responsible for using a number you control and for approving or declining payment prompts on your device.",
     ],
   },
   {
@@ -45,7 +46,7 @@ const sections = [
   {
     heading: "6. Intellectual property",
     body: [
-      "The HealthAI application, model, and branding are the intellectual property of the project team. You retain ownership of the text you submit.",
+      "The SomAI application, models, and branding are the intellectual property of the project team. You retain ownership of the text you submit.",
     ],
   },
   {
@@ -62,7 +63,7 @@ const sections = [
   },
   {
     heading: "9. Contact",
-    body: ["Questions about these terms? Contact legal@healthai.app."],
+    body: ["Questions about these terms? Contact legal@somai.app."],
   },
 ];
 
@@ -75,7 +76,7 @@ export default function TermsPage() {
           Terms &amp; <span className="text-gradient-brand">Conditions</span>
         </>
       }
-      updated="July 21, 2026"
+      updated="August 15, 2026"
       sections={sections}
     />
   );
