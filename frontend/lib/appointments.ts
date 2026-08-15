@@ -28,8 +28,11 @@ export async function listAvailability(
 export async function createAvailability(
   token: string,
   payload: { starts_at: string; ends_at: string },
-): Promise<DoctorAvailability> {
-  return apiFetch<DoctorAvailability>(
+): Promise<DoctorAvailability[]> {
+  const data = await apiFetch<
+    | DoctorAvailability
+    | { items?: DoctorAvailability[]; count?: number }
+  >(
     "/api/appointments/availability",
     {
       method: "POST",
@@ -37,6 +40,10 @@ export async function createAvailability(
     },
     token,
   );
+  if (data && typeof data === "object" && Array.isArray((data as { items?: DoctorAvailability[] }).items)) {
+    return (data as { items: DoctorAvailability[] }).items;
+  }
+  return [data as DoctorAvailability];
 }
 
 export async function deleteAvailability(
@@ -50,12 +57,31 @@ export async function deleteAvailability(
   );
 }
 
+export type AppointmentPaymentConfig = {
+  enabled: boolean;
+  amount: number;
+  currency: string;
+  payment_method: string;
+  instructions?: string;
+};
+
+export async function getAppointmentPaymentConfig(
+  token: string,
+): Promise<AppointmentPaymentConfig> {
+  return apiFetch<AppointmentPaymentConfig>(
+    "/api/appointments/payment-config",
+    {},
+    token,
+  );
+}
+
 export async function createAppointment(
   token: string,
   payload: {
     prediction_id: string | number;
     availability_id: string | number;
     note?: string;
+    payer_phone?: string;
   },
 ): Promise<Appointment> {
   return apiFetch<Appointment>(
@@ -63,6 +89,8 @@ export async function createAppointment(
     {
       method: "POST",
       body: JSON.stringify(payload),
+      // EVC Plus USSD prompt can take up to ~2 minutes.
+      signal: AbortSignal.timeout(130_000),
     },
     token,
   );
