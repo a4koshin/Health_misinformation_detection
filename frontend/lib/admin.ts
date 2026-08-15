@@ -9,6 +9,7 @@ import type {
   DoctorCreate,
   DoctorProfile,
   DoctorUpdate,
+  PaymentTransaction,
   User,
 } from "@/types/api";
 
@@ -22,6 +23,17 @@ export async function listUsers(token: string): Promise<User[]> {
 
 export async function listAuditLogs(token: string): Promise<AuditLog[]> {
   return apiFetch<AuditLog[]>("/api/admin/audit-logs", {}, token);
+}
+
+export async function listPayments(
+  token: string,
+): Promise<PaymentTransaction[]> {
+  const data = await apiFetch<{ items: PaymentTransaction[] }>(
+    "/api/admin/payments",
+    {},
+    token,
+  );
+  return Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function createUser(
