@@ -73,7 +73,10 @@ function AppointmentsContent() {
       [...items].sort((a, b) => {
         if (a.status === "pending" && b.status !== "pending") return -1;
         if (a.status !== "pending" && b.status === "pending") return 1;
-        return (b.created_at || "").localeCompare(a.created_at || "");
+        const aq = a.queue_number ?? Number.MAX_SAFE_INTEGER;
+        const bq = b.queue_number ?? Number.MAX_SAFE_INTEGER;
+        if (aq !== bq) return aq - bq;
+        return (a.starts_at || "").localeCompare(b.starts_at || "");
       }),
     [items],
   );
@@ -144,6 +147,7 @@ function AppointmentsContent() {
       >
         <GlassTableHead>
           <GlassTableRow>
+            <GlassTableHeaderCell>Queue</GlassTableHeaderCell>
             <GlassTableHeaderCell>User</GlassTableHeaderCell>
             <GlassTableHeaderCell>Corrected claim</GlassTableHeaderCell>
             <GlassTableHeaderCell>Note</GlassTableHeaderCell>
@@ -158,14 +162,14 @@ function AppointmentsContent() {
           {isLoading ? (
             Array.from({ length: 4 }).map((_, index) => (
               <GlassTableRow key={index}>
-                <GlassTableCell colSpan={6}>
+                <GlassTableCell colSpan={7}>
                   <div className="h-8 animate-pulse rounded-lg bg-gray-50" />
                 </GlassTableCell>
               </GlassTableRow>
             ))
           ) : pagination.pageItems.length === 0 ? (
             <GlassTableRow>
-              <GlassTableCell colSpan={6}>
+              <GlassTableCell colSpan={7}>
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
                   <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                     <MaterialIcon name="event_available" size={24} />
@@ -183,6 +187,15 @@ function AppointmentsContent() {
           ) : (
             pagination.pageItems.map((item) => (
               <GlassTableRow key={item.id}>
+                <GlassTableCell>
+                  {item.queue_number != null ? (
+                    <span className="inline-flex min-w-10 items-center justify-center rounded-xl bg-[#ff5c00]/10 px-2.5 py-1 text-sm font-semibold text-[#cc4a00]">
+                      #{item.queue_number}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-[#94a3b8]">—</span>
+                  )}
+                </GlassTableCell>
                 <GlassTableCell>
                   <p className="font-medium text-[#0f172a]">
                     {item.user_name || "User"}
