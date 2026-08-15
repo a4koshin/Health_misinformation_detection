@@ -17,10 +17,14 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  notificationStreamUrl,
 } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/store/auth-store";
 import type { AppNotification } from "@/types/api";
+
+/** Near-real-time: SSE push + short poll fallback for every role. */
+const POLL_MS = 3_000;
 
 function formatWhen(value: string | null) {
   if (!value) return "";
@@ -60,11 +64,30 @@ export function NotificationBell({ className }: { className?: string }) {
   }
 
   useEffect(() => {
+    if (!token) return;
     void refresh();
+
     const timer = window.setInterval(() => {
       void refresh();
-    }, 15000);
-    return () => window.clearInterval(timer);
+    }, POLL_MS);
+
+    let source: EventSource | null = null;
+    try {
+      source = new EventSource(notificationStreamUrl(token));
+      source.onmessage = () => {
+        void refresh();
+      };
+      source.addEventListener("connected", () => {
+        void refresh();
+      });
+    } catch {
+      // Polling alone is enough if EventSource cannot start.
+    }
+
+    return () => {
+      window.clearInterval(timer);
+      source?.close();
+    };
   }, [token]);
 
   async function handleOpenChange(next: boolean) {
