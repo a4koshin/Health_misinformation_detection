@@ -45,7 +45,7 @@ def get_pending_reviews(
     pending_count = query.filter(Prediction.review_status == "pending").count()
     pagination = query.order_by(
         case((Prediction.review_status == "pending", 0), else_=1),
-        Prediction.created_at.asc(),
+        Prediction.created_at.desc(),
     ).paginate(page=page, per_page=per_page, error_out=False)
 
     return {
@@ -90,7 +90,7 @@ def get_admin_assignment_queue(
         Prediction.review_status == "pending",
     ).count()
 
-    pagination = query.order_by(Prediction.created_at.asc()).paginate(
+    pagination = query.order_by(Prediction.created_at.desc()).paginate(
         page=page, per_page=per_page, error_out=False
     )
 
