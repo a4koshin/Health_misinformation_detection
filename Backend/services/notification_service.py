@@ -62,11 +62,11 @@ def _add_notification(
     claim_excerpt: str | None,
     corrected_excerpt: str | None,
     href: str,
-) -> None:
+) -> int | None:
     if _already_sent(
         recipient_id=recipient.id, type=type, prediction_id=prediction_id
     ):
-        return
+        return None
     db.session.add(
         Notification(
             recipient_id=recipient.id,
@@ -85,6 +85,16 @@ def _add_notification(
             href=href,
         )
     )
+    return int(recipient.id)
+
+
+def _fanout(recipient_ids: list[int | None] | set[int | None]) -> None:
+    ids = {int(rid) for rid in recipient_ids if rid is not None}
+    if not ids:
+        return
+    from services.notification_hub import publish_many
+
+    publish_many(ids, {"type": "refresh"})
 
 
 def notify_non_reliable_claim(prediction: Prediction) -> None:
@@ -109,19 +119,22 @@ def _notify_non_reliable_claim(prediction: Prediction) -> None:
         "Assign a doctor to review it."
     )
 
+    recipient_ids: list[int | None] = []
     for admin in _active_users_with_role("admin"):
-        _add_notification(
-            recipient=admin,
-            audience="admin",
-            type="review_queued",
-            title=title,
-            body=admin_body,
-            prediction_id=prediction.id,
-            actor=owner,
-            other_user=None,
-            claim_excerpt=excerpt,
-            corrected_excerpt=None,
-            href="/assign-reviews",
+        recipient_ids.append(
+            _add_notification(
+                recipient=admin,
+                audience="admin",
+                type="review_queued",
+                title=title,
+                body=admin_body,
+                prediction_id=prediction.id,
+                actor=owner,
+                other_user=None,
+                claim_excerpt=excerpt,
+                corrected_excerpt=None,
+                href="/assign-reviews",
+            )
         )
 
     from services import audit_service
@@ -137,6 +150,7 @@ def _notify_non_reliable_claim(prediction: Prediction) -> None:
     )
 
     db.session.commit()
+    _fanout(recipient_ids)
 
 
 def notify_non_reliable_batch(predictions: list[Prediction], *, user_id: int) -> None:
@@ -170,19 +184,22 @@ def _notify_non_reliable_batch(predictions: list[Prediction], *, user_id: int) -
     first_id = queued[0].id
     excerpt = _excerpt(queued[0].claim_text)
 
+    recipient_ids: list[int | None] = []
     for admin in _active_users_with_role("admin"):
-        _add_notification(
-            recipient=admin,
-            audience="admin",
-            type="review_queued",
-            title=title,
-            body=admin_body,
-            prediction_id=first_id,
-            actor=owner,
-            other_user=None,
-            claim_excerpt=excerpt,
-            corrected_excerpt=None,
-            href="/assign-reviews",
+        recipient_ids.append(
+            _add_notification(
+                recipient=admin,
+                audience="admin",
+                type="review_queued",
+                title=title,
+                body=admin_body,
+                prediction_id=first_id,
+                actor=owner,
+                other_user=None,
+                claim_excerpt=excerpt,
+                corrected_excerpt=None,
+                href="/assign-reviews",
+            )
         )
 
     from services import audit_service
@@ -201,6 +218,7 @@ def _notify_non_reliable_batch(predictions: list[Prediction], *, user_id: int) -
     )
 
     db.session.commit()
+    _fanout(recipient_ids)
 
 
 def notify_review_assigned(
@@ -236,7 +254,7 @@ def _notify_review_assigned(
     owner_name = _display_name(owner)
     title = "Claim assigned to you"
 
-    _add_notification(
+    recipient_id = _add_notification(
         recipient=doctor,
         audience="advisor",
         type="review_assigned",
@@ -268,6 +286,7 @@ def _notify_review_assigned(
         commit=False,
     )
     db.session.commit()
+    _fanout([recipient_id])
 
 
 def notify_claim_corrected(prediction: Prediction, advisor: User) -> None:
@@ -291,36 +310,40 @@ def _notify_claim_corrected(prediction: Prediction, advisor: User) -> None:
     owner_name = _display_name(owner)
     title = "Claim corrected"
 
-    _add_notification(
-        recipient=owner,
-        audience="user",
-        type="claim_corrected",
-        title="Your claim was corrected",
-        body=(
-            f"{advisor_name} corrected your claim. "
-            "Open Corrections to read the updated sentence."
-        ),
-        prediction_id=prediction.id,
-        actor=advisor,
-        other_user=owner,
-        claim_excerpt=excerpt,
-        corrected_excerpt=corrected,
-        href="/corrections",
-    )
-
-    for admin in _active_users_with_role("admin"):
+    recipient_ids: list[int | None] = [
         _add_notification(
-            recipient=admin,
-            audience="admin",
+            recipient=owner,
+            audience="user",
             type="claim_corrected",
-            title=title,
-            body=f"{advisor_name} corrected a claim from {owner_name}.",
+            title="Your claim was corrected",
+            body=(
+                f"{advisor_name} corrected your claim. "
+                "Open Corrections to read the updated sentence."
+            ),
             prediction_id=prediction.id,
             actor=advisor,
             other_user=owner,
             claim_excerpt=excerpt,
             corrected_excerpt=corrected,
-            href="/audit-log",
+            href="/corrections",
+        )
+    ]
+
+    for admin in _active_users_with_role("admin"):
+        recipient_ids.append(
+            _add_notification(
+                recipient=admin,
+                audience="admin",
+                type="claim_corrected",
+                title=title,
+                body=f"{advisor_name} corrected a claim from {owner_name}.",
+                prediction_id=prediction.id,
+                actor=advisor,
+                other_user=owner,
+                claim_excerpt=excerpt,
+                corrected_excerpt=corrected,
+                href="/audit-log",
+            )
         )
 
     from services import audit_service
@@ -339,6 +362,7 @@ def _notify_claim_corrected(prediction: Prediction, advisor: User) -> None:
     )
 
     db.session.commit()
+    _fanout(recipient_ids)
 
 
 def notify_appointment_requested(
@@ -364,7 +388,7 @@ def _notify_appointment_requested(appointment, user: User, doctor: User) -> None
         type="appointment_requested",
         prediction_id=appointment.prediction_id,
     ).delete(synchronize_session=False)
-    _add_notification(
+    recipient_id = _add_notification(
         recipient=doctor,
         audience="advisor",
         type="appointment_requested",
@@ -381,6 +405,7 @@ def _notify_appointment_requested(appointment, user: User, doctor: User) -> None
         href="/appointments",
     )
     db.session.commit()
+    _fanout([recipient_id])
 
 
 def notify_appointment_status(appointment, *, doctor: User, user: User) -> None:
@@ -399,7 +424,7 @@ def _notify_appointment_status(appointment, *, doctor: User, user: User) -> None
         Notification.prediction_id == appointment.prediction_id,
         Notification.type.in_(("appointment_confirmed", "appointment_declined")),
     ).delete(synchronize_session=False)
-    _add_notification(
+    recipient_id = _add_notification(
         recipient=user,
         audience="user",
         type=notify_type,
@@ -425,6 +450,7 @@ def _notify_appointment_status(appointment, *, doctor: User, user: User) -> None
         href="/corrections",
     )
     db.session.commit()
+    _fanout([recipient_id])
 
 
 def list_notifications(user_id: int, *, limit: int = 40) -> list[dict]:
