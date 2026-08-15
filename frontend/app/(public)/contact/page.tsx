@@ -9,27 +9,27 @@ import { PageHeader, PageSection } from "@/components/marketing/page-shell";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 export const metadata: Metadata = {
-  title: "Contact — HealthAI",
-  description: "Get in touch with the HealthAI team.",
+  title: "Contact — SomAI",
+  description: "Get in touch with the SomAI team.",
 };
 
 const contactMethods = [
   {
     icon: "mail",
     title: "Email",
-    value: "hello@healthai.app",
+    value: "hello@somai.app",
     description: "For general questions and feedback.",
   },
   {
     icon: "school",
     title: "Research",
-    value: "research@healthai.app",
+    value: "research@somai.app",
     description: "For dataset access and academic collaboration.",
   },
   {
     icon: "support_agent",
     title: "Support",
-    value: "support@healthai.app",
+    value: "support@somai.app",
     description: "For account or technical issues.",
   },
 ];
@@ -58,12 +58,12 @@ export default function ContactPage() {
                 Get in touch
               </p>
               <h2 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-                Talk to the team behind HealthAI
+                Talk to the team behind SomAI
               </h2>
               <p className="mt-5 text-base leading-7 text-ink-muted">
-                Whether you found a claim we should look at, want to use the
-                dataset in your research, or just have feedback on the product
-                — our inbox is open.
+                Whether you found a claim we should look at, want to collaborate
+                on Somali health NLP, or just have feedback on the product —
+                our inbox is open.
               </p>
 
               <div className="mt-9 space-y-7">
