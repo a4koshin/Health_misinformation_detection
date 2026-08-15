@@ -17,6 +17,12 @@ notification_bp.add_url_rule(
     endpoint="unread_count",
 )
 notification_bp.add_url_rule(
+    "/stream",
+    view_func=notification_controller.stream_notifications,
+    methods=["GET"],
+    endpoint="stream_notifications",
+)
+notification_bp.add_url_rule(
     "/read-all",
     view_func=notification_controller.mark_all_read,
     methods=["POST"],
