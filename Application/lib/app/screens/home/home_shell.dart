@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,6 +26,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  NotificationProvider? _notifications;
 
   static const _pages = [
     DashboardScreen(),
@@ -37,8 +40,67 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NotificationProvider>().load();
+      if (!mounted) return;
+      _notifications = context.read<NotificationProvider>();
+      _notifications!.addListener(_onNotificationsChanged);
+      _notifications!.startRealtime();
     });
+  }
+
+  @override
+  void dispose() {
+    _notifications?.removeListener(_onNotificationsChanged);
+    super.dispose();
+  }
+
+  void _onNotificationsChanged() {
+    if (!mounted || _notifications == null) return;
+    final alert = _notifications!.consumeAlert();
+    if (alert == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.ink,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              alert.title.isEmpty ? 'New notification' : alert.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            if (alert.body.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                alert.body,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ],
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'Open',
+          textColor: AppColors.brand,
+          onPressed: () {
+            final href = (alert.href ?? '').toLowerCase();
+            if (href.contains('corrections')) {
+              _notifications?.requestCorrectionsRefresh();
+              setState(() => _index = 1);
+              return;
+            }
+            unawaited(_openNotifications());
+          },
+        ),
+        duration: const Duration(seconds: 6),
+      ),
+    );
   }
 
   Future<void> _openNotifications() async {
@@ -48,6 +110,7 @@ class _HomeShellState extends State<HomeShell> {
     if (!mounted) return;
     context.read<NotificationProvider>().refreshUnread();
     if (href == '/corrections') {
+      context.read<NotificationProvider>().requestCorrectionsRefresh();
       setState(() => _index = 1);
     }
   }
@@ -66,10 +129,8 @@ class _HomeShellState extends State<HomeShell> {
         extendBody: true,
         appBar: AppBar(
           automaticallyImplyLeading: false,
-          titleSpacing: isHome ? 4 : 20,
-          leading: isHome
-              ? NotificationBell(onPressed: _openNotifications)
-              : null,
+          titleSpacing: 4,
+          leading: NotificationBell(onPressed: _openNotifications),
           title: isHome
               ? Text(
                   'Hello, $firstName',
@@ -88,7 +149,12 @@ class _HomeShellState extends State<HomeShell> {
         ),
         bottomNavigationBar: AppBottomNav(
           index: _index,
-          onChanged: (index) => setState(() => _index = index),
+          onChanged: (index) {
+            setState(() => _index = index);
+            if (index == 1) {
+              context.read<NotificationProvider>().requestCorrectionsRefresh();
+            }
+          },
         ),
       ),
     );
