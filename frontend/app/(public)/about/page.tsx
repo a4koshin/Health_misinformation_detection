@@ -8,15 +8,15 @@ import { PageHeader, PageSection } from "@/components/marketing/page-shell";
 import { MaterialIcon } from "@/components/ui/material-icon";
 
 export const metadata: Metadata = {
-  title: "About — HealthAI",
+  title: "About — SomAI",
   description:
-    "Learn why HealthAI exists and how it fights Somali health misinformation.",
+    "Learn why SomAI exists and how SomBERTb helps Somali speakers verify health claims.",
 };
 
 const stats = [
-  { value: "10K+", label: "Claims analyzed" },
-  { value: "94%", label: "Model accuracy" },
-  { value: "<1s", label: "Average verdict time" },
+  { value: "SomBERTb", label: "Prediction model" },
+  { value: "2 labels", label: "Reliable / Non-Reliable" },
+  { value: "3 roles", label: "User · Doctor · Admin" },
   { value: "100%", label: "Somali focused" },
 ];
 
@@ -25,19 +25,19 @@ const milestones = [
     icon: "lightbulb",
     title: "The observation",
     description:
-      "Health misinformation spreads through Somali WhatsApp groups and social feeds faster than facts can catch up — and no detection tool supported the language.",
+      "Health rumors spread through Somali WhatsApp groups and social feeds faster than facts can catch up — and few tools supported the language well.",
   },
   {
     icon: "dataset",
     title: "The research",
     description:
-      "Thousands of Somali health claims were collected, labeled, and used to train and evaluate multiple machine learning models as a university graduation project.",
+      "Labeled Somali health claims were used to train and evaluate models, leading to SomBERTb as the production classifier for Reliable vs Non-Reliable.",
   },
   {
     icon: "rocket_launch",
     title: "The product",
     description:
-      "The best performer — a Support Vector Machine with TF-IDF features — became the engine of a full platform: chat, history, dashboards, and batch analysis.",
+      "SomAI grew into a full platform: prediction, medical gatekeeping, history, doctor corrections, EVC Plus appointments, and admin operations — on web and mobile.",
   },
 ];
 
@@ -52,7 +52,7 @@ const values = [
     icon: "science",
     title: "Scientific rigor",
     description:
-      "Our model is trained, validated, and documented with transparent machine learning methodology.",
+      "SomBERTb classifies claims with a transparent Reliable / Non-Reliable decision, plus explanations when available.",
   },
   {
     icon: "visibility",
@@ -64,7 +64,7 @@ const values = [
     icon: "lock",
     title: "Privacy by design",
     description:
-      "Your conversations belong to you. Authentication, role-based access, and deletable history are built in.",
+      "Your predictions belong to your account. Authentication and role-based access are built in from the start.",
   },
 ];
 
@@ -76,11 +76,11 @@ export default function AboutPage() {
           badge="About Us"
           title={
             <>
-              Fighting health misinformation,{" "}
-              <span className="text-brand">one claim at a time</span>
+              Verifying Somali health claims,{" "}
+              <span className="text-brand">one check at a time</span>
             </>
           }
-          description="HealthAI gives every Somali speaker a fast, scientific way to verify health claims before they spread — powered by a machine learning model built for the Somali language."
+          description="SomAI gives every Somali speaker a fast way to check health claims before they spread — powered by SomBERTb and backed by doctor review when needed."
         />
       </PageSection>
 
@@ -95,15 +95,14 @@ export default function AboutPage() {
                 Better health decisions begin with trusted information
               </h2>
               <p className="mt-5 text-base leading-7 text-ink-muted">
-                Health misinformation can travel quickly through social
-                networks, especially when reliable tools do not support the
-                language people use every day. HealthAI was created to close
-                that gap for Somali-speaking communities.
+                Misleading health claims travel quickly through social networks,
+                especially when everyday tools do not support Somali well. SomAI
+                was created to close that gap.
               </p>
               <p className="mt-4 text-base leading-7 text-ink-muted">
-                We combine language-aware machine learning with a simple,
-                accessible experience so anyone can check a claim before
-                believing or sharing it.
+                We combine SomBERTb classification with medical filtering and a
+                doctor workflow so anyone can check a claim — and get human help
+                when a result is Non-Reliable.
               </p>
               <GlassButton
                 asChild
@@ -111,7 +110,7 @@ export default function AboutPage() {
                 className="mt-8 bg-brand bg-none hover:bg-[#e65300]"
               >
                 <Link href="/how-it-works">
-                  See how HealthAI works
+                  See how SomAI works
                   <MaterialIcon name="arrow_forward" size={20} />
                 </Link>
               </GlassButton>
@@ -134,7 +133,7 @@ export default function AboutPage() {
                   reach, not harder to understand.
                 </blockquote>
                 <div className="mt-8 border-t border-gray-200 pt-6">
-                  <p className="font-semibold text-ink">The HealthAI mission</p>
+                  <p className="font-semibold text-ink">The SomAI mission</p>
                   <p className="mt-1 text-sm text-ink-muted">
                     Built for Somali speakers, designed for everyone
                   </p>
@@ -240,11 +239,11 @@ export default function AboutPage() {
         <Reveal>
           <div className="rounded-3xl border border-orange-100 bg-orange-50 px-6 py-14 text-center sm:px-12">
             <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              Help stop misinformation before it spreads
+              Help stop misleading claims before they spread
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-ink-muted">
-              Create a free account and start checking Somali health claims in
-              seconds.
+              Create a free account and start checking Somali health claims with
+              SomBERTb.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <GlassButton
