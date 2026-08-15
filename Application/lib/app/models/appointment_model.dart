@@ -7,6 +7,7 @@ class AppointmentModel {
     this.note,
     this.startsAt,
     this.endsAt,
+    this.queueNumber,
   });
 
   final String id;
@@ -16,12 +17,20 @@ class AppointmentModel {
   final String? note;
   final DateTime? startsAt;
   final DateTime? endsAt;
+  final int? queueNumber;
 
   bool get isPending => status == 'pending';
   bool get isConfirmed => status == 'confirmed';
   bool get isActive => isPending || isConfirmed;
 
   factory AppointmentModel.fromJson(Map<String, dynamic> json) {
+    final rawQueue = json['queue_number'];
+    int? queueNumber;
+    if (rawQueue is int) {
+      queueNumber = rawQueue;
+    } else if (rawQueue != null) {
+      queueNumber = int.tryParse('$rawQueue');
+    }
     return AppointmentModel(
       id: '${json['id'] ?? ''}',
       predictionId: '${json['prediction_id'] ?? ''}',
@@ -30,6 +39,7 @@ class AppointmentModel {
       note: json['note'] as String?,
       startsAt: DateTime.tryParse('${json['starts_at'] ?? ''}'),
       endsAt: DateTime.tryParse('${json['ends_at'] ?? ''}'),
+      queueNumber: queueNumber,
     );
   }
 }
