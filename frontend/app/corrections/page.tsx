@@ -13,6 +13,7 @@ import {
   GlassTextarea,
 } from "@/components/glass/glass-input";
 import { GlassModal } from "@/components/glass/glass-modal";
+import { PaymentResultModal } from "@/components/glass/payment-result-modal";
 import {
   GlassTableBody,
   GlassTableCell,
@@ -32,11 +33,12 @@ import {
   formatSlotDate,
   formatSlotRange,
   formatSlotTime,
+  getAppointmentPaymentConfig,
   listAppointments,
   listAvailability,
   slotDateKey,
   slotDateParts,
-  slotDurationLabel,
+  type AppointmentPaymentConfig,
 } from "@/lib/appointments";
 import { ApiError } from "@/lib/api";
 import { getCorrections } from "@/lib/history";
@@ -143,7 +145,7 @@ function BookingSlotPicker({
         <p className="text-xs font-semibold text-[#0f172a]">
           Time · {formatSlotDate(selected.starts_at)}
         </p>
-        <div className="grid gap-2">
+        <div className="flex flex-wrap gap-2">
           {times.map((slot) => {
             const active = selectedSlotId === slot.id;
             return (
@@ -154,34 +156,22 @@ function BookingSlotPicker({
                 onClick={() => onSelect(slot.id)}
                 className={
                   active
-                    ? "flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl border border-[#ff5c00] bg-[#ffefe6] px-2.5 py-2 text-left"
-                    : "flex min-h-11 w-full cursor-pointer items-center gap-2.5 rounded-xl border border-gray-200 bg-white px-2.5 py-2 text-left hover:border-[#ff5c00]/40"
+                    ? "flex min-w-[76px] cursor-pointer flex-col items-center justify-center rounded-xl border border-[#ff5c00] bg-[#ff5c00] px-3 py-2.5 text-white"
+                    : "flex min-w-[76px] cursor-pointer flex-col items-center justify-center rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-[#0f172a] hover:border-[#ff5c00]/40"
                 }
               >
+                <span className="text-[13px] font-bold leading-none">
+                  {formatSlotTime(slot.starts_at)}
+                </span>
                 <span
                   className={
                     active
-                      ? "flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-[#ff5c00]"
-                      : "flex size-7 shrink-0 items-center justify-center rounded-lg bg-[#ffefe6] text-[#cc4a00]"
+                      ? "mt-1 text-[11px] font-medium text-white/90"
+                      : "mt-1 text-[11px] font-medium text-[#64748b]"
                   }
                 >
-                  <MaterialIcon name="schedule" size={14} />
+                  {formatSlotTime(slot.ends_at)}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-semibold text-[#0f172a]">
-                    {formatSlotTime(slot.starts_at)} – {formatSlotTime(slot.ends_at)}
-                  </span>
-                  <span className="block text-[11px] text-[#64748b]">
-                    {slotDurationLabel(slot.starts_at, slot.ends_at)}
-                  </span>
-                </span>
-                <span
-                  className={
-                    active
-                      ? "size-4 shrink-0 rounded-full border-[4px] border-[#ff5c00]"
-                      : "size-4 shrink-0 rounded-full border-2 border-gray-300"
-                  }
-                />
               </button>
             );
           })}
@@ -203,10 +193,18 @@ function CorrectionsContent() {
   const [search, setSearch] = useState("");
   const [bookingItem, setBookingItem] = useState<Detection | null>(null);
   const [bookingNote, setBookingNote] = useState("");
+  const [payerPhone, setPayerPhone] = useState("");
+  const [paymentConfig, setPaymentConfig] =
+    useState<AppointmentPaymentConfig | null>(null);
   const [slots, setSlots] = useState<DoctorAvailability[]>([]);
   const [selectedSlotId, setSelectedSlotId] = useState("");
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   const [isBooking, setIsBooking] = useState(false);
+  const [resultModal, setResultModal] = useState<{
+    tone: "success" | "error";
+    title: string;
+    message: string;
+  } | null>(null);
   const columnCount = isAdmin ? 5 : isUser ? 5 : 4;
 
   useEffect(() => {
@@ -284,15 +282,21 @@ function CorrectionsContent() {
 
   async function openBooking(item: Detection) {
     setBookingNote("");
+    setPayerPhone("");
     setSelectedSlotId("");
     setSlots([]);
+    setPaymentConfig(null);
     setBookingItem(item);
     if (!token || !item.advisor_id) return;
     setIsLoadingSlots(true);
     try {
-      const available = await listAvailability(token, item.advisor_id);
+      const [available, pay] = await Promise.all([
+        listAvailability(token, item.advisor_id),
+        getAppointmentPaymentConfig(token).catch(() => null),
+      ]);
       setSlots(available);
       setSelectedSlotId(available[0]?.id ?? "");
+      setPaymentConfig(pay);
     } catch (error) {
       toast.error(
         error instanceof ApiError
@@ -311,26 +315,45 @@ function CorrectionsContent() {
       toast.error("Pick an available date and time.");
       return;
     }
+    if (paymentConfig?.enabled && !payerPhone.trim()) {
+      toast.error("Enter your EVC Plus number to pay.");
+      return;
+    }
     setIsBooking(true);
+    const paying = Boolean(paymentConfig?.enabled);
+    const doctorName = bookingItem.advisor_name || "the doctor";
     try {
       const created = await createAppointment(token, {
         prediction_id: bookingItem.id,
         availability_id: selectedSlotId,
         note: bookingNote.trim() || undefined,
+        payer_phone: payerPhone.trim() || undefined,
       });
       setAppointments((current) => [created, ...current]);
       setBookingItem(null);
       setBookingNote("");
+      setPayerPhone("");
       setSelectedSlotId("");
-      toast.success(
-        `Appointment requested with ${bookingItem.advisor_name || "the doctor"}.`,
-      );
+      setPaymentConfig(null);
+      const queueLabel =
+        created.queue_number != null ? ` Queue #${created.queue_number}.` : "";
+      setResultModal({
+        tone: "success",
+        title: paying ? "Payment successful" : "Appointment requested",
+        message: paying
+          ? `EVC Plus payment received. Appointment requested with ${doctorName}.${queueLabel}`
+          : `Appointment requested with ${doctorName}.${queueLabel}`,
+      });
     } catch (error) {
-      toast.error(
+      const message =
         error instanceof ApiError
           ? error.message
-          : "Unable to book this appointment.",
-      );
+          : "Unable to book this appointment.";
+      setResultModal({
+        tone: "error",
+        title: paying ? "Payment failed" : "Booking failed",
+        message,
+      });
     } finally {
       setIsBooking(false);
     }
@@ -346,39 +369,45 @@ function CorrectionsContent() {
       }
     >
       <DataTableCard
+        className="w-full shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+        tableClassName="table-fixed min-w-[720px]"
         header={
-          <div>
-            <h2 className="text-base font-semibold text-[#0f172a]">
-              Corrected sentences
-            </h2>
-            <p className="text-sm text-[#475569]">
-              {isAdmin
-                ? "Every claim a doctor corrected appears here for admin oversight."
-                : "Only claims a Doctor corrected appear here."}
-            </p>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-[#0f172a]">
+                Corrected sentences
+              </h2>
+              <p className="mt-1 text-sm text-[#64748b]">
+                {isAdmin
+                  ? "Every claim a doctor corrected appears here for admin oversight."
+                  : "Compare the original claim with the doctor rewrite, then book if you need help."}
+              </p>
+            </div>
+            {!isLoading && filtered.length > 0 ? (
+              <p className="text-xs font-medium text-[#94a3b8]">
+                {filtered.length} result{filtered.length === 1 ? "" : "s"}
+              </p>
+            ) : null}
           </div>
         }
         toolbar={
-          <div className="space-y-1.5">
-            <GlassLabel htmlFor="corrections-search">Search</GlassLabel>
-            <div className="relative">
-              <MaterialIcon
-                name="search"
-                size={18}
-                className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#94a3b8]"
-              />
-              <GlassInput
-                id="corrections-search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={
-                  isAdmin
-                    ? "Search claim, correction, user, or doctor…"
-                    : "Search original claim, correction, or doctor…"
-                }
-                className="rounded-xl bg-white pl-10"
-              />
-            </div>
+          <div className="relative max-w-xl">
+            <MaterialIcon
+              name="search"
+              size={18}
+              className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#94a3b8]"
+            />
+            <GlassInput
+              id="corrections-search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={
+                isAdmin
+                  ? "Search claim, correction, user, or doctor…"
+                  : "Search original claim, correction, or doctor…"
+              }
+              className="rounded-xl bg-white pl-10"
+            />
           </div>
         }
         footer={
@@ -398,16 +427,26 @@ function CorrectionsContent() {
         }
       >
         <GlassTableHead>
-          <GlassTableRow>
+          <GlassTableRow className="hover:bg-transparent">
             {isAdmin ? (
-              <GlassTableHeaderCell>User</GlassTableHeaderCell>
+              <GlassTableHeaderCell className="w-[14%]">
+                User
+              </GlassTableHeaderCell>
             ) : null}
-            <GlassTableHeaderCell>Previous claim</GlassTableHeaderCell>
-            <GlassTableHeaderCell>Corrected sentence</GlassTableHeaderCell>
-            <GlassTableHeaderCell>Corrected by</GlassTableHeaderCell>
-            <GlassTableHeaderCell>Date and Time</GlassTableHeaderCell>
+            <GlassTableHeaderCell className={isAdmin ? "w-[24%]" : "w-[28%]"}>
+              Previous claim
+            </GlassTableHeaderCell>
+            <GlassTableHeaderCell className={isAdmin ? "w-[24%]" : "w-[28%]"}>
+              Corrected sentence
+            </GlassTableHeaderCell>
+            <GlassTableHeaderCell className="w-[14%]">
+              Corrected by
+            </GlassTableHeaderCell>
+            <GlassTableHeaderCell className="w-[14%]">
+              Date &amp; time
+            </GlassTableHeaderCell>
             {isUser ? (
-              <GlassTableHeaderCell className="text-right">
+              <GlassTableHeaderCell className="w-[16%] text-right">
                 Appointment
               </GlassTableHeaderCell>
             ) : null}
@@ -416,23 +455,23 @@ function CorrectionsContent() {
         <GlassTableBody>
           {isLoading ? (
             Array.from({ length: 4 }).map((_, index) => (
-              <GlassTableRow key={index}>
+              <GlassTableRow key={index} className="hover:bg-transparent">
                 <GlassTableCell colSpan={columnCount}>
-                  <div className="h-8 animate-pulse rounded-lg bg-gray-50" />
+                  <div className="h-12 animate-pulse rounded-xl bg-gray-50" />
                 </GlassTableCell>
               </GlassTableRow>
             ))
           ) : pagination.pageItems.length === 0 ? (
-            <GlassTableRow>
+            <GlassTableRow className="hover:bg-transparent">
               <GlassTableCell colSpan={columnCount}>
-                <div className="flex flex-col items-center gap-2 py-10 text-center">
+                <div className="flex flex-col items-center gap-2 py-14 text-center">
                   <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                     <MaterialIcon name="rate_review" size={24} />
                   </span>
-                  <p className="text-sm font-medium text-[#0f172a]">
+                  <p className="text-sm font-semibold text-[#0f172a]">
                     No corrections yet
                   </p>
-                  <p className="text-sm text-[#475569]">
+                  <p className="max-w-md text-sm leading-relaxed text-[#64748b]">
                     {pendingCount > 0
                       ? `${pendingCount} Non-Reliable claim${pendingCount === 1 ? "" : "s"} still waiting for doctor review. After a doctor submits a rewrite, it will appear here.`
                       : isAdmin
@@ -447,76 +486,100 @@ function CorrectionsContent() {
               const appointment = appointmentByPrediction.get(item.id);
               const status = appointment?.status;
               return (
-              <GlassTableRow key={item.id}>
-                {isAdmin ? (
+                <GlassTableRow key={item.id} className="align-top">
+                  {isAdmin ? (
+                    <GlassTableCell>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#0f172a]">
+                          {item.user_name || "User"}
+                        </p>
+                        <p className="truncate text-xs text-[#94a3b8]">
+                          {item.user_email || "—"}
+                        </p>
+                      </div>
+                    </GlassTableCell>
+                  ) : null}
                   <GlassTableCell>
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-[#0f172a]">
-                        {item.user_name || "User"}
-                      </p>
-                      <p className="truncate text-xs text-[#64748b]">
-                        {item.user_email || "—"}
+                    <p className="line-clamp-3 text-sm leading-relaxed text-[#475569]">
+                      {previousClaim(item) || "—"}
+                    </p>
+                  </GlassTableCell>
+                  <GlassTableCell>
+                    <p className="line-clamp-3 text-sm leading-relaxed font-medium text-[#0f172a]">
+                      {correctedClaim(item) || "—"}
+                    </p>
+                  </GlassTableCell>
+                  <GlassTableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#ff5c00]/10 text-xs font-semibold text-[#cc4a00]">
+                        {(item.advisor_name || "D").trim().charAt(0).toUpperCase()}
+                      </span>
+                      <p className="truncate text-sm font-medium text-[#0f172a]">
+                        {item.advisor_name || "Doctor"}
                       </p>
                     </div>
                   </GlassTableCell>
-                ) : null}
-                <GlassTableCell className="max-w-[320px]">
-                  <p className="line-clamp-4 text-sm text-[#0f172a]">
-                    {previousClaim(item) || "—"}
-                  </p>
-                </GlassTableCell>
-                <GlassTableCell className="max-w-[320px]">
-                  <p className="line-clamp-4 text-sm font-medium text-[#0f172a]">
-                    {correctedClaim(item) || "—"}
-                  </p>
-                </GlassTableCell>
-                <GlassTableCell className="whitespace-nowrap">
-                  <p className="font-medium text-[#0f172a]">
-                    {item.advisor_name || "Doctor"}
-                  </p>
-                </GlassTableCell>
-                <GlassTableCell className="whitespace-nowrap text-[#475569]">
-                  {formatDate(item.reviewed_at || item.created_at)}
-                </GlassTableCell>
-                {isUser ? (
-                  <GlassTableCell className="text-right">
-                    {status === "pending" ? (
-                      <div className="space-y-1">
-                        <GlassBadge tone="brand">Requested</GlassBadge>
-                        {appointment?.starts_at ? (
-                          <p className="text-xs text-[#64748b]">
-                            {formatSlotRange(
-                              appointment.starts_at,
-                              appointment.ends_at,
-                            )}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : status === "confirmed" ? (
-                      <div className="space-y-1">
-                        <GlassBadge tone="success">Confirmed</GlassBadge>
-                        {appointment?.starts_at ? (
-                          <p className="text-xs text-[#64748b]">
-                            {formatSlotRange(
-                              appointment.starts_at,
-                              appointment.ends_at,
-                            )}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <GlassButton
-                        type="button"
-                        size="sm"
-                        onClick={() => void openBooking(item)}
-                        disabled={!item.advisor_id}
-                      >
-                        Book appointment
-                      </GlassButton>
-                    )}
+                  <GlassTableCell>
+                    <p className="text-sm whitespace-nowrap text-[#64748b]">
+                      {formatDate(item.reviewed_at || item.created_at)}
+                    </p>
                   </GlassTableCell>
-                ) : null}
-              </GlassTableRow>
+                  {isUser ? (
+                    <GlassTableCell className="text-right">
+                      {status === "pending" ? (
+                        <div className="inline-flex flex-col items-end gap-1">
+                          <GlassBadge tone="brand">Requested</GlassBadge>
+                          {appointment?.queue_number != null ? (
+                            <span className="text-xs font-semibold text-[#cc4a00]">
+                              Queue #{appointment.queue_number}
+                            </span>
+                          ) : null}
+                          {appointment?.starts_at ? (
+                            <span className="max-w-[11rem] text-right text-[11px] leading-snug text-[#94a3b8]">
+                              {formatSlotRange(
+                                appointment.starts_at,
+                                appointment.ends_at,
+                              )}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : status === "confirmed" ? (
+                        <div className="inline-flex flex-col items-end gap-1">
+                          <GlassBadge tone="success">Confirmed</GlassBadge>
+                          {appointment?.queue_number != null ? (
+                            <span className="text-xs font-semibold text-emerald-700">
+                              Queue #{appointment.queue_number}
+                            </span>
+                          ) : null}
+                          {appointment?.starts_at ? (
+                            <span className="max-w-[11rem] text-right text-[11px] leading-snug text-[#94a3b8]">
+                              {formatSlotRange(
+                                appointment.starts_at,
+                                appointment.ends_at,
+                              )}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="inline-flex flex-col items-end gap-1.5">
+                          <GlassButton
+                            type="button"
+                            size="sm"
+                            title="Hadii aad u baahantahay talooyin caafimaad oo dheeri ah kuna saabsan mowduucaan waxaa qabsataa balan si aad ula kulanto dhakhtarka"
+                            onClick={() => void openBooking(item)}
+                            disabled={!item.advisor_id}
+                          >
+                            <MaterialIcon name="event" size={16} />
+                            Book
+                          </GlassButton>
+                          <p className="max-w-[11rem] text-right text-[10px] leading-snug text-[#94a3b8]">
+                            Qabsato balan dhakhtarka
+                          </p>
+                        </div>
+                      )}
+                    </GlassTableCell>
+                  ) : null}
+                </GlassTableRow>
               );
             })
           )}
@@ -529,8 +592,10 @@ function CorrectionsContent() {
           if (!open && !isBooking) {
             setBookingItem(null);
             setBookingNote("");
+            setPayerPhone("");
             setSelectedSlotId("");
             setSlots([]);
+            setPaymentConfig(null);
           }
         }}
         title="Book an appointment"
@@ -565,6 +630,36 @@ function CorrectionsContent() {
                 />
               )}
             </div>
+            {paymentConfig?.enabled ? (
+              <div className="space-y-3 rounded-2xl border border-[#ff5c00]/20 bg-[#ff5c00]/5 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium text-[#0f172a]">
+                    Pay with EVC Plus
+                  </p>
+                  <p className="text-sm font-semibold text-[#cc4a00]">
+                    ${Number(paymentConfig.amount).toFixed(2)}{" "}
+                    {paymentConfig.currency}
+                  </p>
+                </div>
+                <p className="text-xs leading-relaxed text-[#64748b]">
+                  {paymentConfig.instructions ||
+                    "Approve the Hormuud EVC Plus PIN prompt on your phone to finish booking."}
+                </p>
+                <div className="space-y-2">
+                  <GlassLabel htmlFor="payer-phone">EVC Plus number</GlassLabel>
+                  <GlassInput
+                    id="payer-phone"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={payerPhone}
+                    onChange={(event) => setPayerPhone(event.target.value)}
+                    placeholder="61xxxxxxx"
+                    className="rounded-xl bg-white"
+                    required
+                  />
+                </div>
+              </div>
+            ) : null}
             <div className="space-y-2">
               <GlassLabel htmlFor="appointment-note">
                 What would you like to know? (optional)
@@ -585,22 +680,45 @@ function CorrectionsContent() {
                 onClick={() => {
                   setBookingItem(null);
                   setBookingNote("");
+                  setPayerPhone("");
                   setSelectedSlotId("");
                   setSlots([]);
+                  setPaymentConfig(null);
                 }}
               >
                 Cancel
               </GlassButton>
               <GlassButton
                 type="submit"
-                disabled={isBooking || isLoadingSlots || !selectedSlotId}
+                disabled={
+                  isBooking ||
+                  isLoadingSlots ||
+                  !selectedSlotId ||
+                  (Boolean(paymentConfig?.enabled) && !payerPhone.trim())
+                }
               >
-                {isBooking ? "Sending…" : "Book time"}
+                {isBooking
+                  ? paymentConfig?.enabled
+                    ? "Waiting for EVC…"
+                    : "Sending…"
+                  : paymentConfig?.enabled
+                    ? `Pay $${Number(paymentConfig.amount).toFixed(2)} & book`
+                    : "Book time"}
               </GlassButton>
             </div>
           </form>
         ) : null}
       </GlassModal>
+
+      <PaymentResultModal
+        open={Boolean(resultModal)}
+        onOpenChange={(open) => {
+          if (!open) setResultModal(null);
+        }}
+        tone={resultModal?.tone ?? "success"}
+        title={resultModal?.title ?? ""}
+        message={resultModal?.message ?? ""}
+      />
     </PrivatePage>
   );
 }
