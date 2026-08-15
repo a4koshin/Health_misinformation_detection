@@ -1,5 +1,16 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE } from "@/lib/api";
 import type { AppNotification, NotificationListResponse } from "@/types/api";
+
+const STREAM_BASE =
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_BACKEND_URL) ||
+  "http://127.0.0.1:5000";
+
+/** Direct backend URL so SSE is not buffered by the Next.js rewrite proxy. */
+export function notificationStreamUrl(token: string): string {
+  const base = (API_BASE || STREAM_BASE).replace(/\/$/, "");
+  return `${base}/api/notifications/stream?token=${encodeURIComponent(token)}`;
+}
 
 export async function listNotifications(
   token: string,
