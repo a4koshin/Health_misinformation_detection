@@ -87,6 +87,14 @@ export type Appointment = {
   ends_at?: string | null;
   note: string | null;
   status: AppointmentStatus;
+  payment_status?: string | null;
+  payment_amount?: string | null;
+  payment_currency?: string | null;
+  payment_method?: string | null;
+  payer_phone?: string | null;
+  payment_reference?: string | null;
+  paid_at?: string | null;
+  queue_number?: number | null;
   created_at: string | null;
   updated_at: string | null;
   user_name?: string | null;
@@ -263,6 +271,7 @@ export type DatasetPredictionResponse = {
 
 export type NotificationType =
   | "review_queued"
+  | "review_assigned"
   | "claim_corrected"
   | "appointment_requested"
   | "appointment_confirmed"
@@ -304,6 +313,30 @@ export type AuditLog = {
   details: string | null;
   ip_address: string | null;
   created_at: string | null;
+};
+
+export type PaymentStatus = "success" | "rejected" | "failed";
+
+export type PaymentTransaction = {
+  id: string;
+  user_id: string;
+  doctor_user_id: string | null;
+  prediction_id: string | null;
+  appointment_id: string | null;
+  status: PaymentStatus | string;
+  amount: string | null;
+  currency: string | null;
+  payment_method: string | null;
+  payer_phone: string | null;
+  payment_reference: string | null;
+  payment_invoice_id: string | null;
+  payment_request_id: string | null;
+  response_code: string | null;
+  message: string | null;
+  created_at: string | null;
+  user_name: string | null;
+  user_email: string | null;
+  doctor_name: string | null;
 };
 
 export type UserProfile = {
