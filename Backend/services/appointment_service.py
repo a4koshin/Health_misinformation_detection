@@ -390,6 +390,10 @@ def update_appointment_status(
         raise ValueError("This appointment has already been responded to.")
     if appointment.doctor_user_id != actor.id or not actor.is_doctor:
         raise PermissionError("Only the assigned doctor can respond to this request.")
+    if next_status == "declined" and (appointment.payment_status or "").strip().lower() == "paid":
+        raise ValueError(
+            "This appointment is already paid. You can confirm it, but you cannot decline it."
+        )
 
     appointment.status = next_status
     appointment.updated_at = datetime.now(timezone.utc)
