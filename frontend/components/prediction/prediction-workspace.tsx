@@ -896,7 +896,9 @@ function MediaActions({
         </svg>
       </span>
       <span className="space-y-1">
-        <span className="block text-sm font-medium text-ink">{primaryLabel}</span>
+        <span className="block text-sm font-medium text-ink">
+          {primaryLabel}
+        </span>
         <span className="block text-xs text-ink-muted">{description}</span>
       </span>
       {busyLabel ? (
