@@ -196,7 +196,8 @@ def purchase(
     if not isinstance(data, dict):
         data = {"raw": data}
 
-    response_msg = str(data.get("responseMsg") or data.get("response_msg") or "")
+    response_msg = str(data.get("responseMsg")
+                       or data.get("response_msg") or "")
     response_code = str(
         data.get("responseCode") or data.get("response_code") or ""
     )
