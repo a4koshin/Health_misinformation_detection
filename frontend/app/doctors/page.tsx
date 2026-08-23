@@ -22,6 +22,10 @@ import {
   TableEditButton,
 } from "@/components/glass/table-icon-button";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   TablePagination,
   useTablePagination,
 } from "@/components/glass/table-pagination";
@@ -77,6 +81,46 @@ function isImagePath(url: string | null | undefined) {
   return /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
 }
 
+const PROFILE_ACCEPT =
+  "image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp";
+const LICENSE_ACCEPT = "application/pdf,.pdf";
+const PROFILE_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+]);
+const LICENSE_EXTENSIONS = new Set([".pdf"]);
+
+function fileExtension(file: File) {
+  const name = file.name || "";
+  const index = name.lastIndexOf(".");
+  return index >= 0 ? name.slice(index).toLowerCase() : "";
+}
+
+function validateProfileImageFile(file: File | null): string | undefined {
+  if (!file) return undefined;
+  const extension = fileExtension(file);
+  const mime = (file.type || "").toLowerCase();
+  const mimeOk = !mime || mime.startsWith("image/");
+  if (!PROFILE_EXTENSIONS.has(extension) || !mimeOk) {
+    return "Profile image must be JPG, PNG, GIF, or WebP.";
+  }
+  return undefined;
+}
+
+function validateLicenseDocumentFile(file: File | null): string | undefined {
+  if (!file) return undefined;
+  const extension = fileExtension(file);
+  const mime = (file.type || "").toLowerCase();
+  const mimeOk = !mime || mime === "application/pdf";
+  if (!LICENSE_EXTENSIONS.has(extension) || !mimeOk) {
+    return "License must be a PDF document (images are not allowed).";
+  }
+  return undefined;
+}
+
 function FileField({
   id,
   label,
@@ -87,6 +131,8 @@ function FileField({
   fileName,
   hint,
   variant = "document",
+  validate,
+  onReject,
   onChange,
 }: {
   id: string;
@@ -98,6 +144,8 @@ function FileField({
   fileName?: string | null;
   hint?: string;
   variant?: "profile" | "document";
+  validate?: (file: File) => string | undefined;
+  onReject?: (message: string) => void;
   onChange: (file: File | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -169,7 +217,17 @@ function FileField({
             accept={accept}
             className="sr-only"
             onChange={(event) => {
-              onChange(event.target.files?.[0] ?? null);
+              const file = event.target.files?.[0] ?? null;
+              if (file && validate) {
+                const typeError = validate(file);
+                if (typeError) {
+                  toast.error(typeError);
+                  if (inputRef.current) inputRef.current.value = "";
+                  onReject?.(typeError);
+                  return;
+                }
+              }
+              onChange(file);
             }}
           />
         </label>
@@ -197,6 +255,7 @@ function DoctorsContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<DoctorProfile | null>(null);
   const [pendingDelete, setPendingDelete] = useState<DoctorProfile | null>(null);
+  const [detailDoctor, setDetailDoctor] = useState<DoctorProfile | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [form, setForm] = useState<DoctorFormState>(emptyForm);
   const [showForm, setShowForm] = useState(false);
@@ -307,12 +366,12 @@ function DoctorsContent() {
       );
     const licenseError =
       needsLicense && !form.licenseFile
-        ? "License card/document is required."
-        : undefined;
+        ? "License PDF document is required."
+        : validateLicenseDocumentFile(form.licenseFile);
     const profileError =
       needsProfile && !form.profileFile
         ? "Profile image is required."
-        : undefined;
+        : validateProfileImageFile(form.profileFile);
 
     const nextErrors: FormErrors = {
       ...(nameError ? { name: nameError } : {}),
@@ -398,7 +457,7 @@ function DoctorsContent() {
   return (
     <PrivatePage
       title="Doctors"
-      description="Create doctor accounts with profile photo, license document, job title, and workplace."
+      description="Create doctor accounts with profile photo and license PDF."
       actions={
         <GlassButton type="button" size="sm" onClick={openCreateForm}>
           <MaterialIcon name="person_add" size={18} />
@@ -415,7 +474,7 @@ function DoctorsContent() {
         description={
           editingDoctor
             ? `Update the doctor profile for ${editingDoctor.email}.`
-            : "Add a doctor account. Upload their profile photo and license card or document."
+            : "Add a doctor account. Upload a profile photo (image) and a license PDF."
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -492,7 +551,7 @@ function DoctorsContent() {
               <div className="mb-3">
                 <p className="text-sm font-medium text-[#0f172a]">Documents</p>
                 <p className="text-xs text-[#64748b]">
-                  Profile photo and license card or PDF.
+                  Profile photo (image only) and license PDF (document only).
                 </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -500,12 +559,19 @@ function DoctorsContent() {
                   id="doctor-profile"
                   label="Profile image"
                   variant="profile"
-                  hint="JPG, PNG, or WebP"
-                  accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
+                  hint="JPG, PNG, GIF, or WebP"
+                  accept={PROFILE_ACCEPT}
                   required={!editingDoctor}
                   error={formErrors.profileFile}
                   previewUrl={profilePreview}
                   fileName={form.profileFile?.name}
+                  validate={validateProfileImageFile}
+                  onReject={(message) => {
+                    setFormErrors((current) => ({
+                      ...current,
+                      profileFile: message,
+                    }));
+                  }}
                   onChange={(file) => {
                     setForm((current) => ({ ...current, profileFile: file }));
                     setFormErrors((current) => ({
@@ -527,14 +593,21 @@ function DoctorsContent() {
                 />
                 <FileField
                   id="doctor-license"
-                  label="License card"
+                  label="License document"
                   variant="document"
-                  hint="JPG, PNG, WebP, or PDF"
-                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,.jpg,.jpeg,.png,.gif,.webp,.pdf"
+                  hint="PDF only"
+                  accept={LICENSE_ACCEPT}
                   required={!editingDoctor}
                   error={formErrors.licenseFile}
                   previewUrl={licensePreview}
                   fileName={form.licenseFile?.name}
+                  validate={validateLicenseDocumentFile}
+                  onReject={(message) => {
+                    setFormErrors((current) => ({
+                      ...current,
+                      licenseFile: message,
+                    }));
+                  }}
                   onChange={(file) => {
                     setForm((current) => ({ ...current, licenseFile: file }));
                     setFormErrors((current) => ({
@@ -724,6 +797,7 @@ function DoctorsContent() {
                   <GlassTableCell>{doctor.email || "—"}</GlassTableCell>
                   <GlassTableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <ViewDetailsButton onClick={() => setDetailDoctor(doctor)} />
                       <TableEditButton onClick={() => openEditForm(doctor)} />
                       <TableDeleteButton
                         onClick={() => setPendingDelete(doctor)}
@@ -737,6 +811,30 @@ function DoctorsContent() {
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailDoctor)}
+        onOpenChange={(open) => {
+          if (!open) setDetailDoctor(null);
+        }}
+        title="Doctor details"
+        fields={
+          detailDoctor
+            ? [
+                { label: "Name", value: detailDoctor.name },
+                { label: "Email", value: detailDoctor.email },
+                { label: "Job title", value: detailDoctor.job_title },
+                { label: "Workplace", value: detailDoctor.workplace },
+                {
+                  label: "Status",
+                  value:
+                    detailDoctor.is_active === false ? "Inactive" : "Active",
+                },
+                { label: "Created", value: detailDoctor.created_at },
+              ]
+            : []
+        }
+      />
 
       <DeleteAlertModal
         open={Boolean(pendingDelete)}
