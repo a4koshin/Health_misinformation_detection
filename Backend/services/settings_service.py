@@ -166,49 +166,33 @@ def wipe_all_data(admin_id, password: str) -> dict:
     if not admin.check_password(password):
         raise ValueError("Password is incorrect.")
 
-    # Clear dependent rows first so user deletes do not hit FK constraints.
-    notifications_deleted = int(
-        Notification.query.delete(synchronize_session=False) or 0
-    )
-    predictions_deleted = int(
-        Prediction.query.delete(synchronize_session=False) or 0
-    )
-    password_resets_deleted = int(
-        PasswordReset.query.delete(synchronize_session=False) or 0
-    )
-    audit_logs_deleted = int(
-        AuditLog.query.delete(synchronize_session=False) or 0
-    )
+    def _delete_model(model) -> int:
+        return int(model.query.delete(synchronize_session=False) or 0)
 
-    doctors_deleted = 0
-    try:
-        from models.doctor import Doctor
-
-        doctors_deleted = int(Doctor.query.delete(synchronize_session=False) or 0)
-    except Exception:
-        doctors_deleted = 0
+    def _delete_table(table_name: str) -> int:
         try:
             with db.session.begin_nested():
-                result = db.session.execute(text("DELETE FROM doctors"))
-                doctors_deleted = int(result.rowcount or 0)
+                result = db.session.execute(text(f"DELETE FROM {table_name}"))
+                return int(result.rowcount or 0)
         except Exception:
-            doctors_deleted = 0
+            return 0
 
-    upload_batches_deleted = 0
-    try:
-        with db.session.begin_nested():
-            result = db.session.execute(text("DELETE FROM upload_batches"))
-            upload_batches_deleted = int(result.rowcount or 0)
-    except Exception:
-        upload_batches_deleted = 0
+    from models.appointment import Appointment
+    from models.availability import DoctorAvailability
+    from models.doctor import Doctor
+    from models.payment import PaymentTransaction
 
-    conversations_deleted = 0
-    try:
-        with db.session.begin_nested():
-            result = db.session.execute(text("DELETE FROM conversations"))
-            conversations_deleted = int(result.rowcount or 0)
-    except Exception:
-        conversations_deleted = 0
+    # Child tables first so FK constraints on predictions/users do not fail.
+    payments_deleted = _delete_model(PaymentTransaction)
+    appointments_deleted = _delete_model(Appointment)
+    availability_deleted = _delete_model(DoctorAvailability)
+    notifications_deleted = _delete_model(Notification)
+    conversations_deleted = _delete_table("conversations")
+    upload_batches_deleted = _delete_table("upload_batches")
+    predictions_deleted = _delete_model(Prediction)
+    password_resets_deleted = _delete_model(PasswordReset)
+    audit_logs_deleted = _delete_model(AuditLog)
+    doctors_deleted = _delete_model(Doctor)
 
     other_users = User.query.filter(
         User.id != admin.id,
@@ -239,6 +223,10 @@ def wipe_all_data(admin_id, password: str) -> dict:
 
     return {
         "predictions_deleted": predictions_deleted,
+        "appointments_deleted": appointments_deleted,
+        "payments_deleted": payments_deleted,
+        "availability_deleted": availability_deleted,
+        "doctors_deleted": doctors_deleted,
         "users_deleted": users_deleted,
         "audit_logs_deleted": audit_logs_deleted,
         "password_resets_deleted": password_resets_deleted,
