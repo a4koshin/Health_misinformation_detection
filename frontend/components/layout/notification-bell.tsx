@@ -191,6 +191,12 @@ export function NotificationBell({ className }: { className?: string }) {
                   <span className="mt-0.5 line-clamp-2 block text-xs text-ink-muted">
                     {item.body}
                   </span>
+                  {item.claim_excerpt &&
+                  !item.body?.includes(item.claim_excerpt) ? (
+                    <span className="mt-1 line-clamp-2 block text-xs text-ink">
+                      {item.claim_excerpt}
+                    </span>
+                  ) : null}
                   <span className="mt-1 block text-[11px] text-ink-muted">
                     {formatWhen(item.created_at)}
                   </span>
