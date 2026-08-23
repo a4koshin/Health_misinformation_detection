@@ -26,6 +26,10 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
 import { ApiError } from "@/lib/api";
 import { getReviewQueue, submitReview, type ReviewDecision } from "@/lib/review";
 import { getDisplayName } from "@/lib/user";
@@ -74,6 +78,7 @@ function ReviewContent() {
   const [correctedClaim, setCorrectedClaim] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [detailItem, setDetailItem] = useState<Detection | null>(null);
   const pagination = useTablePagination(items, 10);
 
   async function loadQueue(silent = false) {
@@ -287,14 +292,17 @@ function ReviewContent() {
                   )}
                 </GlassTableCell>
                 <GlassTableCell className="text-right">
-                  <GlassButton
-                    type="button"
-                    size="sm"
-                    disabled={reviewed}
-                    onClick={() => openReview(item, "corrected")}
-                  >
-                    {reviewed ? "Reviewed" : "Correct"}
-                  </GlassButton>
+                  <div className="flex items-center justify-end gap-1">
+                    <ViewDetailsButton onClick={() => setDetailItem(item)} />
+                    <GlassButton
+                      type="button"
+                      size="sm"
+                      disabled={reviewed}
+                      onClick={() => openReview(item, "corrected")}
+                    >
+                      {reviewed ? "Reviewed" : "Correct"}
+                    </GlassButton>
+                  </div>
                 </GlassTableCell>
               </GlassTableRow>
               );
@@ -302,6 +310,35 @@ function ReviewContent() {
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Claim details"
+        fields={
+          detailItem
+            ? [
+                { label: "User", value: detailItem.user_name || "User" },
+                { label: "Email", value: detailItem.user_email },
+                { label: "Claim", value: claimText(detailItem) },
+                { label: "AI label", value: displayLabel(detailItem.label) },
+                { label: "Date", value: formatDate(detailItem.created_at) },
+                {
+                  label: "Review status",
+                  value: isReviewed(detailItem)
+                    ? reviewedByLabel(detailItem)
+                    : "Waiting",
+                },
+                {
+                  label: "Corrected sentence",
+                  value: detailItem.corrected_claim_text,
+                },
+              ]
+            : []
+        }
+      />
 
       <GlassModal
         open={Boolean(activeItem)}
