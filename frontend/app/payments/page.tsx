@@ -25,6 +25,10 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
 import { listPayments } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
@@ -70,6 +74,7 @@ function PaymentsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [detailItem, setDetailItem] = useState<PaymentTransaction | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -253,13 +258,16 @@ function PaymentsContent() {
             <GlassTableHeaderCell>Amount</GlassTableHeaderCell>
             <GlassTableHeaderCell>Status</GlassTableHeaderCell>
             <GlassTableHeaderCell>Details</GlassTableHeaderCell>
+            <GlassTableHeaderCell className="text-right">
+              View
+            </GlassTableHeaderCell>
           </GlassTableRow>
         </GlassTableHead>
         <GlassTableBody>
           {isLoading ? (
             <GlassTableRow>
               <GlassTableCell
-                colSpan={6}
+                colSpan={7}
                 className="py-12 text-center text-[#64748b]"
               >
                 Loading payments…
@@ -268,7 +276,7 @@ function PaymentsContent() {
           ) : pagination.pageItems.length === 0 ? (
             <GlassTableRow>
               <GlassTableCell
-                colSpan={6}
+                colSpan={7}
                 className="py-12 text-center text-[#64748b]"
               >
                 No payments match your filters.
@@ -311,11 +319,42 @@ function PaymentsContent() {
                         : "—")}
                   </p>
                 </GlassTableCell>
+                <GlassTableCell className="text-right">
+                  <ViewDetailsButton onClick={() => setDetailItem(item)} />
+                </GlassTableCell>
               </GlassTableRow>
             ))
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Payment details"
+        fields={
+          detailItem
+            ? [
+                { label: "When", value: formatDate(detailItem.created_at) },
+                {
+                  label: "User",
+                  value: detailItem.user_name || detailItem.user_email,
+                },
+                { label: "Email", value: detailItem.user_email },
+                { label: "Doctor", value: detailItem.doctor_name },
+                { label: "Phone", value: detailItem.payer_phone },
+                { label: "Amount", value: formatAmount(detailItem) },
+                { label: "Status", value: statusLabel(detailItem.status) },
+                { label: "Method", value: detailItem.payment_method },
+                { label: "Reference", value: detailItem.payment_reference },
+                { label: "Invoice", value: detailItem.payment_invoice_id },
+                { label: "Message", value: detailItem.message },
+              ]
+            : []
+        }
+      />
     </PrivatePage>
   );
 }
