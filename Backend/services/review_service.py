@@ -38,9 +38,7 @@ def get_pending_reviews(
         Prediction.is_active.is_(True),
         Prediction.review_status.in_(("pending", "corrected", "confirmed")),
     )
-    since = advisor_queue_start(advisor)
-    if since is not None:
-        query = query.filter(Prediction.created_at >= since)
+    # Assigned claims always appear — admin may assign older Non-Reliable rows.
 
     pending_count = query.filter(Prediction.review_status == "pending").count()
     pagination = query.order_by(
@@ -191,12 +189,18 @@ def submit_review(
         )
 
     advisor = db.session.get(User, advisor_id)
-    since = advisor_queue_start(advisor) if advisor else None
     claim_created = _naive_utc(prediction.created_at)
-    if since is not None and claim_created is not None and claim_created < since:
-        raise ValueError(
-            "This claim was submitted before you joined as a Doctor."
-        )
+    admin_assigned = prediction.assigned_by_id is not None
+    if not admin_assigned and advisor:
+        since = advisor_queue_start(advisor)
+        if (
+            since is not None
+            and claim_created is not None
+            and claim_created < since
+        ):
+            raise ValueError(
+                "This claim was submitted before you joined as a Doctor."
+            )
 
     choice = (decision or "").strip().lower()
     if choice not in {"confirmed", "corrected"}:
@@ -208,6 +212,9 @@ def submit_review(
     prediction.reviewed_at = datetime.now(timezone.utc)
     prediction.needs_review = False
 
+    if not prediction.ai_label:
+        prediction.ai_label = prediction.label
+
     if choice == "corrected":
         rewritten = (corrected_claim or note or "").strip()
         if not rewritten:
@@ -215,11 +222,13 @@ def submit_review(
         if rewritten == (prediction.claim_text or "").strip():
             raise ValueError("Corrected sentence must differ from the original claim.")
         prediction.label = "Reliable"
+        prediction.doctor_label = "Reliable"
         prediction.risk = "low"
         prediction.corrected_claim_text = rewritten
         if not prediction.advisor_note:
             prediction.advisor_note = rewritten
     else:
+        prediction.doctor_label = prediction.label
         prediction.corrected_claim_text = None
 
     db.session.commit()
