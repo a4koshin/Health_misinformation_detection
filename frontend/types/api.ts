@@ -55,6 +55,8 @@ export type Detection = {
   advisor_note?: string | null;
   original_claim_text?: string | null;
   corrected_claim_text?: string | null;
+  ai_label?: string | null;
+  doctor_label?: string | null;
   user_name?: string | null;
   user_email?: string | null;
   advisor_id?: string | null;
