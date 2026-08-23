@@ -309,7 +309,7 @@ export function Sidebar({ onClose, onNavigate }: SidebarProps) {
                 />
                 <NavItem
                   icon="payments"
-                  label="Payments"
+                  label="Payment attempts"
                   active={pathname === "/payments"}
                   onClick={() => go("/payments")}
                 />
