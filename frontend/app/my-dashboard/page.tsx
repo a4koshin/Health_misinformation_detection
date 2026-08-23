@@ -31,6 +31,10 @@ import {
 } from "@/components/glass/glass-table";
 import { TableIconButton } from "@/components/glass/table-icon-button";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   TablePagination,
   useTablePagination,
 } from "@/components/glass/table-pagination";
@@ -192,6 +196,7 @@ function UserDashboardContent() {
   const [stats, setStats] = useState<UserDashboardStats | null>(null);
   const [chats, setChats] = useState<Detection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [detailItem, setDetailItem] = useState<Detection | null>(null);
   const chatsPagination = useTablePagination(chats, 10);
 
   useEffect(() => {
@@ -518,12 +523,17 @@ function UserDashboardContent() {
                       {formatRelativeTime(chat.created_at)}
                     </GlassTableCell>
                     <GlassTableCell className="text-right">
-                      <TableIconButton
-                        label="Open chat"
-                        icon="open_in_new"
-                        tone="brand"
-                        onClick={() => handleOpenChat(chat.id)}
-                      />
+                      <div className="flex items-center justify-end gap-1">
+                        <ViewDetailsButton
+                          onClick={() => setDetailItem(chat)}
+                        />
+                        <TableIconButton
+                          label="Open chat"
+                          icon="open_in_new"
+                          tone="brand"
+                          onClick={() => handleOpenChat(chat.id)}
+                        />
+                      </div>
                     </GlassTableCell>
                   </GlassTableRow>
                 ))
@@ -539,6 +549,33 @@ function UserDashboardContent() {
           <p className="text-sm text-[#475569]">No prediction data yet.</p>
         </GlassCard>
       )}
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Chat details"
+        fields={
+          detailItem
+            ? [
+                {
+                  label: "Claim",
+                  value: getConversationTitle(detailItem),
+                },
+                { label: "Label", value: displayLabel(detailItem.label) },
+                {
+                  label: "Updated",
+                  value: formatRelativeTime(detailItem.created_at),
+                },
+                {
+                  label: "Corrected sentence",
+                  value: detailItem.corrected_claim_text,
+                },
+              ]
+            : []
+        }
+      />
     </PrivatePage>
   );
 }
