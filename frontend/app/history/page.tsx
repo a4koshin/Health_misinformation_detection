@@ -21,6 +21,10 @@ import {
 } from "@/components/glass/glass-table";
 import { TableIconButton } from "@/components/glass/table-icon-button";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   TablePagination,
   useTablePagination,
 } from "@/components/glass/table-pagination";
@@ -96,7 +100,7 @@ function HistoryContent() {
   const isAdvisor = user?.role === "doctor";
   const isAdmin = user?.role === "admin";
   const historyRevision = useChatStore((state) => state.historyRevision);
-  const columnCount = isAdvisor ? 7 : isAdmin ? 9 : 7;
+  const columnCount = isAdvisor ? 8 : isAdmin ? 10 : 8;
 
   const [history, setHistory] = useState<Detection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,6 +110,7 @@ function HistoryContent() {
     null,
   );
   const [isTogglingActive, setIsTogglingActive] = useState(false);
+  const [detailItem, setDetailItem] = useState<Detection | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -296,11 +301,9 @@ function HistoryContent() {
             {isAdmin ? (
               <GlassTableHeaderCell>Status</GlassTableHeaderCell>
             ) : null}
-            {isAdmin ? (
-              <GlassTableHeaderCell className="text-right">
-                Action
-              </GlassTableHeaderCell>
-            ) : null}
+            <GlassTableHeaderCell className="text-right">
+              {isAdmin ? "Actions" : "Details"}
+            </GlassTableHeaderCell>
           </GlassTableRow>
         </GlassTableHead>
         <GlassTableBody>
@@ -413,30 +416,76 @@ function HistoryContent() {
                         </GlassBadge>
                       </GlassTableCell>
                     ) : null}
-                    {isAdmin ? (
-                      <GlassTableCell className="text-right">
-                        <TableIconButton
-                          icon={isActive ? "block" : "check_circle"}
-                          tone={isActive ? "danger" : "brand"}
-                          onClick={() => setPendingDeactivate(item)}
-                          disabled={
-                            isTogglingActive &&
-                            pendingDeactivate?.id === item.id
-                          }
-                          label={
-                            isActive
-                              ? `Deactivate prediction ${item.id}`
-                              : `Activate prediction ${item.id}`
-                          }
-                        />
-                      </GlassTableCell>
-                    ) : null}
+                    <GlassTableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <ViewDetailsButton onClick={() => setDetailItem(item)} />
+                        {isAdmin ? (
+                          <TableIconButton
+                            icon={isActive ? "block" : "check_circle"}
+                            tone={isActive ? "danger" : "brand"}
+                            onClick={() => setPendingDeactivate(item)}
+                            disabled={
+                              isTogglingActive &&
+                              pendingDeactivate?.id === item.id
+                            }
+                            label={
+                              isActive
+                                ? `Deactivate prediction ${item.id}`
+                                : `Activate prediction ${item.id}`
+                            }
+                          />
+                        ) : null}
+                      </div>
+                    </GlassTableCell>
                   </GlassTableRow>
                   );
                 })
               )}
             </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Prediction details"
+        fields={
+          detailItem
+            ? [
+                { label: "ID", value: formatPredictionId(detailItem.id) },
+                { label: "User", value: detailItem.user_name || "User" },
+                { label: "Email", value: detailItem.user_email },
+                {
+                  label: "Previous claim",
+                  value:
+                    detailItem.original_claim_text || claimText(detailItem),
+                },
+                {
+                  label: "Corrected sentence",
+                  value: correctedText(detailItem),
+                },
+                { label: "Label", value: displayLabel(detailItem.label) },
+                { label: "Source", value: detailItem.source || "Manual check" },
+                { label: "Date", value: formatDate(detailItem.created_at) },
+                {
+                  label: "Review",
+                  value:
+                    reviewLabel(detailItem) ||
+                    (detailItem.advisor_name
+                      ? `Reviewed by ${detailItem.advisor_name}`
+                      : "—"),
+                },
+                { label: "Doctor", value: detailItem.advisor_name },
+                {
+                  label: "Status",
+                  value:
+                    detailItem.is_active === false ? "Inactive" : "Active",
+                },
+              ]
+            : []
+        }
+      />
 
       <DeleteAlertModal
         open={Boolean(pendingDeactivate)}
