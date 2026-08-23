@@ -27,6 +27,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   createAvailability,
   deleteAvailability,
   formatSlotRange,
@@ -67,6 +71,7 @@ function AvailabilityContent() {
   const [endTime, setEndTime] = useState("20:00");
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [detailItem, setDetailItem] = useState<DoctorAvailability | null>(null);
 
   async function load() {
     if (!token) return;
@@ -237,21 +242,50 @@ function AvailabilityContent() {
                   </GlassBadge>
                 </GlassTableCell>
                 <GlassTableCell className="text-right">
-                  <GlassButton
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    disabled={Boolean(slot.booked) || deletingId === slot.id}
-                    onClick={() => void handleDelete(slot)}
-                  >
-                    Remove
-                  </GlassButton>
+                  <div className="flex items-center justify-end gap-1">
+                    <ViewDetailsButton onClick={() => setDetailItem(slot)} />
+                    <GlassButton
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={Boolean(slot.booked) || deletingId === slot.id}
+                      onClick={() => void handleDelete(slot)}
+                    >
+                      Remove
+                    </GlassButton>
+                  </div>
                 </GlassTableCell>
               </GlassTableRow>
             ))
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Slot details"
+        fields={
+          detailItem
+            ? [
+                {
+                  label: "Date and time",
+                  value: formatSlotRange(
+                    detailItem.starts_at,
+                    detailItem.ends_at,
+                  ),
+                },
+                {
+                  label: "Status",
+                  value: detailItem.booked ? "Booked" : "Open",
+                },
+                { label: "Created", value: detailItem.created_at },
+              ]
+            : []
+        }
+      />
 
       <GlassModal
         open={showForm}
