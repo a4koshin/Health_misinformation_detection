@@ -21,9 +21,36 @@ BASE_UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads"
 LICENSE_UPLOAD_DIR = BASE_UPLOAD_DIR / "doctor_licenses"
 PROFILE_UPLOAD_DIR = BASE_UPLOAD_DIR / "doctor_profiles"
 
-ALLOWED_LICENSE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"}
+ALLOWED_LICENSE_EXTENSIONS = {".pdf"}
 ALLOWED_PROFILE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5MB
+PROFILE_MIME_PREFIX = "image/"
+LICENSE_MIME_TYPES = {"application/pdf"}
+
+
+def _extension(filename: str | None) -> str:
+    return Path(secure_filename(filename or "")).suffix.lower()
+
+
+def _validate_upload_type(
+    *,
+    file: FileStorage | None,
+    allowed: set[str],
+    label: str,
+    allowed_mimes: set[str] | None = None,
+    mime_prefix: str | None = None,
+) -> None:
+    if not file or not file.filename:
+        raise ValueError(f"{label} file is required.")
+    extension = _extension(file.filename)
+    if extension not in allowed:
+        allowed_list = ", ".join(sorted(ext.lstrip(".").upper() for ext in allowed))
+        raise ValueError(f"{label} must be a {allowed_list} file.")
+    content_type = (file.mimetype or "").strip().lower()
+    if mime_prefix and content_type and not content_type.startswith(mime_prefix):
+        raise ValueError(f"{label} must be an image file.")
+    if allowed_mimes and content_type and content_type not in allowed_mimes:
+        raise ValueError(f"{label} must be a PDF document.")
 
 
 def _require_text(value: str | None, label: str, *, max_len: int = 180) -> str:
@@ -53,15 +80,20 @@ def _save_upload(
     allowed: set[str],
     prefix: str,
     label: str,
+    allowed_mimes: set[str] | None = None,
+    mime_prefix: str | None = None,
 ) -> str:
-    if not file or not file.filename:
-        raise ValueError(f"{label} file is required.")
+    _validate_upload_type(
+        file=file,
+        allowed=allowed,
+        label=label,
+        allowed_mimes=allowed_mimes,
+        mime_prefix=mime_prefix,
+    )
+    assert file is not None and file.filename
 
     filename = secure_filename(file.filename)
     extension = Path(filename).suffix.lower()
-    if extension not in allowed:
-        allowed_list = ", ".join(sorted(ext.lstrip(".") for ext in allowed))
-        raise ValueError(f"{label} must be one of: {allowed_list}.")
 
     file.stream.seek(0, os.SEEK_END)
     size = file.stream.tell()
@@ -119,6 +151,7 @@ def create_doctor(
         allowed=ALLOWED_LICENSE_EXTENSIONS,
         prefix="license",
         label="License",
+        allowed_mimes=LICENSE_MIME_TYPES,
     )
     profile_url = _save_upload(
         file=profile_image_file,
@@ -126,6 +159,7 @@ def create_doctor(
         allowed=ALLOWED_PROFILE_EXTENSIONS,
         prefix="profile",
         label="Profile image",
+        mime_prefix=PROFILE_MIME_PREFIX,
     )
 
     user = User(
@@ -208,6 +242,7 @@ def update_doctor(
             allowed=ALLOWED_LICENSE_EXTENSIONS,
             prefix=f"license_{doctor.id}",
             label="License",
+            allowed_mimes=LICENSE_MIME_TYPES,
         )
         _delete_local_upload(doctor.license)
         doctor.license = new_license
@@ -219,6 +254,7 @@ def update_doctor(
             allowed=ALLOWED_PROFILE_EXTENSIONS,
             prefix=f"profile_{doctor.id}",
             label="Profile image",
+            mime_prefix=PROFILE_MIME_PREFIX,
         )
         _delete_local_upload(doctor.profile_image)
         if user.avatar_url == doctor.profile_image:
