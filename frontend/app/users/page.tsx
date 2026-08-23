@@ -27,6 +27,10 @@ import {
   TableIconButton,
 } from "@/components/glass/table-icon-button";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   TablePagination,
   useTablePagination,
 } from "@/components/glass/table-pagination";
@@ -71,6 +75,7 @@ function UsersContent() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [pendingToggle, setPendingToggle] = useState<User | null>(null);
   const [isTogglingActive, setIsTogglingActive] = useState(false);
+  const [detailUser, setDetailUser] = useState<User | null>(null);
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [showForm, setShowForm] = useState(false);
   const [formErrors, setFormErrors] = useState<{
@@ -419,6 +424,7 @@ function UsersContent() {
                 </GlassTableCell>
                 <GlassTableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
+                    <ViewDetailsButton onClick={() => setDetailUser(user)} />
                     <TableEditButton onClick={() => openEditForm(user)} />
                     <TableIconButton
                       icon={isActive ? "block" : "check_circle"}
@@ -446,6 +452,33 @@ function UsersContent() {
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailUser)}
+        onOpenChange={(open) => {
+          if (!open) setDetailUser(null);
+        }}
+        title="User details"
+        fields={
+          detailUser
+            ? [
+                { label: "Name", value: detailUser.full_name || "—" },
+                { label: "Email", value: detailUser.email },
+                { label: "Role", value: displayRoleLabel(detailUser.role) },
+                {
+                  label: "Status",
+                  value:
+                    detailUser.is_active === false
+                      ? "Deactivated"
+                      : detailUser.deletion_requested_at
+                        ? "Deletion requested"
+                        : "Active",
+                },
+                { label: "Joined", value: detailUser.created_at },
+              ]
+            : []
+        }
+      />
 
       <DeleteAlertModal
         open={Boolean(pendingToggle)}
