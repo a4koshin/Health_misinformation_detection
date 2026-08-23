@@ -118,6 +118,45 @@ def create_app() -> Flask:
                     "BOOLEAN NOT NULL DEFAULT TRUE"
                 )
             )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS ai_label VARCHAR(50)"
+                )
+            )
+            db.session.execute(
+                text(
+                    "ALTER TABLE predictions "
+                    "ADD COLUMN IF NOT EXISTS doctor_label VARCHAR(50)"
+                )
+            )
+            db.session.execute(
+                text(
+                    "UPDATE predictions "
+                    "SET ai_label = CASE "
+                    "WHEN COALESCE(ai_label, '') IN ('', 'Reliable') "
+                    "THEN 'Non-Reliable' ELSE ai_label END, "
+                    "doctor_label = COALESCE(doctor_label, 'Reliable') "
+                    "WHERE review_status = 'corrected' "
+                    "OR (corrected_claim_text IS NOT NULL "
+                    "AND BTRIM(corrected_claim_text) <> '')"
+                )
+            )
+            db.session.execute(
+                text(
+                    "UPDATE predictions "
+                    "SET ai_label = COALESCE(ai_label, label), "
+                    "doctor_label = COALESCE(doctor_label, label) "
+                    "WHERE review_status = 'confirmed'"
+                )
+            )
+            db.session.execute(
+                text(
+                    "UPDATE predictions "
+                    "SET ai_label = COALESCE(ai_label, label) "
+                    "WHERE ai_label IS NULL"
+                )
+            )
             # Unassigned shared-queue rows become admin assignment queue.
             db.session.execute(
                 text(
