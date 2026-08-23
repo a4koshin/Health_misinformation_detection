@@ -25,6 +25,10 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
 import { listAuditLogs } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
@@ -100,6 +104,7 @@ function AuditLogContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
+  const [detailItem, setDetailItem] = useState<AuditLog | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -241,13 +246,16 @@ function AuditLogContent() {
                 <GlassTableHeaderCell>Action</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Details</GlassTableHeaderCell>
                 <GlassTableHeaderCell>IP</GlassTableHeaderCell>
+                <GlassTableHeaderCell className="text-right">
+                  Details
+                </GlassTableHeaderCell>
               </GlassTableRow>
             </GlassTableHead>
             <GlassTableBody>
               {isLoading ? (
                 <GlassTableRow>
                   <GlassTableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="py-12 text-center text-[#64748b]"
                   >
                     Loading audit events…
@@ -256,7 +264,7 @@ function AuditLogContent() {
               ) : pagination.pageItems.length === 0 ? (
                 <GlassTableRow>
                   <GlassTableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="py-12 text-center text-[#64748b]"
                   >
                     No audit events match your filters.
@@ -294,11 +302,39 @@ function AuditLogContent() {
                     <GlassTableCell className="whitespace-nowrap text-[#64748b]">
                       {item.ip_address || "—"}
                     </GlassTableCell>
+                    <GlassTableCell className="text-right">
+                      <ViewDetailsButton onClick={() => setDetailItem(item)} />
+                    </GlassTableCell>
                   </GlassTableRow>
                 ))
               )}
             </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Audit event"
+        fields={
+          detailItem
+            ? [
+                { label: "When", value: formatDate(detailItem.created_at) },
+                { label: "User", value: detailItem.actor_email },
+                { label: "Action", value: actionLabel(detailItem.action) },
+                {
+                  label: "Entity",
+                  value: detailItem.entity_type
+                    ? `${detailItem.entity_type}${detailItem.entity_id ? ` #${detailItem.entity_id}` : ""}`
+                    : "—",
+                },
+                { label: "Details", value: detailItem.details },
+                { label: "IP", value: detailItem.ip_address },
+              ]
+            : []
+        }
+      />
     </PrivatePage>
   );
 }
