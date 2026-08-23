@@ -23,11 +23,15 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
 import { predictDataset } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/store/auth-store";
 import { useChatStore } from "@/store/chat-store";
-import type { DatasetPredictionResponse } from "@/types/api";
+import type { DatasetPredictionResponse, DatasetPredictionRow } from "@/types/api";
 
 const ACCEPTED_EXTENSIONS =
   ".csv,.xlsx,.xlsm,.xls,.xltx,.xltm,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -64,6 +68,7 @@ function DatasetContent() {
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<DatasetPredictionResponse | null>(null);
+  const [detailRow, setDetailRow] = useState<DatasetPredictionRow | null>(null);
   const resultsPagination = useTablePagination(result?.results ?? [], 10);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -232,6 +237,9 @@ function DatasetContent() {
                 <GlassTableHeaderCell>Text</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Prediction</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Error</GlassTableHeaderCell>
+                <GlassTableHeaderCell className="text-right">
+                  Details
+                </GlassTableHeaderCell>
               </GlassTableRow>
             </GlassTableHead>
             <GlassTableBody>
@@ -259,6 +267,9 @@ function DatasetContent() {
                   <GlassTableCell className="text-red-600">
                     {row.error || "—"}
                   </GlassTableCell>
+                  <GlassTableCell className="text-right">
+                    <ViewDetailsButton onClick={() => setDetailRow(row)} />
+                  </GlassTableCell>
                 </GlassTableRow>
               ))}
             </GlassTableBody>
@@ -276,6 +287,24 @@ function DatasetContent() {
           </p>
         </GlassCard>
       )}
+
+      <ViewDetailsModal
+        open={Boolean(detailRow)}
+        onOpenChange={(open) => {
+          if (!open) setDetailRow(null);
+        }}
+        title="Dataset row"
+        fields={
+          detailRow
+            ? [
+                { label: "Row", value: detailRow.row },
+                { label: "Text", value: detailRow.text },
+                { label: "Prediction", value: detailRow.prediction },
+                { label: "Error", value: detailRow.error },
+              ]
+            : []
+        }
+      />
     </PrivatePage>
   );
 }
