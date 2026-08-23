@@ -3,6 +3,8 @@ class PredictionModel {
     required this.id,
     required this.claim,
     required this.label,
+    this.aiLabel,
+    this.doctorLabel,
     this.userId,
     this.createdAt,
     this.source,
@@ -15,6 +17,8 @@ class PredictionModel {
   final String id;
   final String claim;
   final String label;
+  final String? aiLabel;
+  final String? doctorLabel;
   final String? userId;
   final DateTime? createdAt;
   final String? source;
@@ -28,9 +32,27 @@ class PredictionModel {
     return value == 'reliable';
   }
 
+  bool get isCorrection =>
+      reviewStatus == 'corrected' ||
+      (correctedClaim != null && correctedClaim!.trim().isNotEmpty);
+
   String get displayLabel {
     if (label == 'Misinformation') return 'Non-Reliable';
     return label.isEmpty ? 'Pending' : label;
+  }
+
+  String get aiDisplayLabel {
+    final value = (aiLabel ?? '').trim();
+    if (value.isEmpty) return isCorrection ? 'Non-Reliable' : displayLabel;
+    if (value == 'Misinformation') return 'Non-Reliable';
+    return value;
+  }
+
+  String get doctorDisplayLabel {
+    final value = (doctorLabel ?? '').trim();
+    if (value.isEmpty) return isCorrection ? 'Reliable' : '';
+    if (value == 'Misinformation') return 'Non-Reliable';
+    return value;
   }
 
   factory PredictionModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +63,8 @@ class PredictionModel {
       claim:
           '${json['claim_text'] ?? json['input_text'] ?? json['claim'] ?? ''}',
       label: '${json['label'] ?? json['somali_status'] ?? ''}',
+      aiLabel: json['ai_label']?.toString(),
+      doctorLabel: json['doctor_label']?.toString(),
       createdAt: created == null ? null : DateTime.tryParse(created),
       source: json['source'] as String?,
       reviewStatus: json['review_status'] as String?,
