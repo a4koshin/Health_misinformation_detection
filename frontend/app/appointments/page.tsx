@@ -22,6 +22,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   formatSlotRange,
   listAppointments,
   updateAppointmentStatus,
@@ -42,11 +46,16 @@ function statusLabel(status: AppointmentStatus) {
   return "Requested";
 }
 
+function isPaid(item: Appointment) {
+  return (item.payment_status || "").toLowerCase() === "paid";
+}
+
 function AppointmentsContent() {
   const { token } = useAuth();
   const [items, setItems] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [detailItem, setDetailItem] = useState<Appointment | null>(null);
 
   async function load() {
     if (!token) return;
@@ -218,40 +227,90 @@ function AppointmentsContent() {
                   {formatSlotRange(item.starts_at, item.ends_at)}
                 </GlassTableCell>
                 <GlassTableCell>
-                  <GlassBadge tone={statusTone(item.status)}>
-                    {statusLabel(item.status)}
-                  </GlassBadge>
+                  <div className="flex flex-col items-start gap-1">
+                    <GlassBadge tone={statusTone(item.status)}>
+                      {statusLabel(item.status)}
+                    </GlassBadge>
+                    {isPaid(item) ? (
+                      <GlassBadge tone="success">Paid</GlassBadge>
+                    ) : null}
+                  </div>
                 </GlassTableCell>
                 <GlassTableCell className="text-right">
-                  {item.status === "pending" ? (
-                    <div className="flex justify-end gap-2">
-                      <GlassButton
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={updatingId === item.id}
-                        onClick={() => void handleStatus(item, "declined")}
-                      >
-                        Decline
-                      </GlassButton>
-                      <GlassButton
-                        type="button"
-                        size="sm"
-                        disabled={updatingId === item.id}
-                        onClick={() => void handleStatus(item, "confirmed")}
-                      >
-                        Confirm
-                      </GlassButton>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-[#94a3b8]">—</span>
-                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    <ViewDetailsButton onClick={() => setDetailItem(item)} />
+                    {item.status === "pending" ? (
+                      <>
+                        {isPaid(item) ? null : (
+                          <GlassButton
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            disabled={updatingId === item.id}
+                            onClick={() => void handleStatus(item, "declined")}
+                          >
+                            Decline
+                          </GlassButton>
+                        )}
+                        <GlassButton
+                          type="button"
+                          size="sm"
+                          disabled={updatingId === item.id}
+                          onClick={() => void handleStatus(item, "confirmed")}
+                        >
+                          Confirm
+                        </GlassButton>
+                      </>
+                    ) : null}
+                  </div>
                 </GlassTableCell>
               </GlassTableRow>
             ))
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Appointment details"
+        fields={
+          detailItem
+            ? [
+                {
+                  label: "Queue",
+                  value:
+                    detailItem.queue_number != null
+                      ? `#${detailItem.queue_number}`
+                      : "—",
+                },
+                { label: "User", value: detailItem.user_name || "User" },
+                { label: "Email", value: detailItem.user_email },
+                {
+                  label: "Corrected claim",
+                  value:
+                    detailItem.corrected_claim_text ||
+                    detailItem.claim_text ||
+                    "—",
+                },
+                { label: "Note", value: detailItem.note },
+                {
+                  label: "Date and time",
+                  value: formatSlotRange(
+                    detailItem.starts_at,
+                    detailItem.ends_at,
+                  ),
+                },
+                { label: "Status", value: statusLabel(detailItem.status) },
+                { label: "Payment", value: detailItem.payment_status },
+                { label: "Amount", value: detailItem.payment_amount },
+                { label: "Phone", value: detailItem.payer_phone },
+              ]
+            : []
+        }
+      />
     </PrivatePage>
   );
 }
