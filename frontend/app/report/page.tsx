@@ -27,6 +27,10 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
+import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
 import { ApiError } from "@/lib/api";
 import { downloadReportCsv, getUserReport } from "@/lib/history";
 import { displayRoleLabel, roleBadgeTone } from "@/lib/roles";
@@ -172,6 +176,7 @@ function ReportContent() {
   const [period, setPeriod] = useState<PeriodFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [detailRow, setDetailRow] = useState<ReportRow | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -665,12 +670,15 @@ function ReportContent() {
                 <GlassTableHeaderCell>Reviewed</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Source</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Date and Time</GlassTableHeaderCell>
+                <GlassTableHeaderCell className="text-right">
+                  Details
+                </GlassTableHeaderCell>
               </GlassTableRow>
             </GlassTableHead>
             <GlassTableBody>
               {filtered.length === 0 ? (
                 <GlassTableRow>
-                  <GlassTableCell colSpan={7}>
+                  <GlassTableCell colSpan={8}>
                     <div className="flex flex-col items-center gap-3 py-12 text-center">
                       <span className="flex size-12 items-center justify-center rounded-2xl bg-[#ff5c00]/10 text-[#ff5c00]">
                         <MaterialIcon name="description" size={24} />
@@ -745,6 +753,9 @@ function ReportContent() {
                     <GlassTableCell className="whitespace-nowrap text-[#475569]">
                       {row.created_at ? formatDateTime(row.created_at) : "—"}
                     </GlassTableCell>
+                    <GlassTableCell className="text-right">
+                      <ViewDetailsButton onClick={() => setDetailRow(row)} />
+                    </GlassTableCell>
                   </GlassTableRow>
                 ))
               )}
@@ -752,6 +763,61 @@ function ReportContent() {
           </DataTableCard>
         </div>
       )}
+
+      <ViewDetailsModal
+        open={Boolean(detailRow)}
+        onOpenChange={(open) => {
+          if (!open) setDetailRow(null);
+        }}
+        title="Report row"
+        fields={
+          detailRow
+            ? [
+                {
+                  label: "User",
+                  value:
+                    roleFilter === "doctor"
+                      ? detailRow.advisor_name || "Doctor"
+                      : detailRow.user_name ||
+                        detailRow.user_email?.split("@")[0] ||
+                        "User",
+                },
+                {
+                  label: "Email",
+                  value:
+                    roleFilter === "doctor"
+                      ? detailRow.advisor_email
+                      : detailRow.user_email,
+                },
+                {
+                  label: "Role",
+                  value: displayRoleLabel(
+                    roleFilter === "doctor" ? "doctor" : detailRow.user_role,
+                  ),
+                },
+                { label: "Claim", value: detailRow.claim },
+                { label: "Label", value: displayLabel(detailRow.label) },
+                {
+                  label: "Reviewed",
+                  value:
+                    detailRow.review_status === "corrected" &&
+                    detailRow.advisor_name
+                      ? `Reviewed by ${detailRow.advisor_name}`
+                      : detailRow.review_status === "pending"
+                        ? "Waiting"
+                        : "—",
+                },
+                { label: "Source", value: displaySource(detailRow.source) },
+                {
+                  label: "Date and time",
+                  value: detailRow.created_at
+                    ? formatDateTime(detailRow.created_at)
+                    : "—",
+                },
+              ]
+            : []
+        }
+      />
     </PrivatePage>
   );
 }
