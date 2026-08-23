@@ -34,6 +34,7 @@ def save_prediction(
         claim_text=claim_text,
         cleaned_text=cleaned_text,
         label=resolved_label,
+        ai_label=resolved_label,
         confidence=resolved_confidence,
         label_confidence=label_confidence,
         source=resolved_source,
