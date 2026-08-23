@@ -27,6 +27,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { PrivatePage } from "@/components/layout/private-page";
 import { MaterialIcon } from "@/components/ui/material-icon";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   assignReview,
   getAdminReviewQueue,
   listDoctors,
@@ -63,6 +67,7 @@ function AssignReviewsContent() {
   const [activeItem, setActiveItem] = useState<Detection | null>(null);
   const [doctorUserId, setDoctorUserId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [detailItem, setDetailItem] = useState<Detection | null>(null);
   const pagination = useTablePagination(items, 10);
 
   async function loadQueue(silent = false) {
@@ -199,7 +204,7 @@ function AssignReviewsContent() {
             <GlassTableHeaderCell>Doctor</GlassTableHeaderCell>
             <GlassTableHeaderCell>Created</GlassTableHeaderCell>
             <GlassTableHeaderCell className="text-right">
-              Action
+              Actions
             </GlassTableHeaderCell>
           </GlassTableRow>
         </GlassTableHead>
@@ -261,19 +266,52 @@ function AssignReviewsContent() {
                   {formatDate(item.created_at)}
                 </GlassTableCell>
                 <GlassTableCell className="text-right">
-                  <GlassButton
-                    type="button"
-                    size="sm"
-                    onClick={() => openAssign(item)}
-                  >
-                    {item.advisor_id ? "Reassign" : "Assign"}
-                  </GlassButton>
+                  <div className="flex items-center justify-end gap-2">
+                    <ViewDetailsButton onClick={() => setDetailItem(item)} />
+                    <GlassButton
+                      type="button"
+                      size="sm"
+                      onClick={() => openAssign(item)}
+                    >
+                      {item.advisor_id ? "Reassign" : "Assign"}
+                    </GlassButton>
+                  </div>
                 </GlassTableCell>
               </GlassTableRow>
             ))
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Claim details"
+        fields={
+          detailItem
+            ? [
+                { label: "User", value: detailItem.user_name || "User" },
+                { label: "Email", value: detailItem.user_email },
+                { label: "Claim", value: claimText(detailItem) },
+                {
+                  label: "Status",
+                  value:
+                    detailItem.review_status === "awaiting_assignment"
+                      ? "Awaiting assignment"
+                      : "Assigned",
+                },
+                { label: "Doctor", value: detailItem.advisor_name },
+                {
+                  label: "Assigned by",
+                  value: detailItem.assigned_by_name,
+                },
+                { label: "Created", value: formatDate(detailItem.created_at) },
+              ]
+            : []
+        }
+      />
 
       <GlassModal
         open={Boolean(activeItem)}
