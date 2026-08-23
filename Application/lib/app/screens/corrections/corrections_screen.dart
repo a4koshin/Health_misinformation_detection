@@ -397,6 +397,23 @@ class _CorrectionRow extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _LabelChip(
+                title: 'AI labeled',
+                value: item.aiDisplayLabel,
+                reliable: item.aiDisplayLabel == 'Reliable',
+              ),
+              _LabelChip(
+                title: 'Doctor labeled',
+                value: item.doctorDisplayLabel,
+                reliable: item.doctorDisplayLabel == 'Reliable',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -523,6 +540,55 @@ class _StatusChip extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: pending ? AppColors.brandDeep : const Color(0xFF047857),
         ),
+      ),
+    );
+  }
+}
+
+class _LabelChip extends StatelessWidget {
+  const _LabelChip({
+    required this.title,
+    required this.value,
+    required this.reliable,
+  });
+
+  final String title;
+  final String value;
+  final bool reliable;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = reliable ? const Color(0xFF047857) : const Color(0xFFB91C1C);
+    final background =
+        reliable ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: color.withValues(alpha: 0.8),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
