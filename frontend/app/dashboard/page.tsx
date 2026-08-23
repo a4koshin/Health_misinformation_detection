@@ -24,6 +24,10 @@ import { GlassBadge } from "@/components/glass/glass-badge";
 import { GlassCard } from "@/components/glass/glass-card";
 import { DataTableCard } from "@/components/glass/data-table-card";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   GlassTableBody,
   GlassTableCell,
   GlassTableHead,
@@ -193,6 +197,9 @@ function DashboardContent() {
   const { token } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [detailRow, setDetailRow] = useState<
+    DashboardStats["users_table"][number] | null
+  >(null);
 
   useEffect(() => {
     let active = true;
@@ -804,6 +811,9 @@ function DashboardContent() {
                 <GlassTableHeaderCell>Reliable</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Non-Reliable</GlassTableHeaderCell>
                 <GlassTableHeaderCell>Joined</GlassTableHeaderCell>
+                <GlassTableHeaderCell className="text-right">
+                  Details
+                </GlassTableHeaderCell>
               </GlassTableRow>
             </GlassTableHead>
             <GlassTableBody>
@@ -834,12 +844,39 @@ function DashboardContent() {
                   <GlassTableCell className="text-[#64748b]">
                     {row.joined ?? "—"}
                   </GlassTableCell>
+                  <GlassTableCell className="text-right">
+                    <ViewDetailsButton onClick={() => setDetailRow(row)} />
+                  </GlassTableCell>
                 </GlassTableRow>
               ))}
             </GlassTableBody>
           </DataTableCard>
         </div>
       )}
+
+      <ViewDetailsModal
+        open={Boolean(detailRow)}
+        onOpenChange={(open) => {
+          if (!open) setDetailRow(null);
+        }}
+        title="User activity"
+        fields={
+          detailRow
+            ? [
+                {
+                  label: "User",
+                  value: detailRow.full_name || detailRow.email.split("@")[0],
+                },
+                { label: "Email", value: detailRow.email },
+                { label: "Role", value: displayRoleLabel(detailRow.role) },
+                { label: "Predictions", value: detailRow.predictions },
+                { label: "Reliable", value: detailRow.reliable },
+                { label: "Non-Reliable", value: detailRow.non_reliable },
+                { label: "Joined", value: detailRow.joined },
+              ]
+            : []
+        }
+      />
     </PrivatePage>
   );
 }
