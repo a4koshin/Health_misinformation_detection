@@ -9,6 +9,15 @@ def _display_name(user) -> str | None:
     return (user.full_name or "").strip() or user.email.split("@")[0]
 
 
+def _normalize_label(value: str | None) -> str | None:
+    text = (value or "").strip()
+    if not text:
+        return None
+    if text == "Misinformation":
+        return "Non-Reliable"
+    return text
+
+
 class Prediction(db.Model):
     """Maps onto the existing Neon `predictions` table."""
 
@@ -20,6 +29,8 @@ class Prediction(db.Model):
     claim_text = db.Column(db.Text, nullable=False)
     cleaned_text = db.Column(db.Text, nullable=True)
     label = db.Column(db.String(50), nullable=False)
+    ai_label = db.Column(db.String(50), nullable=True)
+    doctor_label = db.Column(db.String(50), nullable=True)
     confidence = db.Column(db.Float, nullable=False)
     label_confidence = db.Column(db.Float, nullable=True)
     topic = db.Column(db.String(100), nullable=True)
@@ -51,6 +62,19 @@ class Prediction(db.Model):
         )
         is_medical = self.source != "non_medical"
         stored_source = (self.source or "").strip()
+        is_corrected = (self.review_status or "") == "corrected" or bool(
+            (self.corrected_claim_text or "").strip()
+        )
+        ai_label = _normalize_label(self.ai_label)
+        doctor_label = _normalize_label(self.doctor_label)
+        if not ai_label:
+            ai_label = (
+                "Non-Reliable"
+                if is_corrected
+                else _normalize_label(self.label)
+            )
+        if not doctor_label and is_corrected:
+            doctor_label = "Reliable"
         if stored_source == "UploadedFile" or self.upload_batch_id:
             source_label = "UploadedFile"
         elif stored_source in {"Manual check", "File upload"}:
@@ -64,6 +88,8 @@ class Prediction(db.Model):
             "claim_text": self.claim_text,
             "is_medical": is_medical,
             "label": self.label,
+            "ai_label": ai_label,
+            "doctor_label": doctor_label,
             "label_confidence": confidence,
             "source": source_label,
             "created_at": self.created_at.isoformat() if self.created_at else None,
