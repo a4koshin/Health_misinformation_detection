@@ -32,14 +32,18 @@ class Config:
     CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "").strip()
     GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
     # cerebras (default) or groq — which provider to try first
-    LLM_PRIMARY = (os.getenv("LLM_PRIMARY", "cerebras") or "cerebras").strip().lower()
+    LLM_PRIMARY = (os.getenv("LLM_PRIMARY", "cerebras")
+                   or "cerebras").strip().lower()
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(
         minutes=int(os.getenv("JWT_ACCESS_TOKEN_EXPIRES_MINUTES", "60"))
     )
     # Allow large CSV/Excel dataset uploads (up to 20k rows).
-    MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(64 * 1024 * 1024)))
-    ADMIN_USER = (os.getenv("ADMIN_USER") or os.getenv("ADMIN_EMAIL") or "").strip()
-    ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD") or os.getenv("PASSWORD") or "").strip()
+    MAX_CONTENT_LENGTH = int(
+        os.getenv("MAX_CONTENT_LENGTH", str(64 * 1024 * 1024)))
+    ADMIN_USER = (os.getenv("ADMIN_USER") or os.getenv(
+        "ADMIN_EMAIL") or "").strip()
+    ADMIN_PASSWORD = (os.getenv("ADMIN_PASSWORD")
+                      or os.getenv("PASSWORD") or "").strip()
     ADMIN_NAME = (os.getenv("ADMIN_NAME") or "Admin").strip() or "Admin"
     MAIL_SERVER = (os.getenv("MAIL_SERVER") or "").strip()
     MAIL_PORT = int(os.getenv("MAIL_PORT") or "587")
@@ -82,4 +86,5 @@ class Config:
         EVC_PLUS_ENABLED = False
     else:
         # Auto-enable when merchant credentials are present
-        EVC_PLUS_ENABLED = bool(EVC_MERCHANT_UID and EVC_API_USER_ID and EVC_API_KEY)
+        EVC_PLUS_ENABLED = bool(
+            EVC_MERCHANT_UID and EVC_API_USER_ID and EVC_API_KEY)
