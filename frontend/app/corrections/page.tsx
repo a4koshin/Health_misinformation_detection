@@ -15,6 +15,10 @@ import {
 import { GlassModal } from "@/components/glass/glass-modal";
 import { PaymentResultModal } from "@/components/glass/payment-result-modal";
 import {
+  ViewDetailsButton,
+  ViewDetailsModal,
+} from "@/components/glass/view-details-modal";
+import {
   GlassTableBody,
   GlassTableCell,
   GlassTableHead,
@@ -59,7 +63,12 @@ function formatDate(value: string | null | undefined) {
 }
 
 function previousClaim(item: Detection) {
-  return (item.original_claim_text || item.claim_text || item.input_text || "").trim();
+  return (
+    item.original_claim_text ||
+    item.claim_text ||
+    item.input_text ||
+    ""
+  ).trim();
 }
 
 function correctedClaim(item: Detection) {
@@ -69,6 +78,32 @@ function correctedClaim(item: Detection) {
     return (item.advisor_note || "").trim();
   }
   return "";
+}
+
+function displayLabel(label: string | null | undefined) {
+  const value = (label || "").trim();
+  if (!value) return "—";
+  if (value === "Misinformation") return "Non-Reliable";
+  return value;
+}
+
+function labelTone(label: string | null | undefined) {
+  const value = displayLabel(label);
+  if (value === "Reliable") return "success" as const;
+  if (value === "Non-Reliable") return "danger" as const;
+  return "neutral" as const;
+}
+
+function aiLabeled(item: Detection) {
+  const stored = displayLabel(item.ai_label);
+  if (stored !== "—") return stored;
+  return "Non-Reliable";
+}
+
+function doctorLabeled(item: Detection) {
+  const stored = displayLabel(item.doctor_label);
+  if (stored !== "—") return stored;
+  return "Reliable";
 }
 
 function BookingSlotPicker({
@@ -128,10 +163,14 @@ function BookingSlotPicker({
                 >
                   {group.weekday}
                 </span>
-                <span className="text-base font-bold leading-none">{group.day}</span>
+                <span className="text-base font-bold leading-none">
+                  {group.day}
+                </span>
                 <span
                   className={
-                    active ? "text-[10px] text-white/90" : "text-[10px] text-[#475569]"
+                    active
+                      ? "text-[10px] text-white/90"
+                      : "text-[10px] text-[#475569]"
                   }
                 >
                   {group.month}
@@ -205,7 +244,8 @@ function CorrectionsContent() {
     title: string;
     message: string;
   } | null>(null);
-  const columnCount = isAdmin ? 5 : isUser ? 5 : 4;
+  const [detailItem, setDetailItem] = useState<Detection | null>(null);
+  const columnCount = isAdmin ? 8 : isUser ? 8 : 7;
 
   useEffect(() => {
     let active = true;
@@ -227,7 +267,9 @@ function CorrectionsContent() {
           isUser ? listAppointments(token) : Promise.resolve([]),
         ]);
         const rows = Array.isArray(data.items) ? data.items : [];
-        const corrections = rows.filter((item) => Boolean(correctedClaim(item)));
+        const corrections = rows.filter((item) =>
+          Boolean(correctedClaim(item)),
+        );
         if (active) {
           setItems(corrections);
           setAppointments(booked);
@@ -268,6 +310,8 @@ function CorrectionsContent() {
       [
         previousClaim(item),
         correctedClaim(item),
+        aiLabeled(item),
+        doctorLabeled(item),
         item.advisor_name ?? "",
         item.user_name ?? "",
         item.user_email ?? "",
@@ -370,7 +414,7 @@ function CorrectionsContent() {
     >
       <DataTableCard
         className="w-full shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
-        tableClassName="table-fixed min-w-[720px]"
+        tableClassName="table-fixed min-w-[980px]"
         header={
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -433,13 +477,19 @@ function CorrectionsContent() {
                 User
               </GlassTableHeaderCell>
             ) : null}
-            <GlassTableHeaderCell className={isAdmin ? "w-[24%]" : "w-[28%]"}>
+            <GlassTableHeaderCell className={isAdmin ? "w-[18%]" : "w-[22%]"}>
               Previous claim
             </GlassTableHeaderCell>
-            <GlassTableHeaderCell className={isAdmin ? "w-[24%]" : "w-[28%]"}>
+            <GlassTableHeaderCell className={isAdmin ? "w-[18%]" : "w-[22%]"}>
               Corrected sentence
             </GlassTableHeaderCell>
-            <GlassTableHeaderCell className="w-[14%]">
+            <GlassTableHeaderCell className="w-[10%]">
+              AI labeled
+            </GlassTableHeaderCell>
+            <GlassTableHeaderCell className="w-[10%]">
+              Doctor labeled
+            </GlassTableHeaderCell>
+            <GlassTableHeaderCell className="w-[12%]">
               Corrected by
             </GlassTableHeaderCell>
             <GlassTableHeaderCell className="w-[14%]">
@@ -450,6 +500,9 @@ function CorrectionsContent() {
                 Appointment
               </GlassTableHeaderCell>
             ) : null}
+            <GlassTableHeaderCell className="w-[8%] text-right">
+              Details
+            </GlassTableHeaderCell>
           </GlassTableRow>
         </GlassTableHead>
         <GlassTableBody>
@@ -510,9 +563,22 @@ function CorrectionsContent() {
                     </p>
                   </GlassTableCell>
                   <GlassTableCell>
+                    <GlassBadge tone={labelTone(aiLabeled(item))}>
+                      {aiLabeled(item)}
+                    </GlassBadge>
+                  </GlassTableCell>
+                  <GlassTableCell>
+                    <GlassBadge tone={labelTone(doctorLabeled(item))}>
+                      {doctorLabeled(item)}
+                    </GlassBadge>
+                  </GlassTableCell>
+                  <GlassTableCell>
                     <div className="flex items-center gap-2">
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#ff5c00]/10 text-xs font-semibold text-[#cc4a00]">
-                        {(item.advisor_name || "D").trim().charAt(0).toUpperCase()}
+                        {(item.advisor_name || "D")
+                          .trim()
+                          .charAt(0)
+                          .toUpperCase()}
                       </span>
                       <p className="truncate text-sm font-medium text-[#0f172a]">
                         {item.advisor_name || "Doctor"}
@@ -579,12 +645,69 @@ function CorrectionsContent() {
                       )}
                     </GlassTableCell>
                   ) : null}
+                  <GlassTableCell className="text-right">
+                    <ViewDetailsButton onClick={() => setDetailItem(item)} />
+                  </GlassTableCell>
                 </GlassTableRow>
               );
             })
           )}
         </GlassTableBody>
       </DataTableCard>
+
+      <ViewDetailsModal
+        open={Boolean(detailItem)}
+        onOpenChange={(open) => {
+          if (!open) setDetailItem(null);
+        }}
+        title="Correction details"
+        fields={
+          detailItem
+            ? [
+                { label: "User", value: detailItem.user_name || "User" },
+                { label: "Email", value: detailItem.user_email },
+                {
+                  label: "Previous claim",
+                  value: previousClaim(detailItem) || "—",
+                },
+                {
+                  label: "Corrected sentence",
+                  value: correctedClaim(detailItem) || "—",
+                },
+                {
+                  label: "AI labeled",
+                  value: aiLabeled(detailItem),
+                },
+                {
+                  label: "Doctor labeled",
+                  value: doctorLabeled(detailItem),
+                },
+                {
+                  label: "Corrected by",
+                  value: detailItem.advisor_name || "Doctor",
+                },
+                {
+                  label: "Date & time",
+                  value: formatDate(
+                    detailItem.reviewed_at || detailItem.created_at,
+                  ),
+                },
+                {
+                  label: "Appointment",
+                  value: (() => {
+                    const status = appointmentByPrediction.get(
+                      detailItem.id,
+                    )?.status;
+                    if (status === "pending") return "Requested";
+                    if (status === "confirmed") return "Confirmed";
+                    if (status === "declined") return "Declined";
+                    return "Not booked";
+                  })(),
+                },
+              ]
+            : []
+        }
+      />
 
       <GlassModal
         open={Boolean(bookingItem)}
