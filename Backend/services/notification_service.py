@@ -262,6 +262,7 @@ def _notify_review_assigned(
         body=(
             f"{admin_name} assigned you a Non-Reliable claim from {owner_name} "
             "to review."
+            + (f' Claim: "{excerpt}"' if excerpt else "")
         ),
         prediction_id=prediction.id,
         actor=admin,
